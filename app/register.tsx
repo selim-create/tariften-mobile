@@ -43,7 +43,15 @@ export default function RegisterScreen() {
       await register(email.trim(), password, displayName.trim());
       router.replace('/(tabs)');
     } catch (error: unknown) {
-      Alert.alert('Kayıt Başarısız', error instanceof Error ? error.message : 'Kayıt yapılamadı.');
+      const rawMessage = error instanceof Error ? error.message : '';
+      const cleanMessage = rawMessage.replace(/<[^>]*>/g, '').trim();
+      let userMessage = cleanMessage || 'Kayıt yapılamadı.';
+      if (cleanMessage.toLowerCase().includes('email') || cleanMessage.toLowerCase().includes('e-posta')) {
+        userMessage = 'Bu e-posta adresi zaten kullanılıyor.';
+      } else if (cleanMessage.toLowerCase().includes('password') || cleanMessage.toLowerCase().includes('şifre')) {
+        userMessage = 'Şifre gereksinimleri karşılanmıyor.';
+      }
+      Alert.alert('Kayıt Başarısız', userMessage);
     } finally {
       setLoading(false);
     }

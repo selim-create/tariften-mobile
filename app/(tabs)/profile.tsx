@@ -106,14 +106,14 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
-          {user.avatar_url ? (
+          {user.avatar_url && user.avatar_url.length > 0 ? (
             <Image source={{ uri: user.avatar_url }} style={styles.avatar} contentFit="cover" />
           ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarInitial}>
-                {user.user_display_name?.charAt(0)?.toUpperCase()}
-              </Text>
-            </View>
+            <Image
+              source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(user.user_display_name || 'U')}&background=db4c3f&color=fff&size=160` }}
+              style={styles.avatar}
+              contentFit="cover"
+            />
           )}
           <Text style={styles.displayName}>{user.user_display_name}</Text>
           <Text style={styles.email}>{user.user_email}</Text>
@@ -189,20 +189,6 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     marginBottom: 12,
-  },
-  avatarPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#e74c3c',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  avatarInitial: {
-    color: '#ffffff',
-    fontSize: 32,
-    fontWeight: '700',
   },
   displayName: {
     fontSize: 20,

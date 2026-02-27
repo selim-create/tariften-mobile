@@ -1,20 +1,33 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   FlatList,
+  Modal,
   RefreshControl,
+  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { getRecipes, getTerms } from '../../lib/api';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { generateAIRecipe, getRecipes, getTerms } from '../../lib/api';
 import { Recipe, RecipeFilters } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
 import SearchBar from '../../components/SearchBar';
 import FilterSheet from '../../components/FilterSheet';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../context/AuthContext';
+
+const AI_LOADING_MESSAGES = [
+  'Şef malzemeleri kokluyor... 👃',
+  'Eski tarif defterleri karıştırılıyor... 📖',
+  'Yapay zeka mutfağa giriyor... 🤖',
+  'Tarifler harmanlıyor... 🥘',
+  'Son dokunuşlar yapılıyor... ✨',
+];
 
 export default function RecipesScreen() {
   const params = useLocalSearchParams<{
@@ -25,6 +38,8 @@ export default function RecipesScreen() {
     mealType?: string;
     collection?: string;
   }>();
+  const router = useRouter();
+  const { token } = useAuth();
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,6 +56,10 @@ export default function RecipesScreen() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [query, setQuery] = useState(params.query || '');
+  const [aiModalVisible, setAiModalVisible] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiLoadingMessage, setAiLoadingMessage] = useState(AI_LOADING_MESSAGES[0]);
+  const aiMsgIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadRecipes = useCallback(
     async (pageNum: number = 1, currentFilters: RecipeFilters = filters, append = false) => {
@@ -111,6 +130,55 @@ export default function RecipesScreen() {
     setFilters(newFilters);
   }, []);
 
+  const handleGenerateAI = useCallback(async () => {
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    const searchQuery = filters.query || query;
+    if (!searchQuery.trim()) {
+      Alert.alert('Hata', 'Tarif oluşturmak için önce bir arama yapın.');
+      return;
+    }
+    setAiModalVisible(true);
+    setAiLoading(true);
+    let msgIdx = 0;
+    aiMsgIntervalRef.current = setInterval(() => {
+      msgIdx = (msgIdx + 1) % AI_LOADING_MESSAGES.length;
+      setAiLoadingMessage(AI_LOADING_MESSAGES[msgIdx]);
+    }, 2000);
+    try {
+      const result = await generateAIRecipe(token, searchQuery);
+      if (aiMsgIntervalRef.current) {
+        clearInterval(aiMsgIntervalRef.current);
+        aiMsgIntervalRef.current = null;
+      }
+      setAiModalVisible(false);
+      if (result?.slug) {
+        router.push(`/recipe/${result.slug}`);
+      } else {
+        Alert.alert('Tarif Hazır!', 'AI tarifiniz oluşturuldu.');
+      }
+    } catch (error: unknown) {
+      if (aiMsgIntervalRef.current) {
+        clearInterval(aiMsgIntervalRef.current);
+        aiMsgIntervalRef.current = null;
+      }
+      setAiModalVisible(false);
+      Alert.alert('Hata', error instanceof Error ? error.message : 'AI tarif oluşturulamadı.');
+    } finally {
+      setAiLoading(false);
+    }
+  }, [token, filters.query, query, router]);
+
+  useEffect(() => {
+    return () => {
+      if (aiMsgIntervalRef.current) {
+        clearInterval(aiMsgIntervalRef.current);
+      }
+    };
+  }, []);
+
   const activeFilterCount = [
     filters.cuisine?.length,
     filters.diet?.length,
@@ -156,6 +224,17 @@ export default function RecipesScreen() {
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>Tarif bulunamadı.</Text>
               <Text style={styles.emptySubtext}>Farklı filtreler deneyin.</Text>
+              {(filters.query || query) ? (
+                <TouchableOpacity style={styles.aiCard} onPress={handleGenerateAI}>
+                  <View style={styles.aiCardHeader}>
+                    <Ionicons name="sparkles" size={20} color="#ffffff" />
+                    <Text style={styles.aiCardTitle}>AI ile Tarif Oluştur</Text>
+                  </View>
+                  <Text style={styles.aiCardDesc}>
+                    "{filters.query || query}" için yapay zeka ile özel bir tarif hazırlayalım.
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           }
           ListFooterComponent={
@@ -171,6 +250,17 @@ export default function RecipesScreen() {
         onFiltersChange={handleFiltersChange}
         terms={terms ?? undefined}
       />
+
+      {/* AI Loading Modal */}
+      <Modal visible={aiModalVisible} transparent animationType="fade">
+        <View style={styles.aiModalOverlay}>
+          <View style={styles.aiModalCard}>
+            <ActivityIndicator color="#e74c3c" size="large" />
+            <Text style={styles.aiModalTitle}>Tarif Hazırlanıyor...</Text>
+            <Text style={styles.aiModalMessage}>{aiLoadingMessage}</Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -219,6 +309,7 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     paddingVertical: 60,
+    paddingHorizontal: 16,
   },
   emptyText: {
     fontSize: 16,
@@ -229,5 +320,53 @@ const styles = StyleSheet.create({
   emptySubtext: {
     fontSize: 14,
     color: '#999999',
+    marginBottom: 20,
+  },
+  aiCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 14,
+    padding: 20,
+    width: '100%',
+    gap: 8,
+  },
+  aiCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  aiCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  aiCardDesc: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.75)',
+    lineHeight: 20,
+  },
+  aiModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  aiModalCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
+  },
+  aiModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  aiModalMessage: {
+    fontSize: 14,
+    color: '#666666',
+    textAlign: 'center',
   },
 });

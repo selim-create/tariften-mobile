@@ -33,7 +33,15 @@ export default function LoginScreen() {
       await login(email.trim(), password);
       router.replace('/(tabs)');
     } catch (error: unknown) {
-      Alert.alert('Giriş Başarısız', error instanceof Error ? error.message : 'E-posta veya şifre hatalı.');
+      const rawMessage = error instanceof Error ? error.message : '';
+      const cleanMessage = rawMessage.replace(/<[^>]*>/g, '').trim();
+      let userMessage = 'E-posta veya şifre hatalı.';
+      if (cleanMessage.toLowerCase().includes('parola') || cleanMessage.toLowerCase().includes('password')) {
+        userMessage = 'Şifreniz hatalı. Lütfen tekrar deneyin.';
+      } else if (cleanMessage.toLowerCase().includes('kullanıcı') || cleanMessage.toLowerCase().includes('user')) {
+        userMessage = 'Kullanıcı bulunamadı. E-posta adresinizi kontrol edin.';
+      }
+      Alert.alert('Giriş Başarısız', userMessage);
     } finally {
       setLoading(false);
     }

@@ -177,11 +177,26 @@ export async function googleAuth(idToken: string) {
   return data;
 }
 
-export async function getMe(token: string) {
+export async function getMe(token: string): Promise<import('./types').User | null> {
   const data = await fetchData(`${API_URL}/tariften/v1/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  return data;
+  if (!data) return null;
+  // API returns { success: true, user: { ... } }
+  const u = data.success && data.user ? data.user : data;
+  if (!u?.id) return null;
+  return {
+    id: u.id,
+    user_login: u.user_login || u.username || '',
+    user_nicename: u.user_nicename || u.username || '',
+    user_email: u.user_email || u.email || '',
+    user_display_name: u.user_display_name || u.fullname || '',
+    avatar_url: u.avatar_url || '',
+    diet: u.diet || '',
+    experience: u.experience || '',
+    bio: u.bio || '',
+    token,
+  };
 }
 
 export async function updateProfile(token: string, profileData: Record<string, unknown>) {
