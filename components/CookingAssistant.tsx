@@ -38,6 +38,7 @@ export default function CookingAssistant({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [timerSeconds, setTimerSeconds] = useState<number | null>(null);
   const [timerRunning, setTimerRunning] = useState(false);
+  const [completed, setCompleted] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const currentStep = normalizeStep(steps[currentIndex]);
@@ -77,6 +78,7 @@ export default function CookingAssistant({
     if (!visible) {
       stopTimer();
       setCurrentIndex(0);
+      setCompleted(false);
     }
   }, [visible, stopTimer]);
 
@@ -109,70 +111,91 @@ export default function CookingAssistant({
           </TouchableOpacity>
         </View>
 
-        {/* Progress */}
-        <View style={styles.progressContainer}>
-          <Text style={styles.progressText}>
-            Adım {currentIndex + 1} / {totalSteps}
-          </Text>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${((currentIndex + 1) / totalSteps) * 100}%` }]} />
-          </View>
-        </View>
-
-        {/* Step content */}
-        <View style={styles.stepContainer}>
-          <View style={styles.stepNumberBadge}>
-            <Text style={styles.stepNumberText}>{currentIndex + 1}</Text>
-          </View>
-          <Text style={styles.stepContent}>{currentStep.content}</Text>
-        </View>
-
-        {/* Timer */}
-        {timerSeconds !== null && (
-          <View style={styles.timerSection}>
-            <Text style={styles.timerLabel}>⏱ Zamanlayıcı</Text>
-            <Text style={styles.timerDisplay}>{formatTime(timerSeconds)}</Text>
-            <TouchableOpacity
-              style={[styles.timerButton, timerRunning && styles.timerButtonStop]}
-              onPress={timerRunning ? stopTimer : startTimer}
-            >
-              <Ionicons name={timerRunning ? 'pause' : 'play'} size={18} color="#ffffff" />
-              <Text style={styles.timerButtonText}>{timerRunning ? 'Durdur' : 'Başlat'}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Chef tip */}
-        {chefTip && isLast && (
-          <View style={styles.chefTip}>
-            <Text style={styles.chefTipIcon}>👨‍🍳</Text>
-            <Text style={styles.chefTipText}>{chefTip}</Text>
-          </View>
-        )}
-
-        {/* Navigation */}
-        <View style={styles.navigation}>
-          <TouchableOpacity
-            style={[styles.navButton, isFirst && styles.navButtonDisabled]}
-            onPress={goPrev}
-            disabled={isFirst}
-          >
-            <Ionicons name="chevron-back" size={22} color={isFirst ? '#cccccc' : '#1a1a1a'} />
-            <Text style={[styles.navButtonText, isFirst && styles.navButtonTextDisabled]}>Geri</Text>
-          </TouchableOpacity>
-
-          {isLast ? (
+        {completed ? (
+          /* Completion Screen */
+          <View style={styles.completionContainer}>
+            <Text style={styles.completionEmoji}>🎉</Text>
+            <Text style={styles.completionTitle}>Afiyet Olsun!</Text>
+            <Text style={styles.completionSubtitle}>{recipeTitle} hazır!</Text>
+            {chefTip ? (
+              <View style={styles.chefTip}>
+                <Text style={styles.chefTipIcon}>👨‍🍳</Text>
+                <Text style={styles.chefTipText}>{chefTip}</Text>
+              </View>
+            ) : null}
             <TouchableOpacity style={styles.finishButton} onPress={onClose}>
               <Ionicons name="checkmark-circle" size={20} color="#ffffff" />
-              <Text style={styles.finishButtonText}>Tamamla 🎉</Text>
+              <Text style={styles.finishButtonText}>Kapat</Text>
             </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={styles.nextButton} onPress={goNext}>
-              <Text style={styles.nextButtonText}>İleri</Text>
-              <Ionicons name="chevron-forward" size={22} color="#ffffff" />
-            </TouchableOpacity>
-          )}
-        </View>
+          </View>
+        ) : (
+          <>
+            {/* Progress */}
+            <View style={styles.progressContainer}>
+              <Text style={styles.progressText}>
+                Adım {currentIndex + 1} / {totalSteps}
+              </Text>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${((currentIndex + 1) / totalSteps) * 100}%` }]} />
+              </View>
+            </View>
+
+            {/* Step content */}
+            <View style={styles.stepContainer}>
+              <View style={styles.stepNumberBadge}>
+                <Text style={styles.stepNumberText}>{currentIndex + 1}</Text>
+              </View>
+              <Text style={styles.stepContent}>{currentStep.content}</Text>
+            </View>
+
+            {/* Timer */}
+            {timerSeconds !== null && (
+              <View style={styles.timerSection}>
+                <Text style={styles.timerLabel}>⏱ Zamanlayıcı</Text>
+                <Text style={styles.timerDisplay}>{formatTime(timerSeconds)}</Text>
+                <TouchableOpacity
+                  style={[styles.timerButton, timerRunning && styles.timerButtonStop]}
+                  onPress={timerRunning ? stopTimer : startTimer}
+                >
+                  <Ionicons name={timerRunning ? 'pause' : 'play'} size={18} color="#ffffff" />
+                  <Text style={styles.timerButtonText}>{timerRunning ? 'Durdur' : 'Başlat'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Chef tip on last step */}
+            {chefTip && isLast && (
+              <View style={styles.chefTip}>
+                <Text style={styles.chefTipIcon}>👨‍🍳</Text>
+                <Text style={styles.chefTipText}>{chefTip}</Text>
+              </View>
+            )}
+
+            {/* Navigation */}
+            <View style={styles.navigation}>
+              <TouchableOpacity
+                style={[styles.navButton, isFirst && styles.navButtonDisabled]}
+                onPress={goPrev}
+                disabled={isFirst}
+              >
+                <Ionicons name="chevron-back" size={22} color={isFirst ? '#cccccc' : '#1a1a1a'} />
+                <Text style={[styles.navButtonText, isFirst && styles.navButtonTextDisabled]}>Geri</Text>
+              </TouchableOpacity>
+
+              {isLast ? (
+                <TouchableOpacity style={styles.finishButton} onPress={() => setCompleted(true)}>
+                  <Ionicons name="checkmark-circle" size={20} color="#ffffff" />
+                  <Text style={styles.finishButtonText}>Tamamla 🎉</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.nextButton} onPress={goNext}>
+                  <Text style={styles.nextButtonText}>İleri</Text>
+                  <Ionicons name="chevron-forward" size={22} color="#ffffff" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        )}
       </SafeAreaView>
     </Modal>
   );
@@ -364,5 +387,27 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  completionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+    gap: 16,
+  },
+  completionEmoji: {
+    fontSize: 72,
+  },
+  completionTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    textAlign: 'center',
+  },
+  completionSubtitle: {
+    fontSize: 16,
+    color: '#666666',
+    textAlign: 'center',
+    marginBottom: 8,
   },
 });
