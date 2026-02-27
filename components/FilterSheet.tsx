@@ -60,14 +60,14 @@ export default function FilterSheet({ visible, onClose, filters, onFiltersChange
 
   const renderOptions = (key: keyof RecipeFilters, options: FilterOption[]) => (
     <View style={styles.optionsRow}>
-      {options.map((opt) => (
+      {options.filter((opt) => opt && opt.value != null).map((opt) => (
         <TouchableOpacity
           key={opt.value}
           style={[styles.chip, isSelected(key, opt.value) && styles.chipSelected]}
           onPress={() => toggleArrayFilter(key, opt.value)}
         >
           <Text style={[styles.chipText, isSelected(key, opt.value) && styles.chipTextSelected]}>
-            {opt.label}
+            {opt.label ?? opt.value}
           </Text>
         </TouchableOpacity>
       ))}

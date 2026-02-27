@@ -91,7 +91,28 @@ export default function RecipesScreen() {
   );
 
   useEffect(() => {
-    getTerms().then(setTerms).catch(console.error);
+    getTerms().then((data) => {
+      if (!data) return;
+      const transform = (arr: unknown): { label: string; value: string }[] => {
+        if (!Array.isArray(arr)) return [];
+        return arr.map((item: unknown) => {
+          if (typeof item === 'string') return { label: item, value: item };
+          if (item && typeof item === 'object' && 'name' in item) {
+            const o = item as { name: string; slug?: string };
+            return { label: o.name, value: o.slug || o.name };
+          }
+          if (item && typeof item === 'object' && 'label' in item && 'value' in item) return item as { label: string; value: string };
+          return { label: String(item), value: String(item) };
+        });
+      };
+      const termsData = data as Record<string, unknown>;
+      setTerms({
+        meal_type: transform(termsData.meal_type),
+        cuisine: transform(termsData.cuisine),
+        diet: transform(termsData.diet),
+        difficulty: transform(termsData.difficulty),
+      });
+    }).catch(console.error);
   }, []);
 
   useEffect(() => {
