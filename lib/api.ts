@@ -311,8 +311,12 @@ export async function getMenus(params?: { slug?: string; collection?: string }):
 }
 
 export async function getMenu(slug: string): Promise<Menu | null> {
-  const menus = await getMenus({ slug });
-  return menus.length > 0 ? menus[0] : null;
+  const data = await fetchData(`${API_URL}/tariften/v1/menus/search?slug=${encodeURIComponent(slug)}`);
+  if (!data) return null;
+  if (data.id && data.title) return data;
+  if (data.data && Array.isArray(data.data) && data.data.length > 0) return data.data[0];
+  if (Array.isArray(data) && data.length > 0) return data[0];
+  return null;
 }
 
 export async function updateMenu(token: string, menuData: Record<string, unknown>) {

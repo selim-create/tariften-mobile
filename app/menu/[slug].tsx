@@ -1,15 +1,42 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getMenu } from '../../lib/api';
 import { Menu } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+interface SectionStyle {
+  icon: string;
+  label: string;
+  description: string;
+}
+
+const sectionStyles: Record<string, SectionStyle> = {
+  starter: { icon: '🍲', label: 'Başlangıç', description: 'İştah açıcı hafif lezzetler' },
+  side: { icon: '🍋', label: 'Ara Sıcak & Meze', description: 'Sofrayı zenginleştiren tatlar' },
+  salad: { icon: '🌿', label: 'Salata', description: 'Taze ve ferah eşlikçiler' },
+  main: { icon: '🍴', label: 'Ana Yemek', description: 'Sofranın yıldızları' },
+  dessert: { icon: '🍨', label: 'Tatlı', description: 'Mutlu sonlar' },
+  drink: { icon: '🍷', label: 'İçecek', description: 'Tamamlayıcı yudumlar' },
+  soup: { icon: '🍲', label: 'Çorba', description: 'Sıcacık başlangıçlar' },
+  meze: { icon: '🍋', label: 'Mezeler', description: 'Sofrayı açan lezzetler' },
+  hot_appetizer: { icon: '🔥', label: 'Ara Sıcak', description: 'Sıcak başlangıçlar' },
+  breakfast_main: { icon: '🥚', label: 'Ana Kahvaltılıklar', description: 'Güne enerji veren tatlar' },
+  breakfast_side: { icon: '🧀', label: 'Hafif Yanlar', description: 'Kahvaltıyı tamamlayanlar' },
+  savory: { icon: '🍪', label: 'Tuzlular', description: 'Tuzlu atıştırmalıklar' },
+  sweet: { icon: '🎂', label: 'Tatlılar', description: 'Tatlı molası' },
+  cold_canape: { icon: '🌾', label: 'Soğuk Kanapeler', description: 'Zarif lokmalar' },
+  hot_bites: { icon: '🔥', label: 'Sıcak İkramlar', description: 'Sıcak servis edilenler' },
+  dip_sauce: { icon: '🍚', label: 'Dip & Soslar', description: 'Eşlikçi soslar' },
+};
+
 export default function MenuDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  const navigation = useNavigation();
+  const router = useRouter();
   const [menu, setMenu] = useState<Menu | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -18,15 +45,12 @@ export default function MenuDetailScreen() {
     try {
       const data = await getMenu(slug);
       setMenu(data);
-      if (data) {
-        navigation.setOptions({ title: data.title });
-      }
     } catch (error) {
       console.error('Menu load error:', error);
     } finally {
       setLoading(false);
     }
-  }, [slug, navigation]);
+  }, [slug]);
 
   useEffect(() => {
     loadMenu();
@@ -42,62 +66,86 @@ export default function MenuDetailScreen() {
     );
   }
 
-  const sectionTypeLabels: Record<string, string> = {
-    starter: 'Başlangıç',
-    main: 'Ana Yemek',
-    side: 'Yan Yemek',
-    dessert: 'Tatlı',
-    drink: 'İçecek',
-    soup: 'Çorba',
-    meze: 'Meze',
-    hot_appetizer: 'Sıcak Başlangıç',
-    salad: 'Salata',
-    breakfast_main: 'Kahvaltı Ana',
-    breakfast_side: 'Kahvaltı Yan',
-    savory: 'Tuzlu',
-    sweet: 'Tatlı',
-    cold_canape: 'Soğuk Kanape',
-    hot_bites: 'Sıcak Atıştırmalık',
-    dip_sauce: 'Sos',
-  };
-
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {menu.image ? (
-        <Image source={{ uri: menu.image }} style={styles.image} contentFit="cover" transition={300} />
-      ) : null}
+      {/* Immersive Header */}
+      <View style={styles.headerContainer}>
+        {menu.image ? (
+          <Image source={{ uri: menu.image }} style={styles.headerImage} contentFit="cover" transition={300} />
+        ) : (
+          <View style={styles.headerImagePlaceholder} />
+        )}
+        <View style={styles.headerOverlay} />
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.8}>
+            <Text style={styles.backButtonText}>← Menülere Dön</Text>
+          </TouchableOpacity>
+          <View style={styles.headerBadges}>
+            {menu.concept ? (
+              <View style={styles.conceptBadge}>
+                <Text style={styles.conceptBadgeText}>{menu.concept}</Text>
+              </View>
+            ) : null}
+            {menu.guest_count ? (
+              <View style={styles.metaBadge}>
+                <Text style={styles.metaBadgeText}>👥 {menu.guest_count} Kişilik</Text>
+              </View>
+            ) : null}
+            {menu.event_type ? (
+              <View style={styles.metaBadge}>
+                <Text style={styles.metaBadgeText}>{menu.event_type}</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.headerTitle}>{menu.title}</Text>
+        </View>
+      </View>
 
-      <View style={styles.content}>
-        <Text style={styles.title}>{menu.title}</Text>
-
+      {/* Content Body */}
+      <View style={styles.contentCard}>
+        <View style={styles.kitchenLabel}>
+          <Text style={styles.kitchenLabelText}>Mutfaktan</Text>
+        </View>
+        <Text style={styles.quoteText}>
+          "Davetlilerinizi büyüleyecek, dengeli ve unutulmaz bir lezzet yolculuğu için özenle seçildi."
+        </Text>
         {menu.description ? (
           <Text style={styles.description}>{menu.description}</Text>
         ) : null}
 
-        <View style={styles.metaRow}>
-          {menu.event_type ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{menu.event_type}</Text>
+        {/* Sections */}
+        {menu.sections?.map((section, idx) => {
+          const style = sectionStyles[section.type] || {
+            icon: '🍽️',
+            label: section.title || section.type,
+            description: '',
+          };
+          return (
+            <View key={idx} style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionIconContainer}>
+                  <Text style={styles.sectionIcon}>{style.icon}</Text>
+                </View>
+                <View style={styles.sectionHeaderText}>
+                  <Text style={styles.sectionTitle}>{style.label}</Text>
+                  {style.description ? (
+                    <Text style={styles.sectionDescription}>{style.description}</Text>
+                  ) : null}
+                </View>
+              </View>
+              <View style={styles.sectionDivider} />
+              {section.recipes?.map((recipe) => (
+                <RecipeCard key={recipe.id} recipe={recipe} />
+              ))}
             </View>
-          ) : null}
-          {menu.guest_count ? (
-            <Text style={styles.metaText}>👥 {menu.guest_count} kişi</Text>
-          ) : null}
-          {menu.concept ? (
-            <Text style={styles.metaText}>🎯 {menu.concept}</Text>
-          ) : null}
-        </View>
+          );
+        })}
 
-        {menu.sections?.map((section, idx) => (
-          <View key={idx} style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              {sectionTypeLabels[section.type] || section.title || section.type}
-            </Text>
-            {section.recipes?.map((recipe) => (
-              <RecipeCard key={recipe.id} recipe={recipe} />
-            ))}
-          </View>
-        ))}
+        {/* Bottom Actions */}
+        <View style={styles.bottomCard}>
+          <Text style={styles.bottomCardTitle}>Hazır mısınız? 🥂</Text>
+          <Text style={styles.bottomCardSubtitle}>Bu menüyü sofralarınıza taşıyın.</Text>
+        </View>
       </View>
 
       <View style={styles.bottomPadding} />
@@ -108,61 +156,174 @@ export default function MenuDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f5f5f5',
   },
-  image: {
+  headerContainer: {
+    width: SCREEN_WIDTH,
+    height: 320,
+    position: 'relative',
+  },
+  headerImage: {
     width: '100%',
-    height: 260,
+    height: '100%',
   },
-  content: {
-    padding: 16,
+  headerImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#2a2a2a',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#1a1a1a',
-    marginBottom: 8,
-    lineHeight: 32,
+  headerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
-  description: {
-    fontSize: 15,
-    color: '#666666',
-    lineHeight: 22,
-    marginBottom: 16,
+  headerContent: {
+    ...StyleSheet.absoluteFillObject,
+    padding: 20,
+    justifyContent: 'flex-end',
   },
-  metaRow: {
+  backButton: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  backButtonText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  headerBadges: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 24,
-    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
   },
-  badge: {
+  conceptBadge: {
+    backgroundColor: '#e74c3c',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  conceptBadgeText: {
+    fontSize: 12,
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  metaBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  metaBadgeText: {
+    fontSize: 12,
+    color: '#ffffff',
+    fontWeight: '500',
+  },
+  headerTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#ffffff',
+    lineHeight: 34,
+  },
+  contentCard: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    marginTop: -20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  kitchenLabel: {
+    alignSelf: 'flex-start',
     backgroundColor: '#fff0f0',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 4,
+    marginBottom: 12,
   },
-  badgeText: {
-    fontSize: 13,
+  kitchenLabelText: {
+    fontSize: 12,
     color: '#e74c3c',
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
-  metaText: {
-    fontSize: 13,
-    color: '#666666',
+  quoteText: {
+    fontSize: 14,
+    color: '#888888',
+    fontStyle: 'italic',
+    lineHeight: 21,
+    marginBottom: 12,
+  },
+  description: {
+    fontSize: 15,
+    color: '#444444',
+    lineHeight: 23,
+    marginBottom: 24,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 28,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  sectionIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fff0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  sectionIcon: {
+    fontSize: 22,
+  },
+  sectionHeaderText: {
+    flex: 1,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: '#1a1a1a',
+  },
+  sectionDescription: {
+    fontSize: 12,
+    color: '#888888',
+    marginTop: 2,
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
     marginBottom: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: '#e74c3c',
+  },
+  bottomCard: {
+    backgroundColor: '#fff8f8',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#fde8e8',
+  },
+  bottomCardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 6,
+  },
+  bottomCardSubtitle: {
+    fontSize: 14,
+    color: '#888888',
   },
   errorContainer: {
     flex: 1,
