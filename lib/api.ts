@@ -511,3 +511,18 @@ export async function submitRating(token: string, recipeId: number, rating: numb
   }
   return response.json();
 }
+
+export async function deleteAccount(token: string) {
+  const res = await fetch(`${API_URL}/tariften/v1/auth/delete-account`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.message || 'Hesap silinemedi.');
+  }
+  return await res.json();
+}
