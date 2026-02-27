@@ -181,7 +181,7 @@ export default function RecipeDetailScreen() {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {isPlaceholderImage(recipe.image) ? (
-        <ImagePlaceholder title={recipe.title} style={styles.image} />
+        <ImagePlaceholder title={recipe.title} variant="detail" style={styles.image} />
       ) : (
         <Image source={{ uri: recipe.image }} style={styles.image} contentFit="cover" transition={300} />
       )}

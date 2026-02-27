@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, TouchableOpacity, Text, View } from 'react-native';
+import React from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -24,7 +24,6 @@ const otherTabs: TabConfig[] = [
 export default function TabLayout() {
   const router = useRouter();
   const { user } = useAuth();
-  const [logoError, setLogoError] = useState(false);
 
   return (
     <Tabs
@@ -55,17 +54,13 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Keşfet',
-          headerTitle: () =>
-            logoError ? (
-              <Text style={headerStyles.logoFallback}>tariften</Text>
-            ) : (
-              <Image
-                source={{ uri: 'https://tariften.com/wp-content/uploads/2025/04/tariften-logo.webp' }}
-                style={headerStyles.logoImage}
-                contentFit="contain"
-                onError={() => setLogoError(true)}
-              />
-            ),
+          headerTitle: () => (
+            <Image
+              source={require('../../assets/logo.svg')}
+              style={headerStyles.logoImage}
+              contentFit="contain"
+            />
+          ),
           headerRight: () => (
             <View style={headerStyles.rightContainer}>
               <TouchableOpacity onPress={() => router.push('/recipes')} style={headerStyles.iconButton}>
@@ -122,12 +117,6 @@ const headerStyles = StyleSheet.create({
   logoImage: {
     height: 30,
     width: 120,
-  },
-  logoFallback: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#e74c3c',
-    letterSpacing: -1,
   },
   rightContainer: {
     flexDirection: 'row',
