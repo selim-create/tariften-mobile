@@ -75,7 +75,7 @@ export default function PantryScreen() {
     try {
       await updatePantry(token, updatedItems);
     } catch (error: unknown) {
-      Alert.alert('Hata', error instanceof Error ? error.message : 'Kiler güncellenemedi');
+      Alert.alert('Hata', error instanceof Error ? error.message : 'Dolap güncellenemedi');
       setItems(items);
     }
   };
@@ -87,7 +87,7 @@ export default function PantryScreen() {
     try {
       await updatePantry(token, updatedItems);
     } catch (error: unknown) {
-      Alert.alert('Hata', error instanceof Error ? error.message : 'Kiler güncellenemedi');
+      Alert.alert('Hata', error instanceof Error ? error.message : 'Dolap güncellenemedi');
       setItems(items);
     }
   };
@@ -114,8 +114,8 @@ export default function PantryScreen() {
     return (
       <View style={styles.notLoggedIn}>
         <Ionicons name="basket-outline" size={72} color="#e74c3c" style={styles.notLoggedInIcon} />
-        <Text style={styles.notLoggedInTitle}>Kilerinizi Yönetin</Text>
-        <Text style={styles.notLoggedInText}>Kiler özelliğini kullanmak için giriş yapın.</Text>
+        <Text style={styles.notLoggedInTitle}>Dolap Asistanı</Text>
+        <Text style={styles.notLoggedInText}>{'Mutfağını Yönet\nEvdeki malzemeleri gir, israfı önle ve tasarruf et.'}</Text>
         <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/login')}>
           <Text style={styles.loginButtonText}>Giriş Yap</Text>
         </TouchableOpacity>
@@ -128,7 +128,7 @@ export default function PantryScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Kilerim ({items.length})</Text>
+        <Text style={styles.headerTitle}>Dolabım ({items.length})</Text>
         <View style={styles.headerButtons}>
           <TouchableOpacity
             style={[styles.analyzeButton, analyzing && styles.buttonDisabled]}
@@ -173,7 +173,7 @@ export default function PantryScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="basket-outline" size={52} color="#cccccc" style={styles.emptyIcon} />
-            <Text style={styles.emptyText}>Kileriniz boş.</Text>
+            <Text style={styles.emptyText}>Dolabınız boş.</Text>
             <Text style={styles.emptySubtext}>Malzeme eklemek için + butonuna tıklayın.</Text>
           </View>
         }

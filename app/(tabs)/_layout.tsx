@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity, Text, View } from 'react-native';
 import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +16,7 @@ interface TabConfig {
 
 const otherTabs: TabConfig[] = [
   { name: 'recipes', title: 'Tarifler', icon: 'restaurant', iconOutline: 'restaurant-outline' },
-  { name: 'pantry', title: 'Kiler', icon: 'basket', iconOutline: 'basket-outline' },
+  { name: 'pantry', title: 'Dolap', icon: 'basket', iconOutline: 'basket-outline' },
   { name: 'menus', title: 'Menüler', icon: 'book', iconOutline: 'book-outline' },
   { name: 'profile', title: 'Profil', icon: 'person', iconOutline: 'person-outline' },
 ];
@@ -24,6 +24,7 @@ const otherTabs: TabConfig[] = [
 export default function TabLayout() {
   const router = useRouter();
   const { user } = useAuth();
+  const [logoError, setLogoError] = useState(false);
 
   return (
     <Tabs
@@ -54,11 +55,17 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Keşfet',
-          headerTitle: () => (
-            <Text style={headerStyles.logo}>
-              tariften
-            </Text>
-          ),
+          headerTitle: () =>
+            logoError ? (
+              <Text style={headerStyles.logoFallback}>tariften</Text>
+            ) : (
+              <Image
+                source={{ uri: 'https://tariften.com/wp-content/uploads/2025/04/tariften-logo.webp' }}
+                style={headerStyles.logoImage}
+                contentFit="contain"
+                onError={() => setLogoError(true)}
+              />
+            ),
           headerRight: () => (
             <View style={headerStyles.rightContainer}>
               <TouchableOpacity onPress={() => router.push('/recipes')} style={headerStyles.iconButton}>
@@ -104,7 +111,11 @@ export default function TabLayout() {
 }
 
 const headerStyles = StyleSheet.create({
-  logo: {
+  logoImage: {
+    height: 30,
+    width: 120,
+  },
+  logoFallback: {
     fontSize: 24,
     fontWeight: '900',
     color: '#e74c3c',
