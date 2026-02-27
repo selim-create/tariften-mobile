@@ -243,6 +243,7 @@ export async function getPantry(token: string): Promise<PantryItem[]> {
   const data = await fetchData(`${API_URL}/tariften/v1/pantry`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  if (Array.isArray(data)) return data;
   return data?.items || [];
 }
 
@@ -258,15 +259,16 @@ export async function updatePantry(token: string, items: PantryItem[]) {
   return data;
 }
 
-export async function analyzePantry(token: string) {
+export async function analyzePantry(token: string, text: string = '', image: string = '') {
   const res = await fetch(`${API_URL}/tariften/v1/pantry/analyze`, {
     method: 'POST',
     headers: authHeaders(token),
+    body: JSON.stringify({ text, image }),
   });
 
   const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Kiler analizi yapılamadı');
-  return data;
+  if (!res.ok) throw new Error(data.message || 'Analiz başarısız.');
+  return data.items;
 }
 
 // --- INTERACTIONS ---
