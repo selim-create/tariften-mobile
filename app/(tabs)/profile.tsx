@@ -32,6 +32,7 @@ export default function ProfileScreen() {
   const loadRecipes = useCallback(
     async (tab: ProfileTab) => {
       if (!token) return;
+      setRecipes([]);
       setLoading(true);
       try {
         let data: Recipe[] = [];
@@ -45,6 +46,7 @@ export default function ProfileScreen() {
         setRecipes(data);
       } catch (error) {
         console.error('Profile recipes load error:', error);
+        setRecipes([]);
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -162,6 +164,18 @@ export default function ProfileScreen() {
                   {activeTab === 'cooked' && 'Henüz pişirdiğiniz tarif yok.'}
                   {activeTab === 'my_recipes' && 'Henüz tarif oluşturmadınız.'}
                 </Text>
+                <TouchableOpacity
+                  style={styles.emptyButton}
+                  onPress={() =>
+                    activeTab === 'my_recipes'
+                      ? router.push('/recipe/create')
+                      : router.push('/')
+                  }
+                >
+                  <Text style={styles.emptyButtonText}>
+                    {activeTab === 'my_recipes' ? 'Tarif Oluştur' : 'Tariflere Göz At'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             }
           />
@@ -252,6 +266,18 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     color: '#999999',
+    marginBottom: 12,
+  },
+  emptyButton: {
+    backgroundColor: '#e74c3c',
+    borderRadius: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+  },
+  emptyButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
   },
   notLoggedIn: {
     flex: 1,
