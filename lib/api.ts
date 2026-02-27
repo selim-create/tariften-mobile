@@ -289,7 +289,11 @@ export async function getInteractions(token: string, type: 'favorite' | 'cooked'
   const data = await fetchData(`${API_URL}/tariften/v1/interactions/list?type=${type}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  return data?.data || [];
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.data)) return data.data;
+  if (Array.isArray(data.recipes)) return data.recipes;
+  return [];
 }
 
 export async function checkInteraction(token: string, recipeId: number) {
