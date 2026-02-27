@@ -20,6 +20,8 @@
     "expo-router": "~55.0.2",
     "expo-secure-store": "~55.0.8",
     "expo-status-bar": "~55.0.4",
+    "expo-speech": "*",
+    "expo-speech-recognition": "*",
     "expo-web-browser": "~55.0.9",
     "react": "^19.2.4",
     "react-native": "^0.84.0",
