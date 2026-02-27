@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
+import RenderHtml from 'react-native-render-html';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { getBlogPost } from '../../lib/api';
 import { BlogPost } from '../../lib/types';
@@ -11,6 +12,7 @@ export default function BlogDetailScreen() {
   const navigation = useNavigation();
   const [post, setPost] = useState<BlogPost | null>(null);
   const [loading, setLoading] = useState(true);
+  const { width } = useWindowDimensions();
 
   const loadPost = useCallback(async () => {
     if (!slug) return;
@@ -43,20 +45,6 @@ export default function BlogDetailScreen() {
   }
 
   const title = post.title.rendered.replace(/<[^>]*>/g, '');
-  const content = post.content.rendered
-    .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '\n\n$1\n')
-    .replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n')
-    .replace(/<li[^>]*>(.*?)<\/li>/gi, '• $1\n')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .trim();
-
   const imageUrl = post._embedded?.['wp:featuredmedia']?.[0]?.source_url;
 
   return (
@@ -74,13 +62,15 @@ export default function BlogDetailScreen() {
           })}
         </Text>
         <Text style={styles.title}>{title}</Text>
-        <Text style={styles.body}>{content}</Text>
+        <RenderHtml contentWidth={width - CONTENT_PADDING * 2} source={{ html: post.content.rendered }} />
       </View>
 
       <View style={styles.bottomPadding} />
     </ScrollView>
   );
 }
+
+const CONTENT_PADDING = 20;
 
 const styles = StyleSheet.create({
   container: {
@@ -92,7 +82,7 @@ const styles = StyleSheet.create({
     height: 260,
   },
   content: {
-    padding: 20,
+    padding: CONTENT_PADDING,
   },
   date: {
     fontSize: 13,
@@ -105,11 +95,6 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     lineHeight: 32,
     marginBottom: 16,
-  },
-  body: {
-    fontSize: 16,
-    color: '#1a1a1a',
-    lineHeight: 26,
   },
   errorContainer: {
     flex: 1,
