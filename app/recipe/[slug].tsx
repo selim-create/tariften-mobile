@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -121,6 +122,19 @@ export default function RecipeDetailScreen() {
     }
   };
 
+  const handleShare = async () => {
+    if (!recipe) return;
+    try {
+      await Share.share({
+        title: recipe.title,
+        message: `${recipe.title} tarifini Tariften.com'da incele!\nhttps://tariften.com/recipe/${recipe.slug}`,
+        url: `https://tariften.com/recipe/${recipe.slug}`,
+      });
+    } catch (error) {
+      console.error('Share error:', error);
+    }
+  };
+
   const toggleIngredient = (idx: number) => {
     setCheckedIngredients((prev) => {
       const next = new Set(prev);
@@ -170,24 +184,29 @@ export default function RecipeDetailScreen() {
         {/* Title & Actions */}
         <View style={styles.titleRow}>
           <Text style={styles.title}>{recipe.title}</Text>
-          {user && (
-            <View style={styles.actions}>
-              <TouchableOpacity onPress={handleFavorite} style={styles.actionButton}>
-                <Ionicons
-                  name={isFavorite ? 'heart' : 'heart-outline'}
-                  size={24}
-                  color={isFavorite ? '#e74c3c' : '#666666'}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleCooked} style={styles.actionButton}>
-                <Ionicons
-                  name={isCooked ? 'checkmark-circle' : 'checkmark-circle-outline'}
-                  size={24}
-                  color={isCooked ? '#27ae60' : '#666666'}
-                />
-              </TouchableOpacity>
-            </View>
-          )}
+          <View style={styles.actions}>
+            {user && (
+              <>
+                <TouchableOpacity onPress={handleFavorite} style={styles.actionButton}>
+                  <Ionicons
+                    name={isFavorite ? 'heart' : 'heart-outline'}
+                    size={24}
+                    color={isFavorite ? '#e74c3c' : '#666666'}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleCooked} style={styles.actionButton}>
+                  <Ionicons
+                    name={isCooked ? 'checkmark-circle' : 'checkmark-circle-outline'}
+                    size={24}
+                    color={isCooked ? '#27ae60' : '#666666'}
+                  />
+                </TouchableOpacity>
+              </>
+            )}
+            <TouchableOpacity onPress={handleShare} style={styles.actionButton}>
+              <Ionicons name="share-outline" size={24} color="#666666" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {recipe.excerpt ? <Text style={styles.excerpt}>{recipe.excerpt}</Text> : null}
