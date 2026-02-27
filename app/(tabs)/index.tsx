@@ -115,7 +115,7 @@ export default function HomeScreen() {
       ]);
       setPopularRecipes(popularData.data.slice(0, 6));
       setEditorsRecipes(editorsData.data.slice(0, 4));
-      setLatestBlog(blogData);
+      setLatestBlog(blogData.data);
       setMenus(menusData.slice(0, 3));
     } catch (error) {
       console.error('Home load error:', error);

@@ -116,7 +116,7 @@ export async function generateAIRecipe(token: string, ingredients: string) {
 }
 
 export async function getUserRecipes(token: string): Promise<Recipe[]> {
-  const data = await fetchData(`${API_URL}/tariften/v1/recipes/search?source=user`, {
+  const data = await fetchData(`${API_URL}/tariften/v1/recipes/search?author=me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   return data?.data || [];
@@ -351,7 +351,7 @@ export async function getBlogPosts(params?: {
   slug?: string;
   categories?: number[];
   exclude?: number[];
-}): Promise<BlogPost[]> {
+}): Promise<{ data: BlogPost[]; totalPages: number }> {
   const urlParams = new URLSearchParams();
   urlParams.append('_embed', '1');
   if (params?.page) urlParams.append('page', params.page.toString());
@@ -360,13 +360,24 @@ export async function getBlogPosts(params?: {
   if (params?.categories?.length) urlParams.append('categories', params.categories.join(','));
   if (params?.exclude?.length) urlParams.append('exclude', params.exclude.join(','));
 
-  const data = await fetchData(`${API_URL}/wp/v2/posts?${urlParams.toString()}`);
-  return Array.isArray(data) ? data : [];
+  try {
+    const res = await fetch(`${API_URL}/wp/v2/posts?${urlParams.toString()}`);
+    if (!res.ok) {
+      console.error(`[API Error ${res.status}]: ${API_URL}/wp/v2/posts?${urlParams.toString()}`);
+      return { data: [], totalPages: 0 };
+    }
+    const totalPages = parseInt(res.headers.get('X-WP-TotalPages') || '1');
+    const data = await res.json();
+    return { data: Array.isArray(data) ? data : [], totalPages };
+  } catch (error) {
+    console.error('Blog posts fetch error:', error);
+    return { data: [], totalPages: 0 };
+  }
 }
 
 export async function getBlogPost(slug: string): Promise<BlogPost | null> {
-  const posts = await getBlogPosts({ slug });
-  return posts.length > 0 ? posts[0] : null;
+  const { data } = await getBlogPosts({ slug });
+  return data.length > 0 ? data[0] : null;
 }
 
 // --- NEWSLETTER ---

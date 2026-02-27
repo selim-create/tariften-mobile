@@ -27,16 +27,17 @@ export default function BlogListScreen() {
       if (!append) setLoading(true);
       else setLoadingMore(true);
 
-      const data = await getBlogPosts({ page: pageNum, perPage: 10 });
+      const { data, totalPages } = await getBlogPosts({ page: pageNum, perPage: 10 });
       if (append) {
         setPosts((prev) => [...prev, ...data]);
       } else {
         setPosts(data);
       }
-      setHasMore(data.length === 10);
+      setHasMore(pageNum < totalPages);
       setPage(pageNum);
     } catch (error) {
       console.error('Blog load error:', error);
+      setHasMore(false);
     } finally {
       setLoading(false);
       setRefreshing(false);
