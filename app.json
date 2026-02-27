@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "tariften-mobile",
+    "name": "Tariften",
     "slug": "tariften-mobile",
     "scheme": "tariften",
     "version": "1.0.0",
@@ -13,7 +13,9 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tariften.app",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +24,9 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.tariften.app",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png",

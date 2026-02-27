@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -146,6 +147,18 @@ export default function LoginScreen() {
               <Text style={styles.registerLinkBold}>Kayıt Olun</Text>
             </Text>
           </TouchableOpacity>
+
+          <Text style={styles.legalText}>
+            Giriş yaparak{' '}
+            <Text style={styles.legalLink} onPress={() => Linking.openURL('https://tariften.com/terms')}>
+              Kullanım Koşulları
+            </Text>
+            {' '}ve{' '}
+            <Text style={styles.legalLink} onPress={() => Linking.openURL('https://tariften.com/privacy')}>
+              Gizlilik Politikası
+            </Text>
+            {'\'nı kabul etmiş olursunuz.'}
+          </Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -305,5 +318,15 @@ const styles = StyleSheet.create({
   registerLinkBold: {
     color: '#e74c3c',
     fontWeight: '700',
+  },
+  legalText: {
+    fontSize: 11,
+    color: '#999999',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  legalLink: {
+    color: '#e74c3c',
+    textDecorationLine: 'underline',
   },
 });

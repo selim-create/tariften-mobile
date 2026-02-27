@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -13,7 +14,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { getInteractions, getUserRecipes } from '../../lib/api';
+import { deleteAccount, getInteractions, getUserRecipes } from '../../lib/api';
 import { Recipe } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -75,6 +76,29 @@ export default function ProfileScreen() {
         onPress: logout,
       },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Hesabı Sil',
+      'Hesabınızı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.',
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Hesabımı Sil',
+          style: 'destructive',
+          onPress: async () => {
+            if (!token) return;
+            try {
+              await deleteAccount(token);
+              logout();
+            } catch (error) {
+              Alert.alert('Hata', error instanceof Error ? error.message : 'Hesap silinemedi.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (!user || !token) {
@@ -185,6 +209,36 @@ export default function ProfileScreen() {
             }
           />
         )}
+
+        {/* Settings Section */}
+        <View style={styles.settingsSection}>
+          <Text style={styles.settingsSectionTitle}>Yasal & Bilgilendirme</Text>
+          {[
+            { icon: 'document-outline' as IoniconName, label: 'Hakkımızda', url: 'https://tariften.com/about' },
+            { icon: 'mail-outline' as IoniconName, label: 'İletişim & Reklam', url: 'https://tariften.com/contact' },
+            { icon: 'reader-outline' as IoniconName, label: 'Kullanım Koşulları', url: 'https://tariften.com/terms' },
+            { icon: 'lock-closed-outline' as IoniconName, label: 'Gizlilik Politikası', url: 'https://tariften.com/privacy' },
+            { icon: 'shield-outline' as IoniconName, label: 'KVKK Aydınlatma Metni', url: 'https://tariften.com/kvkk' },
+          ].map((item) => (
+            <TouchableOpacity
+              key={item.url}
+              style={styles.settingsRow}
+              onPress={() => Linking.openURL(item.url).catch(() => Alert.alert('Hata', 'Sayfa açılamadı.'))}
+            >
+              <Ionicons name={item.icon} size={20} color="#555555" style={styles.settingsRowIcon} />
+              <Text style={styles.settingsRowText}>{item.label}</Text>
+              <Ionicons name="chevron-forward" size={16} color="#bbbbbb" />
+            </TouchableOpacity>
+          ))}
+
+          <Text style={styles.settingsSectionTitle}>Hesap İşlemleri</Text>
+          <TouchableOpacity style={styles.settingsRow} onPress={handleDeleteAccount}>
+            <Ionicons name="trash-outline" size={20} color="#e74c3c" style={styles.settingsRowIcon} />
+            <Text style={[styles.settingsRowText, styles.deleteText]}>Hesabımı Sil</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.versionText}>Tariften v1.0.0</Text>
       </ScrollView>
     </View>
   );
@@ -349,5 +403,45 @@ const styles = StyleSheet.create({
     color: '#e74c3c',
     fontWeight: '700',
     fontSize: 16,
+  },
+  settingsSection: {
+    marginTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  settingsSectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#999999',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 20,
+    marginBottom: 4,
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5f5f5',
+  },
+  settingsRowIcon: {
+    marginRight: 12,
+  },
+  settingsRowText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#1a1a1a',
+  },
+  deleteText: {
+    color: '#e74c3c',
+  },
+  versionText: {
+    textAlign: 'center',
+    fontSize: 12,
+    color: '#bbbbbb',
+    paddingVertical: 20,
   },
 });

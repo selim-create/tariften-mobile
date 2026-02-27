@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -238,6 +239,18 @@ export default function RegisterScreen() {
             )}
           </TouchableOpacity>
 
+          <Text style={styles.legalText}>
+            Kayıt olarak{' '}
+            <Text style={styles.legalLink} onPress={() => Linking.openURL('https://tariften.com/terms')}>
+              Kullanım Koşulları
+            </Text>
+            {' '}ve{' '}
+            <Text style={styles.legalLink} onPress={() => Linking.openURL('https://tariften.com/privacy')}>
+              Gizlilik Politikası
+            </Text>
+            {'\'nı kabul etmiş olursunuz.'}
+          </Text>
+
           <TouchableOpacity
             style={styles.loginLink}
             onPress={() => router.replace('/login')}
@@ -460,6 +473,16 @@ const styles = StyleSheet.create({
   loginLinkBold: {
     color: '#e74c3c',
     fontWeight: '700',
+  },
+  legalText: {
+    fontSize: 11,
+    color: '#999999',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  legalLink: {
+    color: '#e74c3c',
+    textDecorationLine: 'underline',
   },
   // Modal
   modalOverlay: {
