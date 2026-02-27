@@ -19,6 +19,7 @@ import RecipeCard from '../../components/RecipeCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
 type ProfileTab = 'favorites' | 'cooked' | 'my_recipes';
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -79,7 +80,7 @@ export default function ProfileScreen() {
   if (!user || !token) {
     return (
       <View style={styles.notLoggedIn}>
-        <Text style={styles.notLoggedInIcon}>👤</Text>
+        <Ionicons name="person-circle-outline" size={80} color="#e74c3c" style={styles.notLoggedInIcon} />
         <Text style={styles.notLoggedInTitle}>Hesabınıza Giriş Yapın</Text>
         <Text style={styles.notLoggedInText}>
           Favori tariflerinizi, pişirdiklerinizi ve kendi tariflerinizi görüntülemek için giriş yapın.
@@ -94,10 +95,10 @@ export default function ProfileScreen() {
     );
   }
 
-  const tabs: { key: ProfileTab; label: string; icon: string }[] = [
-    { key: 'favorites', label: 'Favoriler', icon: '❤️' },
-    { key: 'cooked', label: 'Pişirdiklerim', icon: '🍳' },
-    { key: 'my_recipes', label: 'Tariflerim', icon: '📝' },
+  const tabs: { key: ProfileTab; label: string; icon: IoniconName; iconActive: IoniconName }[] = [
+    { key: 'favorites', label: 'Favoriler', icon: 'heart-outline', iconActive: 'heart' },
+    { key: 'cooked', label: 'Pişirdiklerim', icon: 'restaurant-outline', iconActive: 'restaurant' },
+    { key: 'my_recipes', label: 'Tariflerim', icon: 'document-text-outline', iconActive: 'document-text' },
   ];
 
   return (
@@ -131,7 +132,11 @@ export default function ProfileScreen() {
               style={[styles.tab, activeTab === tab.key && styles.tabActive]}
               onPress={() => setActiveTab(tab.key)}
             >
-              <Text style={styles.tabIcon}>{tab.icon}</Text>
+              <Ionicons
+                name={activeTab === tab.key ? tab.iconActive : tab.icon}
+                size={20}
+                color={activeTab === tab.key ? '#e74c3c' : '#999999'}
+              />
               <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>
                 {tab.label}
               </Text>
@@ -245,9 +250,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: '#e74c3c',
   },
-  tabIcon: {
-    fontSize: 18,
-  },
   tabLabel: {
     fontSize: 11,
     color: '#999999',
@@ -275,7 +277,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   notLoggedInIcon: {
-    fontSize: 64,
     marginBottom: 16,
   },
   notLoggedInTitle: {

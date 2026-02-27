@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { getRecipes, getTerms } from '../../lib/api';
 import { Recipe, RecipeFilters } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
@@ -16,6 +17,15 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function RecipesScreen() {
+  const params = useLocalSearchParams<{
+    query?: string;
+    cuisine?: string;
+    diet?: string;
+    difficulty?: string;
+    mealType?: string;
+    collection?: string;
+  }>();
+
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -30,7 +40,7 @@ export default function RecipesScreen() {
   } | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(params.query || '');
 
   const loadRecipes = useCallback(
     async (pageNum: number = 1, currentFilters: RecipeFilters = filters, append = false) => {
@@ -63,6 +73,20 @@ export default function RecipesScreen() {
   useEffect(() => {
     getTerms().then(setTerms).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    const newFilters: RecipeFilters = {};
+    if (params.query) newFilters.query = params.query;
+    if (params.cuisine) newFilters.cuisine = [params.cuisine];
+    if (params.diet) newFilters.diet = [params.diet];
+    if (params.difficulty) newFilters.difficulty = [params.difficulty];
+    if (params.mealType) newFilters.mealType = [params.mealType];
+    if (params.collection) newFilters.collection = [params.collection];
+    if (Object.keys(newFilters).length > 0) {
+      if (params.query) setQuery(params.query);
+      setFilters(newFilters);
+    }
+  }, [params.query, params.cuisine, params.diet, params.difficulty, params.mealType, params.collection]);
 
   useEffect(() => {
     loadRecipes(1, filters, false);
