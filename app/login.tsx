@@ -47,6 +47,11 @@ export default function LoginScreen() {
     }
   };
 
+  const handleGoogleSignIn = () => {
+    console.log('Google Sign-In: Kurulum gerekli');
+    Alert.alert('Yakında', 'Google ile giriş özelliği yakında eklenecek.');
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -60,6 +65,23 @@ export default function LoginScreen() {
         <View style={styles.logo}>
           <Text style={styles.logoText}>tariften</Text>
           <Text style={styles.logoSubtitle}>Hesabınıza giriş yapın</Text>
+        </View>
+
+        {/* Social Buttons */}
+        <View style={styles.socialRow}>
+          <TouchableOpacity style={styles.socialButton} onPress={handleGoogleSignIn}>
+            <Text style={styles.socialButtonText}>🔵 Google</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.socialButton, styles.socialButtonDisabled]} disabled>
+            <Text style={[styles.socialButtonText, styles.socialButtonTextDisabled]}>🍎 Apple</Text>
+            <Text style={styles.soonBadge}>Yakında</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>veya e-posta</Text>
+          <View style={styles.dividerLine} />
         </View>
 
         <View style={styles.form}>
@@ -80,7 +102,12 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Şifre</Text>
+            <View style={styles.labelRow}>
+              <Text style={styles.inputLabel}>Şifre</Text>
+              <TouchableOpacity onPress={() => router.push('/forgot-password')}>
+                <Text style={styles.forgotLink}>Şifremi Unuttum</Text>
+              </TouchableOpacity>
+            </View>
             <View style={styles.passwordContainer}>
               <TextInput
                 style={styles.passwordInput}
@@ -137,7 +164,7 @@ const styles = StyleSheet.create({
   },
   logo: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 32,
   },
   logoText: {
     fontSize: 40,
@@ -150,11 +177,64 @@ const styles = StyleSheet.create({
     color: '#666666',
     marginTop: 4,
   },
+  socialRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  socialButton: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: '#e5e5e5',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  socialButtonDisabled: {
+    opacity: 0.5,
+  },
+  socialButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  socialButtonTextDisabled: {
+    color: '#999',
+  },
+  soonBadge: {
+    fontSize: 10,
+    color: '#999',
+    marginLeft: 4,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e5e5e5',
+  },
+  dividerText: {
+    fontSize: 12,
+    color: '#999',
+  },
   form: {
     gap: 16,
   },
   inputGroup: {
     gap: 6,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   inputLabel: {
     fontSize: 13,
@@ -162,6 +242,11 @@ const styles = StyleSheet.create({
     color: '#666666',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  forgotLink: {
+    fontSize: 13,
+    color: '#e74c3c',
+    fontWeight: '600',
   },
   input: {
     borderWidth: 1.5,
