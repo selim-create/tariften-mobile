@@ -8,13 +8,14 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import {
   checkInteraction,
   getRecipe,
   getRecipeRating,
+  getRecipes,
   getUserRating,
   submitRating,
   toggleInteraction,
@@ -24,10 +25,12 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import RatingStars from '../../components/RatingStars';
 import CommentSection from '../../components/CommentSection';
 import CookingAssistant from '../../components/CookingAssistant';
+import RecipeCard from '../../components/RecipeCard';
 
 export default function RecipeDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const navigation = useNavigation();
+  const router = useRouter();
   const { user, token } = useAuth();
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
@@ -37,6 +40,11 @@ export default function RecipeDetailScreen() {
   const [ratingData, setRatingData] = useState({ average: 0, count: 0 });
   const [userRating, setUserRating] = useState<number | null>(null);
   const [cookingAssistantVisible, setCookingAssistantVisible] = useState(false);
+  const [checkedIngredients, setCheckedIngredients] = useState<Set<number>>(new Set());
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+  const [currentServings, setCurrentServings] = useState<number>(1);
+  const [defaultServings, setDefaultServings] = useState<number>(1);
+  const [similarRecipes, setSimilarRecipes] = useState<Recipe[]>([]);
 
   const loadRecipe = useCallback(async () => {
     if (!slug) return;
@@ -46,16 +54,25 @@ export default function RecipeDetailScreen() {
       if (data) {
         navigation.setOptions({ title: data.title });
 
+        const parsedServings = parseInt(String(data.servings), 10) || 1;
+        setDefaultServings(parsedServings);
+        setCurrentServings(parsedServings);
+
         const ratingResult = await getRecipeRating(data.id);
         setRatingData({ average: ratingResult.average || 0, count: ratingResult.count || 0 });
 
         if (token) {
           const interaction = await checkInteraction(token, data.id);
-          setIsFavorite(interaction?.is_favorite || false);
-          setIsCooked(interaction?.is_cooked || false);
+          setIsFavorite(interaction?.favorite || interaction?.is_favorite || false);
+          setIsCooked(interaction?.cooked || interaction?.is_cooked || false);
 
           const userRatingResult = await getUserRating(token, data.id);
           setUserRating(userRatingResult?.rating || null);
+        }
+
+        if (data.cuisine?.length > 0) {
+          const similar = await getRecipes({ cuisine: data.cuisine, page: 1 });
+          setSimilarRecipes((similar.data || []).filter((r: Recipe) => r.id !== data.id).slice(0, 4));
         }
       }
     } catch (error) {
@@ -71,20 +88,24 @@ export default function RecipeDetailScreen() {
 
   const handleFavorite = async () => {
     if (!token || !recipe) return;
+    const newStatus = !isFavorite;
+    setIsFavorite(newStatus);
     try {
       await toggleInteraction(token, recipe.id, 'favorite');
-      setIsFavorite(!isFavorite);
     } catch (error: unknown) {
+      setIsFavorite(!newStatus);
       Alert.alert('Hata', error instanceof Error ? error.message : 'İşlem başarısız');
     }
   };
 
   const handleCooked = async () => {
     if (!token || !recipe) return;
+    const newStatus = !isCooked;
+    setIsCooked(newStatus);
     try {
       await toggleInteraction(token, recipe.id, 'cooked');
-      setIsCooked(!isCooked);
     } catch (error: unknown) {
+      setIsCooked(!newStatus);
       Alert.alert('Hata', error instanceof Error ? error.message : 'İşlem başarısız');
     }
   };
@@ -100,6 +121,31 @@ export default function RecipeDetailScreen() {
     }
   };
 
+  const toggleIngredient = (idx: number) => {
+    setCheckedIngredients((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
+  const toggleStep = (idx: number) => {
+    setCompletedSteps((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
+  const displayAmount = (amount: string | number): string => {
+    const num = parseFloat(String(amount));
+    if (isNaN(num) || defaultServings === 0) return String(amount);
+    const scaled = (num * currentServings) / defaultServings;
+    return Number.isInteger(scaled) ? String(scaled) : scaled.toFixed(1);
+  };
+
   if (loading) return <LoadingSpinner fullScreen />;
 
   if (!recipe) {
@@ -109,6 +155,12 @@ export default function RecipeDetailScreen() {
       </View>
     );
   }
+
+  const calories = recipe.nutrition?.calories || Number(recipe.calories) || 0;
+  const protein = recipe.nutrition?.protein ?? Math.round((calories * 0.25) / 4);
+  const carbs = recipe.nutrition?.carbs ?? Math.round((calories * 0.45) / 4);
+  const fat = recipe.nutrition?.fat ?? Math.round((calories * 0.30) / 9);
+  const nutritionTotal = protein + carbs + fat;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -140,6 +192,39 @@ export default function RecipeDetailScreen() {
 
         {recipe.excerpt ? <Text style={styles.excerpt}>{recipe.excerpt}</Text> : null}
 
+        {/* Tags (above rating) */}
+        {(recipe.meal_type?.length > 0 || recipe.cuisine?.length > 0 || recipe.diet?.length > 0) && (
+          <View style={styles.tagsRow}>
+            {recipe.meal_type?.map((m) => (
+              <TouchableOpacity
+                key={m}
+                style={[styles.tag, styles.tagMealType]}
+                onPress={() => router.push({ pathname: '/recipes', params: { mealType: m } })}
+              >
+                <Text style={[styles.tagText, styles.tagMealTypeText]}>{m}</Text>
+              </TouchableOpacity>
+            ))}
+            {recipe.cuisine?.map((c) => (
+              <TouchableOpacity
+                key={c}
+                style={[styles.tag, styles.tagCuisine]}
+                onPress={() => router.push({ pathname: '/recipes', params: { cuisine: c } })}
+              >
+                <Text style={[styles.tagText, styles.tagCuisineText]}>{c}</Text>
+              </TouchableOpacity>
+            ))}
+            {recipe.diet?.map((d) => (
+              <TouchableOpacity
+                key={d}
+                style={[styles.tag, styles.tagDiet]}
+                onPress={() => router.push({ pathname: '/recipes', params: { diet: d } })}
+              >
+                <Text style={[styles.tagText, styles.tagDietText]}>{d}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         {/* Rating */}
         <View style={styles.ratingSection}>
           <RatingStars rating={ratingData.average} size={18} />
@@ -165,67 +250,77 @@ export default function RecipeDetailScreen() {
         <View style={styles.metaGrid}>
           {recipe.prep_time ? (
             <View style={styles.metaItem}>
-              <Text style={styles.metaIcon}>⏱</Text>
+              <Ionicons name="time-outline" size={20} color="#db4c3f" />
               <Text style={styles.metaLabel}>Hazırlık</Text>
               <Text style={styles.metaValue}>{recipe.prep_time} dk</Text>
             </View>
           ) : null}
           {recipe.cook_time ? (
             <View style={styles.metaItem}>
-              <Text style={styles.metaIcon}>🍳</Text>
+              <Ionicons name="flame-outline" size={20} color="#f97316" />
               <Text style={styles.metaLabel}>Pişirme</Text>
               <Text style={styles.metaValue}>{recipe.cook_time} dk</Text>
             </View>
           ) : null}
-          {recipe.servings ? (
-            <View style={styles.metaItem}>
-              <Text style={styles.metaIcon}>👥</Text>
-              <Text style={styles.metaLabel}>Porsiyon</Text>
-              <Text style={styles.metaValue}>{recipe.servings}</Text>
-            </View>
-          ) : null}
           {recipe.calories ? (
             <View style={styles.metaItem}>
-              <Text style={styles.metaIcon}>🔥</Text>
+              <Ionicons name="leaf-outline" size={20} color="#22c55e" />
               <Text style={styles.metaLabel}>Kalori</Text>
               <Text style={styles.metaValue}>{recipe.calories} kcal</Text>
             </View>
           ) : null}
+          {recipe.difficulty?.[0] ? (
+            <View style={styles.metaItem}>
+              <Ionicons name="bar-chart-outline" size={20} color="#3b82f6" />
+              <Text style={styles.metaLabel}>Zorluk</Text>
+              <Text style={styles.metaValue}>{recipe.difficulty[0]}</Text>
+            </View>
+          ) : null}
         </View>
-
-        {/* Tags */}
-        {(recipe.cuisine?.length > 0 || recipe.diet?.length > 0 || recipe.difficulty?.length > 0) && (
-          <View style={styles.tagsRow}>
-            {recipe.difficulty?.map((d) => (
-              <View key={d} style={[styles.tag, styles.tagDifficulty]}>
-                <Text style={styles.tagText}>{d}</Text>
-              </View>
-            ))}
-            {recipe.cuisine?.map((c) => (
-              <View key={c} style={styles.tag}>
-                <Text style={styles.tagText}>{c}</Text>
-              </View>
-            ))}
-            {recipe.diet?.map((d) => (
-              <View key={d} style={[styles.tag, styles.tagDiet]}>
-                <Text style={styles.tagText}>{d}</Text>
-              </View>
-            ))}
-          </View>
-        )}
 
         {/* Ingredients */}
         {recipe.ingredients?.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Malzemeler</Text>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Malzemeler</Text>
+              <View style={styles.servingsControl}>
+                <TouchableOpacity
+                  style={styles.servingsBtn}
+                  onPress={() => setCurrentServings((s) => Math.max(1, s - 1))}
+                >
+                  <Ionicons name="remove" size={16} color="#e74c3c" />
+                </TouchableOpacity>
+                <Text style={styles.servingsText}>{currentServings} Porsiyon</Text>
+                <TouchableOpacity
+                  style={styles.servingsBtn}
+                  onPress={() => setCurrentServings((s) => s + 1)}
+                >
+                  <Ionicons name="add" size={16} color="#e74c3c" />
+                </TouchableOpacity>
+              </View>
+            </View>
             {recipe.ingredients.map((ing, idx) => (
-              <View key={idx} style={styles.ingredientRow}>
-                <Text style={styles.ingredientBullet}>•</Text>
-                <Text style={styles.ingredientText}>
-                  {ing.amount} {ing.unit} {ing.name}
+              <TouchableOpacity
+                key={idx}
+                style={styles.ingredientRow}
+                onPress={() => toggleIngredient(idx)}
+                activeOpacity={0.7}
+              >
+                {checkedIngredients.has(idx) ? (
+                  <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                ) : (
+                  <Text style={styles.ingredientBullet}>•</Text>
+                )}
+                <Text
+                  style={[
+                    styles.ingredientText,
+                    checkedIngredients.has(idx) && styles.ingredientTextChecked,
+                  ]}
+                >
+                  {displayAmount(ing.amount)} {ing.unit} {ing.name}
                   {ing.note ? ` (${ing.note})` : ''}
                 </Text>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -244,12 +339,30 @@ export default function RecipeDetailScreen() {
               </TouchableOpacity>
             </View>
             {recipe.steps.map((step, idx) => (
-              <View key={idx} style={styles.stepRow}>
-                <View style={styles.stepNumber}>
-                  <Text style={styles.stepNumberText}>{idx + 1}</Text>
-                </View>
-                <Text style={styles.stepText}>{step}</Text>
-              </View>
+              <TouchableOpacity
+                key={idx}
+                style={styles.stepRow}
+                onPress={() => toggleStep(idx)}
+                activeOpacity={0.7}
+              >
+                {completedSteps.has(idx) ? (
+                  <View style={styles.stepNumberDone}>
+                    <Ionicons name="checkmark" size={14} color="#ffffff" />
+                  </View>
+                ) : (
+                  <View style={styles.stepNumber}>
+                    <Text style={styles.stepNumberText}>{idx + 1}</Text>
+                  </View>
+                )}
+                <Text
+                  style={[
+                    styles.stepText,
+                    completedSteps.has(idx) && styles.stepTextDone,
+                  ]}
+                >
+                  {step}
+                </Text>
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -257,32 +370,70 @@ export default function RecipeDetailScreen() {
         {/* Chef Tip */}
         {recipe.chef_tip && (
           <View style={styles.chefTip}>
-            <Text style={styles.chefTipIcon}>👨‍🍳</Text>
+            <Ionicons name="bulb-outline" size={22} color="#d97706" />
             <View style={styles.chefTipContent}>
-              <Text style={styles.chefTipTitle}>Şef İpucu</Text>
+              <Text style={styles.chefTipTitle}>Şefin İpucu:</Text>
               <Text style={styles.chefTipText}>{recipe.chef_tip}</Text>
             </View>
           </View>
         )}
 
         {/* Nutrition */}
-        {recipe.nutrition && (
+        {(recipe.nutrition || calories > 0) && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Besin Değerleri</Text>
-            <View style={styles.nutritionGrid}>
+            <Text style={styles.sectionTitle}>1 Porsiyon İçin Besin Değerleri</Text>
+            {recipe.serving_weight ? (
+              <Text style={styles.servingWeightText}>yaklaşık {recipe.serving_weight} gr</Text>
+            ) : null}
+            <View style={styles.nutritionCalorieRow}>
+              <Text style={styles.nutritionCalorieLabel}>Kalori</Text>
+              <Text style={styles.nutritionCalorieValue}>{calories} kcal</Text>
+            </View>
+            <View style={styles.nutritionBars}>
               {[
-                { label: 'Kalori', value: recipe.nutrition.calories, unit: 'kcal' },
-                { label: 'Protein', value: recipe.nutrition.protein, unit: 'g' },
-                { label: 'Karbonhidrat', value: recipe.nutrition.carbs, unit: 'g' },
-                { label: 'Yağ', value: recipe.nutrition.fat, unit: 'g' },
+                { label: 'Protein', value: protein, unit: 'g', color: '#3b82f6', max: nutritionTotal || 1 },
+                { label: 'Karbonhidrat', value: carbs, unit: 'g', color: '#f97316', max: nutritionTotal || 1 },
+                { label: 'Yağ', value: fat, unit: 'g', color: '#ef4444', max: nutritionTotal || 1 },
               ].map((n) => (
-                <View key={n.label} style={styles.nutritionItem}>
-                  <Text style={styles.nutritionValue}>{n.value}</Text>
-                  <Text style={styles.nutritionUnit}>{n.unit}</Text>
-                  <Text style={styles.nutritionLabel}>{n.label}</Text>
+                <View key={n.label} style={styles.nutritionBarItem}>
+                  <View style={styles.nutritionBarHeader}>
+                    <Text style={styles.nutritionBarLabel}>{n.label}</Text>
+                    <Text style={styles.nutritionBarValue}>{n.value}{n.unit}</Text>
+                  </View>
+                  <View style={styles.nutritionBarBg}>
+                    <View
+                      style={[
+                        styles.nutritionBarFill,
+                        {
+                          backgroundColor: n.color,
+                          width: `${Math.min(100, (n.value / n.max) * 100)}%`,
+                        },
+                      ]}
+                    />
+                  </View>
                 </View>
               ))}
             </View>
+            <Text style={styles.nutritionDisclaimer}>Değerler yaklaşık olarak hesaplanmıştır.</Text>
+          </View>
+        )}
+
+        {/* Similar Recipes */}
+        {similarRecipes.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Bunu Sevenler Şunlara da Düştü 😍</Text>
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: '/recipes', params: { cuisine: recipe.cuisine?.[0] } })}
+              >
+                <Text style={styles.seeAllText}>Tümünü Gör</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.similarList}>
+              {similarRecipes.map((r) => (
+                <RecipeCard key={r.id} recipe={r} horizontal />
+              ))}
+            </ScrollView>
           </View>
         )}
 
@@ -343,6 +494,49 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 16,
   },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
+  },
+  tag: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
+  },
+  tagMealType: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#bfdbfe',
+  },
+  tagCuisine: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#fed7aa',
+  },
+  tagDiet: {
+    backgroundColor: '#f0fdf4',
+    borderColor: '#bbf7d0',
+  },
+  tagDifficulty: {
+    backgroundColor: '#fff0f0',
+    borderColor: '#fecaca',
+  },
+  tagText: {
+    fontSize: 12,
+    color: '#666666',
+  },
+  tagMealTypeText: {
+    color: '#1d4ed8',
+  },
+  tagCuisineText: {
+    color: '#c2410c',
+  },
+  tagDietText: {
+    color: '#15803d',
+  },
   ratingSection: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -382,41 +576,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e5e5',
   },
-  metaIcon: {
-    fontSize: 20,
-    marginBottom: 4,
-  },
   metaLabel: {
     fontSize: 11,
     color: '#999999',
     marginBottom: 2,
+    marginTop: 4,
   },
   metaValue: {
     fontSize: 13,
     fontWeight: '700',
     color: '#1a1a1a',
-  },
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 20,
-  },
-  tag: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 16,
-  },
-  tagDifficulty: {
-    backgroundColor: '#fff0f0',
-  },
-  tagDiet: {
-    backgroundColor: '#f0fff0',
-  },
-  tagText: {
-    fontSize: 12,
-    color: '#666666',
   },
   section: {
     marginBottom: 24,
@@ -426,6 +595,38 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1a1a1a',
     marginBottom: 12,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  seeAllText: {
+    fontSize: 13,
+    color: '#e74c3c',
+    fontWeight: '600',
+  },
+  servingsControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
+  },
+  servingsBtn: {
+    padding: 4,
+  },
+  servingsText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    minWidth: 70,
+    textAlign: 'center',
   },
   stepsSectionHeader: {
     flexDirection: 'row',
@@ -457,12 +658,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#e74c3c',
     marginTop: 1,
+    width: 20,
+    textAlign: 'center',
   },
   ingredientText: {
     fontSize: 15,
     color: '#1a1a1a',
     flex: 1,
     lineHeight: 22,
+  },
+  ingredientTextChecked: {
+    textDecorationLine: 'line-through',
+    opacity: 0.5,
   },
   stepRow: {
     flexDirection: 'row',
@@ -484,11 +691,24 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 13,
   },
+  stepNumberDone: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#22c55e',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
   stepText: {
     flex: 1,
     fontSize: 15,
     color: '#1a1a1a',
     lineHeight: 23,
+  },
+  stepTextDone: {
+    textDecorationLine: 'line-through',
+    opacity: 0.6,
   },
   chefTip: {
     flexDirection: 'row',
@@ -500,9 +720,6 @@ const styles = StyleSheet.create({
     borderColor: '#fde68a',
     gap: 12,
     alignItems: 'flex-start',
-  },
-  chefTipIcon: {
-    fontSize: 24,
   },
   chefTipContent: {
     flex: 1,
@@ -518,33 +735,68 @@ const styles = StyleSheet.create({
     color: '#78350f',
     lineHeight: 21,
   },
-  nutritionGrid: {
+  servingWeightText: {
+    fontSize: 13,
+    color: '#999999',
+    marginBottom: 12,
+    marginTop: -8,
+  },
+  nutritionCalorieRow: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  nutritionItem: {
-    flex: 1,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 10,
-    padding: 12,
+    justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  nutritionValue: {
-    fontSize: 18,
+  nutritionCalorieLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  nutritionCalorieValue: {
+    fontSize: 15,
     fontWeight: '700',
     color: '#e74c3c',
   },
-  nutritionUnit: {
+  nutritionBars: {
+    gap: 12,
+  },
+  nutritionBarItem: {
+    gap: 4,
+  },
+  nutritionBarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  nutritionBarLabel: {
+    fontSize: 13,
+    color: '#666666',
+  },
+  nutritionBarValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  nutritionBarBg: {
+    height: 6,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  nutritionBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  nutritionDisclaimer: {
     fontSize: 11,
     color: '#999999',
+    marginTop: 12,
+    fontStyle: 'italic',
   },
-  nutritionLabel: {
-    fontSize: 11,
-    color: '#666666',
-    marginTop: 2,
-    textAlign: 'center',
+  similarList: {
+    paddingRight: 16,
   },
   errorContainer: {
     flex: 1,

@@ -6,6 +6,7 @@ import {
   Modal,
   RefreshControl,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -187,6 +188,32 @@ export default function RecipesScreen() {
     filters.sort,
   ].filter(Boolean).length;
 
+  const removeFilter = useCallback((type: string, value?: string) => {
+    if (type === 'query') {
+      setQuery('');
+      setFilters((prev) => { const f = { ...prev }; delete f.query; return f; });
+    } else if (type === 'sort') {
+      setFilters((prev) => { const f = { ...prev }; delete f.sort; return f; });
+    } else if (value) {
+      setFilters((prev) => {
+        const key = type as keyof RecipeFilters;
+        const current = (prev[key] as string[]) || [];
+        const updated = current.filter((v) => v !== value);
+        return { ...prev, [key]: updated.length > 0 ? updated : undefined };
+      });
+    }
+  }, []);
+
+  const SORT_LABELS: Record<string, string> = { date: 'En Yeni', popular: 'En Popüler', rating: 'En Yüksek Puan' };
+
+  const activeChips: { id: string; label: string; type: string; value?: string; color: string }[] = [];
+  if (filters.query) activeChips.push({ id: 'query', label: `"${filters.query}"`, type: 'query', color: '#6b7280' });
+  filters.mealType?.forEach((v) => activeChips.push({ id: `mealType-${v}`, label: v, type: 'mealType', value: v, color: '#1d4ed8' }));
+  filters.cuisine?.forEach((v) => activeChips.push({ id: `cuisine-${v}`, label: v, type: 'cuisine', value: v, color: '#c2410c' }));
+  filters.diet?.forEach((v) => activeChips.push({ id: `diet-${v}`, label: v, type: 'diet', value: v, color: '#15803d' }));
+  filters.difficulty?.forEach((v) => activeChips.push({ id: `difficulty-${v}`, label: v, type: 'difficulty', value: v, color: '#6b7280' }));
+  if (filters.sort) activeChips.push({ id: 'sort', label: SORT_LABELS[filters.sort] || filters.sort, type: 'sort', color: '#7c3aed' });
+
   return (
     <View style={styles.container}>
       <View style={styles.searchRow}>
@@ -206,6 +233,31 @@ export default function RecipesScreen() {
           {activeFilterCount > 0 && <Text style={styles.filterCount}>{activeFilterCount}</Text>}
         </TouchableOpacity>
       </View>
+
+      {activeChips.length > 0 && (
+        <View style={styles.activeFiltersRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.activeFiltersContent}>
+            {activeChips.map((chip) => (
+              <TouchableOpacity
+                key={chip.id}
+                style={[styles.activeChip, { backgroundColor: chip.color + '15', borderColor: chip.color + '40' }]}
+                onPress={() => removeFilter(chip.type, chip.value)}
+              >
+                <Text style={[styles.activeChipText, { color: chip.color }]}>{chip.label}</Text>
+                <Ionicons name="close-circle" size={14} color={chip.color} />
+              </TouchableOpacity>
+            ))}
+            {activeChips.length > 1 && (
+              <TouchableOpacity
+                style={styles.clearAllChip}
+                onPress={() => { setFilters({}); setQuery(''); }}
+              >
+                <Text style={styles.clearAllChipText}>Temizle</Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+        </View>
+      )}
 
       {loading ? (
         <LoadingSpinner fullScreen />
@@ -368,5 +420,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666666',
     textAlign: 'center',
+  },
+  activeFiltersRow: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  activeFiltersContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+    flexDirection: 'row',
+  },
+  activeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  activeChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  clearAllChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+  },
+  clearAllChipText: {
+    fontSize: 12,
+    color: '#666666',
+    fontWeight: '600',
   },
 });
