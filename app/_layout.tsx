@@ -18,6 +18,15 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
+          name="menu/create"
+          options={{
+            headerShown: true,
+            headerTitle: 'Yeni Menü',
+            headerBackTitle: 'Vazgeç',
+            headerTintColor: '#e74c3c',
+          }}
+        />
+        <Stack.Screen
           name="menu/[slug]"
           options={{
             headerShown: true,
