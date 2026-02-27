@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { User } from '../lib/types';
-import { getMe, login as apiLogin, register as apiRegister } from '../lib/api';
+import { getMe, login as apiLogin, register as apiRegister, googleAuth, RegisterData } from '../lib/api';
 
 const TOKEN_KEY = 'auth_token';
 
@@ -10,7 +10,8 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, displayName: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
+  register: (userData: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -55,9 +56,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(userData);
   };
 
-  const register = async (email: string, password: string, displayName: string) => {
-    await apiRegister(email, password, displayName);
-    await login(email, password);
+  const loginWithGoogle = async (idToken: string) => {
+    const data = await googleAuth(idToken);
+    const jwt = data.token;
+    await SecureStore.setItemAsync(TOKEN_KEY, jwt);
+    setToken(jwt);
+    const userData = await getMe(jwt);
+    setUser(userData);
+  };
+
+  const register = async (userData: RegisterData) => {
+    await apiRegister(userData);
   };
 
   const logout = async () => {
@@ -77,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, loginWithGoogle, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

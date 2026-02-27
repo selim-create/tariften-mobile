@@ -72,6 +72,15 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
+          name="forgot-password"
+          options={{
+            headerShown: true,
+            headerTitle: 'Şifremi Unuttum',
+            headerBackTitle: 'Geri',
+            headerTintColor: '#e74c3c',
+          }}
+        />
+        <Stack.Screen
           name="collections/index"
           options={{
             headerShown: true,
