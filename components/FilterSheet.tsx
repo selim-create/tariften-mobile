@@ -85,10 +85,10 @@ export default function FilterSheet({ visible, onClose, filters, onFiltersChange
         </View>
 
         <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-          {(terms?.difficulty || DIFFICULTY_OPTIONS) && (
+          {terms?.meal_type && terms.meal_type.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Zorluk</Text>
-              {renderOptions('difficulty', terms?.difficulty || DIFFICULTY_OPTIONS)}
+              <Text style={styles.sectionTitle}>Öğün Tipi</Text>
+              {renderOptions('mealType', terms.meal_type)}
             </View>
           )}
 
@@ -106,10 +106,10 @@ export default function FilterSheet({ visible, onClose, filters, onFiltersChange
             </View>
           )}
 
-          {terms?.meal_type && terms.meal_type.length > 0 && (
+          {(terms?.difficulty || DIFFICULTY_OPTIONS) && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Öğün</Text>
-              {renderOptions('mealType', terms.meal_type)}
+              <Text style={styles.sectionTitle}>Zorluk</Text>
+              {renderOptions('difficulty', terms?.difficulty || DIFFICULTY_OPTIONS)}
             </View>
           )}
 
