@@ -1,5 +1,9 @@
-import { Tabs } from 'expo-router';
+import React from 'react';
+import { StyleSheet, TouchableOpacity, Text, View } from 'react-native';
+import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { useAuth } from '../../context/AuthContext';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -10,8 +14,7 @@ interface TabConfig {
   iconOutline: IoniconName;
 }
 
-const tabs: TabConfig[] = [
-  { name: 'index', title: 'Keşfet', icon: 'home', iconOutline: 'home-outline' },
+const otherTabs: TabConfig[] = [
   { name: 'recipes', title: 'Tarifler', icon: 'restaurant', iconOutline: 'restaurant-outline' },
   { name: 'pantry', title: 'Kiler', icon: 'basket', iconOutline: 'basket-outline' },
   { name: 'menus', title: 'Menüler', icon: 'book', iconOutline: 'book-outline' },
@@ -19,6 +22,9 @@ const tabs: TabConfig[] = [
 ];
 
 export default function TabLayout() {
+  const router = useRouter();
+  const { user } = useAuth();
+
   return (
     <Tabs
       screenOptions={{
@@ -44,7 +50,44 @@ export default function TabLayout() {
         },
       }}
     >
-      {tabs.map((tab) => (
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Keşfet',
+          headerTitle: () => (
+            <Text style={headerStyles.logo}>
+              tariften
+            </Text>
+          ),
+          headerRight: () => (
+            <View style={headerStyles.rightContainer}>
+              <TouchableOpacity onPress={() => router.push('/recipes')} style={headerStyles.iconButton}>
+                <Ionicons name="search-outline" size={22} color="#1a1a1a" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/profile')} style={headerStyles.iconButton}>
+                <Ionicons name="heart-outline" size={22} color="#1a1a1a" />
+              </TouchableOpacity>
+              {user?.avatar_url ? (
+                <TouchableOpacity onPress={() => router.push('/profile')} style={headerStyles.iconButton}>
+                  <Image
+                    source={{ uri: user.avatar_url }}
+                    style={headerStyles.userAvatar}
+                    contentFit="cover"
+                  />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity onPress={() => router.push('/profile')} style={headerStyles.iconButton}>
+                  <Ionicons name="person-circle-outline" size={28} color="#1a1a1a" />
+                </TouchableOpacity>
+              )}
+            </View>
+          ),
+          tabBarIcon: ({ focused, color, size }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+      {otherTabs.map((tab) => (
         <Tabs.Screen
           key={tab.name}
           name={tab.name}
@@ -59,3 +102,26 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const headerStyles = StyleSheet.create({
+  logo: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#e74c3c',
+    letterSpacing: -1,
+  },
+  rightContainer: {
+    flexDirection: 'row',
+    gap: 4,
+    paddingRight: 12,
+    alignItems: 'center',
+  },
+  iconButton: {
+    padding: 4,
+  },
+  userAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+});

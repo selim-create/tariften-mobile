@@ -2,14 +2,16 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Recipe } from '../lib/types';
 
 interface RecipeCardProps {
   recipe: Recipe;
   horizontal?: boolean;
+  badge?: string;
 }
 
-export default function RecipeCard({ recipe, horizontal = false }: RecipeCardProps) {
+export default function RecipeCard({ recipe, horizontal = false, badge }: RecipeCardProps) {
   const router = useRouter();
 
   return (
@@ -24,6 +26,11 @@ export default function RecipeCard({ recipe, horizontal = false }: RecipeCardPro
         contentFit="cover"
         transition={200}
       />
+      {badge ? (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{badge}</Text>
+        </View>
+      ) : null}
       <View style={styles.content}>
         <Text style={styles.title} numberOfLines={2}>
           {recipe.title}
@@ -35,17 +42,29 @@ export default function RecipeCard({ recipe, horizontal = false }: RecipeCardPro
         ) : null}
         <View style={styles.meta}>
           {recipe.prep_time ? (
-            <Text style={styles.metaText}>⏱ {recipe.prep_time} dk</Text>
+            <View style={styles.metaItem}>
+              <Ionicons name="time-outline" size={11} color="#666666" />
+              <Text style={styles.metaText}>{recipe.prep_time} dk</Text>
+            </View>
           ) : null}
           {recipe.difficulty?.length > 0 ? (
-            <Text style={styles.metaText}>📊 {recipe.difficulty[0]}</Text>
+            <View style={styles.metaItem}>
+              <Ionicons name="stats-chart-outline" size={11} color="#666666" />
+              <Text style={styles.metaText}>{recipe.difficulty[0]}</Text>
+            </View>
           ) : null}
           {recipe.calories ? (
-            <Text style={styles.metaText}>🔥 {recipe.calories} kcal</Text>
+            <View style={styles.metaItem}>
+              <Ionicons name="flame-outline" size={11} color="#666666" />
+              <Text style={styles.metaText}>{recipe.calories} kcal</Text>
+            </View>
           ) : null}
         </View>
         {recipe.average_rating && recipe.average_rating > 0 ? (
-          <Text style={styles.rating}>⭐ {recipe.average_rating.toFixed(1)}</Text>
+          <View style={styles.ratingRow}>
+            <Ionicons name="star" size={12} color="#e74c3c" />
+            <Text style={styles.rating}>{recipe.average_rating.toFixed(1)}</Text>
+          </View>
         ) : null}
       </View>
     </TouchableOpacity>
@@ -73,6 +92,20 @@ const styles = StyleSheet.create({
   horizontalImage: {
     height: 140,
   },
+  badge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: '#e74c3c',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
   content: {
     padding: 12,
   },
@@ -92,13 +125,23 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
   metaText: {
     fontSize: 12,
     color: '#666666',
   },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 4,
+  },
   rating: {
     fontSize: 13,
     color: '#e74c3c',
-    marginTop: 4,
   },
 });

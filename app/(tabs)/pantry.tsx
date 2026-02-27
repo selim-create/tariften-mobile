@@ -113,7 +113,7 @@ export default function PantryScreen() {
   if (!token) {
     return (
       <View style={styles.notLoggedIn}>
-        <Text style={styles.notLoggedInIcon}>🧺</Text>
+        <Ionicons name="basket-outline" size={72} color="#e74c3c" style={styles.notLoggedInIcon} />
         <Text style={styles.notLoggedInTitle}>Kilerinizi Yönetin</Text>
         <Text style={styles.notLoggedInText}>Kiler özelliğini kullanmak için giriş yapın.</Text>
         <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/login')}>
@@ -138,7 +138,10 @@ export default function PantryScreen() {
             {analyzing ? (
               <LoadingSpinner size="small" />
             ) : (
-              <Text style={styles.analyzeButtonText}>🤖 AI Tarif</Text>
+              <View style={styles.analyzeButtonContent}>
+                <Ionicons name="color-wand-outline" size={14} color="#ffffff" />
+                <Text style={styles.analyzeButtonText}>AI Tarif</Text>
+              </View>
             )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.addButton} onPress={() => setAddModalVisible(true)}>
@@ -169,7 +172,7 @@ export default function PantryScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🧺</Text>
+            <Ionicons name="basket-outline" size={52} color="#cccccc" style={styles.emptyIcon} />
             <Text style={styles.emptyText}>Kileriniz boş.</Text>
             <Text style={styles.emptySubtext}>Malzeme eklemek için + butonuna tıklayın.</Text>
           </View>
@@ -262,6 +265,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
+  analyzeButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   analyzeButtonText: {
     color: '#ffffff',
     fontWeight: '600',
@@ -314,7 +322,6 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyIcon: {
-    fontSize: 48,
     marginBottom: 12,
   },
   emptyText: {
@@ -335,7 +342,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   notLoggedInIcon: {
-    fontSize: 64,
     marginBottom: 16,
   },
   notLoggedInTitle: {
