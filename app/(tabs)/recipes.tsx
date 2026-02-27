@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { generateAIRecipe, getRecipes, getTerms } from '../../lib/api';
+import { createRecipe, generateAIRecipe, getRecipes, getTerms } from '../../lib/api';
 import { Recipe, RecipeFilters } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
 import SearchBar from '../../components/SearchBar';
@@ -170,17 +170,38 @@ export default function RecipesScreen() {
       setAiLoadingMessage(AI_LOADING_MESSAGES[msgIdx]);
     }, 2000);
     try {
-      const result = await generateAIRecipe(token, searchQuery);
-      if (aiMsgIntervalRef.current) {
-        clearInterval(aiMsgIntervalRef.current);
-        aiMsgIntervalRef.current = null;
-      }
-      setAiModalVisible(false);
-      const slug = result?.slug || result?.data?.slug;
-      if (slug) {
-        router.push(`/recipe/${slug}`);
+      const aiResponse = await generateAIRecipe(token, searchQuery);
+
+      if (aiResponse.success && aiResponse.recipe) {
+        // 2-step flow: generate then save (mirrors web implementation)
+        const saveResponse = await createRecipe(token, aiResponse.recipe);
+
+        if (aiMsgIntervalRef.current) {
+          clearInterval(aiMsgIntervalRef.current);
+          aiMsgIntervalRef.current = null;
+        }
+        setAiModalVisible(false);
+
+        const slug = saveResponse?.slug || saveResponse?.data?.slug || saveResponse?.id;
+        if (slug) {
+          router.push(`/recipe/${slug}`);
+        } else {
+          Alert.alert('Bilgi', 'Tarif oluşturuldu fakat detay sayfasına yönlendirilemedi.');
+        }
       } else {
-        Alert.alert('Hata', 'Tarif oluşturuldu ancak yönlendirme yapılamadı.');
+        // Fallback: API returned slug directly (older format)
+        if (aiMsgIntervalRef.current) {
+          clearInterval(aiMsgIntervalRef.current);
+          aiMsgIntervalRef.current = null;
+        }
+        setAiModalVisible(false);
+
+        const slug = aiResponse?.slug || aiResponse?.data?.slug;
+        if (slug) {
+          router.push(`/recipe/${slug}`);
+        } else {
+          Alert.alert('Hata', 'Tarif oluşturulamadı. Lütfen tekrar deneyin.');
+        }
       }
     } catch (error: unknown) {
       if (aiMsgIntervalRef.current) {
