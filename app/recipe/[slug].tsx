@@ -23,6 +23,7 @@ import { Recipe } from '../../lib/types';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import RatingStars from '../../components/RatingStars';
 import CommentSection from '../../components/CommentSection';
+import CookingAssistant from '../../components/CookingAssistant';
 
 export default function RecipeDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -35,6 +36,7 @@ export default function RecipeDetailScreen() {
   const [isCooked, setIsCooked] = useState(false);
   const [ratingData, setRatingData] = useState({ average: 0, count: 0 });
   const [userRating, setUserRating] = useState<number | null>(null);
+  const [cookingAssistantVisible, setCookingAssistantVisible] = useState(false);
 
   const loadRecipe = useCallback(async () => {
     if (!slug) return;
@@ -231,7 +233,16 @@ export default function RecipeDetailScreen() {
         {/* Steps */}
         {recipe.steps?.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Yapılışı</Text>
+            <View style={styles.stepsSectionHeader}>
+              <Text style={styles.sectionTitle}>Yapılışı</Text>
+              <TouchableOpacity
+                style={styles.startCookingButton}
+                onPress={() => setCookingAssistantVisible(true)}
+              >
+                <Ionicons name="play-circle" size={16} color="#ffffff" />
+                <Text style={styles.startCookingText}>Pişirmeye Başla</Text>
+              </TouchableOpacity>
+            </View>
             {recipe.steps.map((step, idx) => (
               <View key={idx} style={styles.stepRow}>
                 <View style={styles.stepNumber}>
@@ -282,6 +293,13 @@ export default function RecipeDetailScreen() {
 
         <View style={styles.bottomPadding} />
       </View>
+      <CookingAssistant
+        visible={cookingAssistantVisible}
+        onClose={() => setCookingAssistantVisible(false)}
+        recipeTitle={recipe.title}
+        steps={recipe.steps}
+        chefTip={recipe.chef_tip}
+      />
     </ScrollView>
   );
 }
@@ -408,6 +426,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1a1a1a',
     marginBottom: 12,
+  },
+  stepsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  startCookingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#e74c3c',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  startCookingText: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 13,
   },
   ingredientRow: {
     flexDirection: 'row',

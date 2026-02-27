@@ -74,10 +74,18 @@ export default function TabLayout() {
               <TouchableOpacity onPress={() => router.push('/profile')} style={headerStyles.iconButton}>
                 <Ionicons name="heart-outline" size={22} color="#1a1a1a" />
               </TouchableOpacity>
-              {user?.avatar_url ? (
+              {user?.avatar_url && user.avatar_url.length > 0 ? (
                 <TouchableOpacity onPress={() => router.push('/profile')} style={headerStyles.iconButton}>
                   <Image
                     source={{ uri: user.avatar_url }}
+                    style={headerStyles.userAvatar}
+                    contentFit="cover"
+                  />
+                </TouchableOpacity>
+              ) : user ? (
+                <TouchableOpacity onPress={() => router.push('/profile')} style={headerStyles.iconButton}>
+                  <Image
+                    source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(user.user_display_name || 'U')}&background=db4c3f&color=fff&size=56` }}
                     style={headerStyles.userAvatar}
                     contentFit="cover"
                   />
