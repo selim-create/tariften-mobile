@@ -40,6 +40,7 @@ export default function RootLayout() {
           options={{
             headerShown: true,
             headerTitle: 'Blog',
+            headerBackTitle: 'Geri',
             headerTintColor: '#e74c3c',
           }}
         />
@@ -57,6 +58,7 @@ export default function RootLayout() {
           options={{
             headerShown: true,
             headerTitle: 'Giriş Yap',
+            headerBackTitle: 'Geri',
             headerTintColor: '#e74c3c',
           }}
         />
@@ -65,6 +67,7 @@ export default function RootLayout() {
           options={{
             headerShown: true,
             headerTitle: 'Kayıt Ol',
+            headerBackTitle: 'Geri',
             headerTintColor: '#e74c3c',
           }}
         />
@@ -73,6 +76,16 @@ export default function RootLayout() {
           options={{
             headerShown: true,
             headerTitle: 'Koleksiyonlar',
+            headerBackTitle: 'Geri',
+            headerTintColor: '#e74c3c',
+          }}
+        />
+        <Stack.Screen
+          name="profile/edit"
+          options={{
+            headerShown: true,
+            headerTitle: 'Profili Düzenle',
+            headerBackTitle: 'Geri',
             headerTintColor: '#e74c3c',
           }}
         />

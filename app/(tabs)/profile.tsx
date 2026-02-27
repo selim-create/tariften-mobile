@@ -106,15 +106,20 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
-          {user.avatar_url && user.avatar_url.length > 0 ? (
-            <Image source={{ uri: user.avatar_url }} style={styles.avatar} contentFit="cover" />
-          ) : (
-            <Image
-              source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(user.user_display_name || 'U')}&background=db4c3f&color=fff&size=160` }}
-              style={styles.avatar}
-              contentFit="cover"
-            />
-          )}
+          <View style={styles.avatarContainer}>
+            {user.avatar_url && user.avatar_url.length > 0 ? (
+              <Image source={{ uri: user.avatar_url }} style={styles.avatar} contentFit="cover" />
+            ) : (
+              <Image
+                source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(user.user_display_name || 'U')}&background=db4c3f&color=fff&size=160` }}
+                style={styles.avatar}
+                contentFit="cover"
+              />
+            )}
+            <TouchableOpacity style={styles.editAvatarButton} onPress={() => router.push('/profile/edit')}>
+              <Ionicons name="settings-outline" size={14} color="#555555" />
+            </TouchableOpacity>
+          </View>
           <Text style={styles.displayName}>{user.user_display_name}</Text>
           <Text style={styles.email}>{user.user_email}</Text>
           {user.bio ? <Text style={styles.bio}>{user.bio}</Text> : null}
@@ -201,6 +206,20 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     marginBottom: 12,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 12,
+  },
+  editAvatarButton: {
+    position: 'absolute',
+    bottom: 10,
+    right: -2,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
+    borderRadius: 12,
+    padding: 4,
   },
   displayName: {
     fontSize: 20,
