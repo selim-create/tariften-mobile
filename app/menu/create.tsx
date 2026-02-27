@@ -107,6 +107,13 @@ export default function CreateMenuScreen() {
           >
             <Text style={styles.primaryButtonText}>Devam Et →</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => router.back()}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.cancelButtonText}>Vazgeç</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -190,6 +197,13 @@ export default function CreateMenuScreen() {
           <TouchableOpacity style={styles.secondaryButton} onPress={() => setStep(2)} activeOpacity={0.85}>
             <Text style={styles.secondaryButtonText}>Düzenle</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => router.back()}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.cancelButtonText}>Vazgeç</Text>
+          </TouchableOpacity>
         </View>
       )}
     </ScrollView>
@@ -244,7 +258,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 32,
-    marginTop: 8,
+    marginTop: 16,
   },
   progressStep: {
     flexDirection: 'row',
@@ -442,5 +456,14 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  cancelButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    color: '#999999',
+    fontWeight: '500',
   },
 });
