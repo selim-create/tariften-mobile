@@ -27,6 +27,8 @@ import RatingStars from '../../components/RatingStars';
 import CommentSection from '../../components/CommentSection';
 import CookingAssistant from '../../components/CookingAssistant';
 import RecipeCard from '../../components/RecipeCard';
+import ImagePlaceholder, { isPlaceholderImage } from '../../components/ImagePlaceholder';
+import AuthorCard from '../../components/AuthorCard';
 
 export default function RecipeDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -178,7 +180,11 @@ export default function RecipeDetailScreen() {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <Image source={{ uri: recipe.image }} style={styles.image} contentFit="cover" transition={300} />
+      {isPlaceholderImage(recipe.image) ? (
+        <ImagePlaceholder title={recipe.title} style={styles.image} />
+      ) : (
+        <Image source={{ uri: recipe.image }} style={styles.image} contentFit="cover" transition={300} />
+      )}
 
       <View style={styles.content}>
         {/* Title & Actions */}
@@ -453,6 +459,13 @@ export default function RecipeDetailScreen() {
                 <RecipeCard key={r.id} recipe={r} horizontal />
               ))}
             </ScrollView>
+          </View>
+        )}
+
+        {/* Author */}
+        {recipe.author?.name && (
+          <View style={styles.section}>
+            <AuthorCard author={recipe.author} />
           </View>
         )}
 

@@ -176,10 +176,11 @@ export default function RecipesScreen() {
         aiMsgIntervalRef.current = null;
       }
       setAiModalVisible(false);
-      if (result?.slug) {
-        router.push(`/recipe/${result.slug}`);
+      const slug = result?.slug || result?.data?.slug;
+      if (slug) {
+        router.push(`/recipe/${slug}`);
       } else {
-        Alert.alert('Tarif Hazır!', 'AI tarifiniz oluşturuldu.');
+        Alert.alert('Hata', 'Tarif oluşturuldu ancak yönlendirme yapılamadı.');
       }
     } catch (error: unknown) {
       if (aiMsgIntervalRef.current) {
@@ -255,7 +256,7 @@ export default function RecipesScreen() {
         </TouchableOpacity>
       </View>
 
-      {activeChips.length > 0 && (
+      {activeChips.length > 0 ? (
         <View style={styles.activeFiltersRow}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.activeFiltersContent}>
             {activeChips.map((chip) => (
@@ -277,6 +278,11 @@ export default function RecipesScreen() {
               </TouchableOpacity>
             )}
           </ScrollView>
+        </View>
+      ) : (
+        <View style={styles.allRecipesRow}>
+          <Ionicons name="list-outline" size={14} color="#999999" />
+          <Text style={styles.allRecipesText}>Tüm tarifler listeleniyor</Text>
         </View>
       )}
 
@@ -478,5 +484,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666666',
     fontWeight: '600',
+  },
+  allRecipesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  allRecipesText: {
+    fontSize: 12,
+    color: '#999999',
   },
 });

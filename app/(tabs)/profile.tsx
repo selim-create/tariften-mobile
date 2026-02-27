@@ -13,7 +13,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { getInteractions, getRecipes } from '../../lib/api';
+import { getInteractions, getUserRecipes } from '../../lib/api';
 import { Recipe } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -40,9 +40,7 @@ export default function ProfileScreen() {
         } else if (tab === 'cooked') {
           data = await getInteractions(token, 'cooked');
         } else if (tab === 'my_recipes') {
-          // source: 'user' filters to recipes authored by the current authenticated user
-          const result = await getRecipes({ source: 'user' });
-          data = result.data || [];
+          data = await getUserRecipes(token);
         }
         setRecipes(data);
       } catch (error) {

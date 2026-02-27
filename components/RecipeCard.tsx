@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Recipe } from '../lib/types';
+import ImagePlaceholder, { isPlaceholderImage } from './ImagePlaceholder';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -20,12 +21,19 @@ export default function RecipeCard({ recipe, horizontal = false, badge }: Recipe
       onPress={() => router.push(`/recipe/${recipe.slug}`)}
       activeOpacity={0.8}
     >
-      <Image
-        source={{ uri: recipe.image }}
-        style={[styles.image, horizontal && styles.horizontalImage]}
-        contentFit="cover"
-        transition={200}
-      />
+      {isPlaceholderImage(recipe.image) ? (
+        <ImagePlaceholder
+          title={recipe.title}
+          style={[styles.image, horizontal && styles.horizontalImage]}
+        />
+      ) : (
+        <Image
+          source={{ uri: recipe.image }}
+          style={[styles.image, horizontal && styles.horizontalImage]}
+          contentFit="cover"
+          transition={200}
+        />
+      )}
       {badge ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{badge}</Text>

@@ -115,6 +115,13 @@ export async function generateAIRecipe(token: string, ingredients: string) {
   return data;
 }
 
+export async function getUserRecipes(token: string): Promise<Recipe[]> {
+  const data = await fetchData(`${API_URL}/tariften/v1/recipes/search?source=user`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data?.data || [];
+}
+
 export async function createRecipe(token: string, recipeData: Record<string, unknown>) {
   const res = await fetch(`${API_URL}/tariften/v1/recipes/create`, {
     method: 'POST',
