@@ -180,22 +180,37 @@ export default function HomeScreen() {
             returnKeyType="search"
           />
         </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.pillsContainer}
-        >
-          {PILLS.map((pill) => (
-            <TouchableOpacity
-              key={pill}
-              style={styles.pill}
-              onPress={() => router.push({ pathname: '/recipes', params: { query: pill } } as any)}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.pillText, { fontSize: rf(13, fontScale) }]}>{pill}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {isTablet ? (
+          <View style={styles.pillsContainerTablet}>
+            {PILLS.map((pill) => (
+              <TouchableOpacity
+                key={pill}
+                style={styles.pill}
+                onPress={() => router.push({ pathname: '/recipes', params: { query: pill } } as any)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.pillText, { fontSize: rf(13, fontScale) }]}>{pill}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.pillsContainer}
+          >
+            {PILLS.map((pill) => (
+              <TouchableOpacity
+                key={pill}
+                style={styles.pill}
+                onPress={() => router.push({ pathname: '/recipes', params: { query: pill } } as any)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.pillText, { fontSize: rf(13, fontScale) }]}>{pill}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
       </View>
 
       {/* Section 2: Vizesiz Dünya Turu */}
@@ -204,25 +219,43 @@ export default function HomeScreen() {
           <Ionicons name="earth" size={18} color="#1a1a1a" />
           <Text style={[styles.sectionTitle, { fontSize: rf(17, fontScale) }]}>Vizesiz Dünya Turu</Text>
         </View>
-        <FlatList
-          data={CUISINES}
-          keyExtractor={(item) => item.param}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.cuisineCard}
-              onPress={() => navigateWithFilter({ cuisine: item.param })}
-              activeOpacity={0.85}
-            >
-              <Image source={{ uri: item.image }} style={styles.cuisineImage} contentFit="cover" />
-              <View style={styles.cuisineOverlay}>
-                <Text style={styles.cuisineLabel}>{item.label}</Text>
-              </View>
-            </TouchableOpacity>
-          )}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.horizontalList}
-        />
+        {isTablet ? (
+          <View style={styles.cuisineGridTablet}>
+            {CUISINES.map((item) => (
+              <TouchableOpacity
+                key={item.param}
+                style={styles.cuisineCardTablet}
+                onPress={() => navigateWithFilter({ cuisine: item.param })}
+                activeOpacity={0.85}
+              >
+                <Image source={{ uri: item.image }} style={styles.cuisineImage} contentFit="cover" />
+                <View style={styles.cuisineOverlay}>
+                  <Text style={styles.cuisineLabel}>{item.label}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <FlatList
+            data={CUISINES}
+            keyExtractor={(item) => item.param}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.cuisineCard}
+                onPress={() => navigateWithFilter({ cuisine: item.param })}
+                activeOpacity={0.85}
+              >
+                <Image source={{ uri: item.image }} style={styles.cuisineImage} contentFit="cover" />
+                <View style={styles.cuisineOverlay}>
+                  <Text style={styles.cuisineLabel}>{item.label}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalList}
+          />
+        )}
       </View>
 
       {/* Section 3: Şu An Herkes Bunu Pişiriyor */}
@@ -235,14 +268,22 @@ export default function HomeScreen() {
               <Text style={styles.seeAll}>Tümü →</Text>
             </TouchableOpacity>
           </View>
-          <FlatList
-            data={popularRecipes}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => <RecipeCard recipe={item} horizontal badge="Popüler" />}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalList}
-          />
+          {isTablet ? (
+            <View style={styles.popularGridTablet}>
+              {popularRecipes.map((item) => (
+                <RecipeCard key={item.id} recipe={item} badge="Popüler" />
+              ))}
+            </View>
+          ) : (
+            <FlatList
+              data={popularRecipes}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => <RecipeCard recipe={item} horizontal badge="Popüler" />}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalList}
+            />
+          )}
         </View>
       )}
 
@@ -326,10 +367,11 @@ export default function HomeScreen() {
           <Text style={[styles.menuShowcaseDesc, { fontSize: rf(13, fontScale) }]}>
             Sizin yerinize düşündük, planladık, eşleştirdik. Siz sadece mutfağa girin ve şovunuzu yapın. (Teşekküre gerek yok, bi' tabak gönderirsiniz.)
           </Text>
-          {menus.map((item) => (
+          <View style={isTablet ? styles.menuGridTablet : undefined}>
+            {menus.map((item) => (
             <TouchableOpacity
               key={item.id}
-              style={styles.menuCard}
+              style={[styles.menuCard, isTablet && styles.menuCardTablet]}
               onPress={() => router.push(`/menu/${item.slug}`)}
               activeOpacity={0.85}
             >
@@ -371,7 +413,8 @@ export default function HomeScreen() {
                 </View>
               </View>
             </TouchableOpacity>
-          ))}
+            ))}
+          </View>
           <TouchableOpacity
             style={styles.menuArchiveLink}
             onPress={() => router.push('/menus')}
@@ -861,6 +904,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#1a1a1a',
+  },
+  pillsContainerTablet: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingTop: 12,
+  },
+  cuisineGridTablet: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  cuisineCardTablet: {
+    flex: 1,
+    height: 130,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  popularGridTablet: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  menuGridTablet: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  menuCardTablet: {
+    width: '48%',
+    marginBottom: 0,
   },
   bottomPadding: {
     height: 32,
