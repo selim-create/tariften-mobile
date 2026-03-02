@@ -15,7 +15,14 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tariften.app",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Profil fotoğrafı ve tarif fotoğrafları çekmek için kamera erişimi gereklidir.",
+        "NSPhotoLibraryUsageDescription": "Profil fotoğrafı ve tarif fotoğrafları seçmek için galeri erişimi gereklidir.",
+        "NSMicrophoneUsageDescription": "Sesli tarif arama için mikrofon erişimi gereklidir.",
+        "NSSpeechRecognitionUsageDescription": "Sesli arama özelliği için konuşma tanıma erişimi gereklidir."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,7 +33,9 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.tariften.app",
-      "versionCode": 1
+      "versionCode": 1,
+      "googleServicesFile": "./google-services.json",
+      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE", "RECORD_AUDIO", "INTERNET", "VIBRATE"]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -36,7 +45,9 @@
       "expo-router",
       "expo-secure-store",
       "expo-image",
-      "expo-web-browser"
+      "expo-web-browser",
+      "@react-native-firebase/app",
+      "@react-native-firebase/analytics"
     ]
   }
 }
