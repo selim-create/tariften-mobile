@@ -1,13 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getMenu } from '../../lib/api';
 import { Menu } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface SectionStyle {
   icon: string;
@@ -37,6 +35,10 @@ const sectionStyles: Record<string, SectionStyle> = {
 export default function MenuDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
+  const isTablet = screenWidth >= 600;
+  const headerHeight = screenWidth >= 1100 ? 450 : screenWidth >= 900 ? 400 : screenWidth >= 600 ? 350 : 320;
+  const contentMaxWidth = isTablet ? 800 : undefined;
   const [menu, setMenu] = useState<Menu | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -69,7 +71,7 @@ export default function MenuDetailScreen() {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Immersive Header */}
-      <View style={styles.headerContainer}>
+      <View style={[styles.headerContainer, { width: screenWidth, height: headerHeight }]}>
         {menu.image ? (
           <Image source={{ uri: menu.image }} style={styles.headerImage} contentFit="cover" transition={300} />
         ) : (
@@ -102,7 +104,7 @@ export default function MenuDetailScreen() {
       </View>
 
       {/* Content Body */}
-      <View style={styles.contentCard}>
+      <View style={[styles.contentCard, contentMaxWidth ? { maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%' } : undefined]}>
         <View style={styles.kitchenLabel}>
           <Text style={styles.kitchenLabelText}>Mutfaktan</Text>
         </View>
@@ -159,8 +161,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   headerContainer: {
-    width: SCREEN_WIDTH,
-    height: 320,
     position: 'relative',
   },
   headerImage: {

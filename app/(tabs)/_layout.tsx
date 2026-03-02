@@ -4,6 +4,7 @@ import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useAuth } from '../../context/AuthContext';
+import { useResponsive } from '../../hooks/useResponsive';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -24,6 +25,11 @@ const otherTabs: TabConfig[] = [
 export default function TabLayout() {
   const router = useRouter();
   const { user } = useAuth();
+  const { isTablet } = useResponsive();
+
+  const tabBarHeight = isTablet ? 72 : 60;
+  const tabBarLabelSize = isTablet ? 13 : 11;
+  const headerTitleSize = isTablet ? 22 : 18;
 
   return (
     <Tabs
@@ -33,11 +39,11 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: '#ffffff',
           borderTopColor: '#e5e5e5',
-          paddingBottom: 4,
-          height: 60,
+          paddingBottom: isTablet ? 8 : 4,
+          height: tabBarHeight,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: tabBarLabelSize,
           fontWeight: '600',
         },
         headerStyle: {
@@ -46,7 +52,7 @@ export default function TabLayout() {
         headerTintColor: '#1a1a1a',
         headerTitleStyle: {
           fontWeight: '700',
-          fontSize: 18,
+          fontSize: headerTitleSize,
         },
       }}
     >

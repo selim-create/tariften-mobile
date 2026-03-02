@@ -14,10 +14,12 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
+import { useResponsive } from '../hooks/useResponsive';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
+  const { isTablet } = useResponsive();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -59,10 +61,11 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, isTablet && styles.scrollContentTablet]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={[styles.formContainer, isTablet && styles.formContainerTablet]}>
         <View style={styles.logo}>
           <Text style={styles.logoText}>tariften</Text>
           <Text style={styles.logoSubtitle}>Hesabınıza giriş yapın</Text>
@@ -160,6 +163,7 @@ export default function LoginScreen() {
             {'\'nı kabul etmiş olursunuz.'}
           </Text>
         </View>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -174,6 +178,15 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 24,
     justifyContent: 'center',
+  },
+  scrollContentTablet: {
+    alignItems: 'center',
+  },
+  formContainer: {
+    width: '100%',
+  },
+  formContainerTablet: {
+    maxWidth: 480,
   },
   logo: {
     alignItems: 'center',
