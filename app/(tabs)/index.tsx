@@ -272,7 +272,7 @@ export default function HomeScreen() {
             <View style={styles.popularGridTablet}>
               {popularRecipes.map((item) => (
                 <View key={item.id} style={{ width: '31.5%' }}>
-                  <RecipeCard recipe={item} badge="Popüler" />
+                  <RecipeCard recipe={item} badge="Popüler" fullWidth />
                 </View>
               ))}
             </View>
@@ -329,28 +329,55 @@ export default function HomeScreen() {
               <Text style={styles.seeAll}>Tümü →</Text>
             </TouchableOpacity>
           </View>
-          {latestBlog.map((post) => {
-            const imageUrl = post._embedded?.['wp:featuredmedia']?.[0]?.source_url;
-            return (
-              <TouchableOpacity
-                key={post.id}
-                style={styles.blogCard}
-                onPress={() => router.push(`/blog/${post.slug}`)}
-              >
-                {imageUrl && (
-                  <Image source={{ uri: imageUrl }} style={styles.blogImage} contentFit="cover" transition={200} />
-                )}
-                <View style={styles.blogContent}>
-                  <Text style={styles.blogTitle} numberOfLines={2}>
-                    {post.title.rendered.replace(/<[^>]*>/g, '')}
-                  </Text>
-                  <Text style={styles.blogDate}>
-                    {new Date(post.date).toLocaleDateString('tr-TR')}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+          {isTablet ? (
+            <View style={styles.blogGridTablet}>
+              {latestBlog.map((post) => {
+                const imageUrl = post._embedded?.['wp:featuredmedia']?.[0]?.source_url;
+                return (
+                  <TouchableOpacity
+                    key={post.id}
+                    style={[styles.blogCard, styles.blogCardTablet]}
+                    onPress={() => router.push(`/blog/${post.slug}`)}
+                  >
+                    {imageUrl && (
+                      <Image source={{ uri: imageUrl }} style={styles.blogImageTablet} contentFit="cover" transition={200} />
+                    )}
+                    <View style={styles.blogContent}>
+                      <Text style={styles.blogTitle} numberOfLines={2}>
+                        {post.title.rendered.replace(/<[^>]*>/g, '')}
+                      </Text>
+                      <Text style={styles.blogDate}>
+                        {new Date(post.date).toLocaleDateString('tr-TR')}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : (
+            latestBlog.map((post) => {
+              const imageUrl = post._embedded?.['wp:featuredmedia']?.[0]?.source_url;
+              return (
+                <TouchableOpacity
+                  key={post.id}
+                  style={styles.blogCard}
+                  onPress={() => router.push(`/blog/${post.slug}`)}
+                >
+                  {imageUrl && (
+                    <Image source={{ uri: imageUrl }} style={styles.blogImage} contentFit="cover" transition={200} />
+                  )}
+                  <View style={styles.blogContent}>
+                    <Text style={styles.blogTitle} numberOfLines={2}>
+                      {post.title.rendered.replace(/<[^>]*>/g, '')}
+                    </Text>
+                    <Text style={styles.blogDate}>
+                      {new Date(post.date).toLocaleDateString('tr-TR')}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
         </View>
       )}
 
@@ -673,9 +700,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e5e5',
   },
+  blogCardTablet: {
+    width: '31.5%',
+    flexDirection: 'column',
+  },
+  blogGridTablet: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
   blogImage: {
     width: 90,
     height: 90,
+  },
+  blogImageTablet: {
+    width: '100%',
+    height: 120,
   },
   blogContent: {
     flex: 1,

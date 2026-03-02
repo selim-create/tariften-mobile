@@ -12,9 +12,10 @@ interface RecipeCardProps {
   recipe: Recipe;
   horizontal?: boolean;
   badge?: string;
+  fullWidth?: boolean;
 }
 
-export default function RecipeCard({ recipe, horizontal = false, badge }: RecipeCardProps) {
+export default function RecipeCard({ recipe, horizontal = false, badge, fullWidth = false }: RecipeCardProps) {
   const router = useRouter();
   const { isTablet, cardWidth, fontScale } = useResponsive();
 
@@ -27,9 +28,10 @@ export default function RecipeCard({ recipe, horizontal = false, badge }: Recipe
     <TouchableOpacity
       style={[
         styles.card,
-        !horizontal && { width: cardWidth },
+        !horizontal && !fullWidth && { width: cardWidth },
         horizontal && { width: horizontalCardWidth },
         horizontal && styles.horizontalCardBase,
+        !horizontal && fullWidth && { width: '100%' },
       ]}
       onPress={() => router.push(`/recipe/${recipe.slug}`)}
       activeOpacity={0.8}
