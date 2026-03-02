@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "97522202514",
+    "project_id": "tariftencom",
+    "storage_bucket": "tariftencom.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:97522202514:android:311d42d86aac33a650f34b",
+        "android_client_info": {
+          "package_name": "com.tariften.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB-H2ylBlqnfaR_fuqO9JK_Oqok9rE8iF0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
