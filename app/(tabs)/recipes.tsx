@@ -2,10 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Modal,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,6 +17,7 @@ import RecipeCard from '../../components/RecipeCard';
 import SearchBar from '../../components/SearchBar';
 import FilterSheet from '../../components/FilterSheet';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import ResponsiveGrid from '../../components/ResponsiveGrid';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 
@@ -310,11 +309,10 @@ export default function RecipesScreen() {
       {loading ? (
         <LoadingSpinner fullScreen />
       ) : (
-        <FlatList
+        <ResponsiveGrid
           data={recipes}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => <RecipeCard recipe={item} />}
-          contentContainerStyle={styles.list}
+          keyExtractor={(item) => (item as Recipe).id.toString()}
+          renderItem={({ item }) => <RecipeCard recipe={item as Recipe} />}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#e74c3c" />
           }
@@ -402,9 +400,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#ffffff',
     fontWeight: '700',
-  },
-  list: {
-    padding: 16,
   },
   emptyContainer: {
     alignItems: 'center',

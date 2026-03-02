@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
+import { useResponsive } from '../hooks/useResponsive';
 
 const DIET_OPTIONS = [
   { label: 'Hepçil', value: 'none' },
@@ -33,6 +34,7 @@ const LEVEL_OPTIONS = [
 export default function RegisterScreen() {
   const router = useRouter();
   const { register } = useAuth();
+  const { isTablet } = useResponsive();
   const [formData, setFormData] = useState({
     username: '',
     fullname: '',
@@ -93,10 +95,11 @@ export default function RegisterScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, isTablet && styles.scrollContentTablet]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={[styles.formContainer, isTablet && styles.formContainerTablet]}>
         <View style={styles.logo}>
           <Text style={styles.logoText}>tariften</Text>
           <Text style={styles.logoSubtitle}>Hesap oluşturun</Text>
@@ -261,6 +264,7 @@ export default function RegisterScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+        </View>
       </ScrollView>
 
       {/* Success Modal */}
@@ -297,6 +301,15 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 24,
     paddingTop: 16,
+  },
+  scrollContentTablet: {
+    alignItems: 'center',
+  },
+  formContainer: {
+    width: '100%',
+  },
+  formContainerTablet: {
+    maxWidth: 480,
   },
   logo: {
     alignItems: 'center',

@@ -16,6 +16,8 @@ import { getBlogPosts, getMenus, getRecipes } from '../../lib/api';
 import { BlogPost, Menu, Recipe } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { useResponsive } from '../../hooks/useResponsive';
+import { rf } from '../../utils/responsiveFont';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -68,6 +70,7 @@ const MOODS: { label: string; icon: IoniconName; color: string; param: Record<st
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { isTablet, horizontalPadding, fontScale, heroImageHeight } = useResponsive();
   const [popularRecipes, setPopularRecipes] = useState<Recipe[]>([]);
   const [editorsRecipes, setEditorsRecipes] = useState<Recipe[]>([]);
   const [latestBlog, setLatestBlog] = useState<BlogPost[]>([]);
@@ -155,20 +158,20 @@ export default function HomeScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Section 1: Hero */}
-      <View style={styles.hero}>
+      <View style={[styles.hero, { paddingHorizontal: horizontalPadding, minHeight: heroImageHeight }]}>
         <View style={styles.heroBadge}>
           <Ionicons name="sparkles" size={13} color="#db4c3f" />
-          <Text style={styles.heroBadgeText}>Yapay Zeka Mutfak Asistanı</Text>
+          <Text style={[styles.heroBadgeText, { fontSize: rf(12, fontScale) }]}>Yapay Zeka Mutfak Asistanı</Text>
         </View>
-        <Text style={styles.heroTitle}>
+        <Text style={[styles.heroTitle, { fontSize: rf(26, fontScale) }]}>
           Bugün ne{' '}
           <Text style={styles.heroTitleAccent}>pişiriyoruz?</Text>
         </Text>
-        <Text style={styles.heroSubtitle}>Malzemeleri yaz, gerisini yapay zekaya bırak.</Text>
-        <View style={styles.searchContainer}>
+        <Text style={[styles.heroSubtitle, { fontSize: rf(15, fontScale) }]}>Malzemeleri yaz, gerisini yapay zekaya bırak.</Text>
+        <View style={[styles.searchContainer, isTablet && { maxWidth: 600 }]}>
           <Ionicons name="search-outline" size={18} color="#999999" />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { fontSize: rf(15, fontScale) }]}
             placeholder={searchQuery.length === 0 ? displayText + '|' : undefined}
             placeholderTextColor="#999999"
             value={searchQuery}
@@ -189,17 +192,17 @@ export default function HomeScreen() {
               onPress={() => router.push({ pathname: '/recipes', params: { query: pill } } as any)}
               activeOpacity={0.8}
             >
-              <Text style={styles.pillText}>{pill}</Text>
+              <Text style={[styles.pillText, { fontSize: rf(13, fontScale) }]}>{pill}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
 
       {/* Section 2: Vizesiz Dünya Turu */}
-      <View style={styles.section}>
+      <View style={[styles.section, { paddingHorizontal: horizontalPadding }]}>
         <View style={styles.sectionHeader}>
           <Ionicons name="earth" size={18} color="#1a1a1a" />
-          <Text style={styles.sectionTitle}>Vizesiz Dünya Turu</Text>
+          <Text style={[styles.sectionTitle, { fontSize: rf(17, fontScale) }]}>Vizesiz Dünya Turu</Text>
         </View>
         <FlatList
           data={CUISINES}
@@ -224,10 +227,10 @@ export default function HomeScreen() {
 
       {/* Section 3: Şu An Herkes Bunu Pişiriyor */}
       {popularRecipes.length > 0 && (
-        <View style={styles.section}>
+        <View style={[styles.section, { paddingHorizontal: horizontalPadding }]}>
           <View style={styles.sectionHeader}>
             <Ionicons name="flame" size={18} color="#e74c3c" />
-            <Text style={styles.sectionTitle}>Şu An Herkes Bunu Pişiriyor</Text>
+            <Text style={[styles.sectionTitle, { fontSize: rf(17, fontScale) }]}>Şu An Herkes Bunu Pişiriyor</Text>
             <TouchableOpacity onPress={() => router.push('/recipes')}>
               <Text style={styles.seeAll}>Tümü →</Text>
             </TouchableOpacity>
@@ -245,10 +248,10 @@ export default function HomeScreen() {
 
       {/* Section 4: Şefin Tavsiyesi */}
       {editorsRecipes.length > 0 && (
-        <View style={styles.section}>
+        <View style={[styles.section, { paddingHorizontal: horizontalPadding }]}>
           <View style={styles.sectionHeader}>
             <Ionicons name="ribbon" size={18} color="#f39c12" />
-            <Text style={styles.sectionTitle}>Şefin Tavsiyesi</Text>
+            <Text style={[styles.sectionTitle, { fontSize: rf(17, fontScale) }]}>Şefin Tavsiyesi</Text>
             <TouchableOpacity onPress={() => router.push('/recipes')}>
               <Text style={styles.seeAll}>Tümü →</Text>
             </TouchableOpacity>
@@ -257,7 +260,7 @@ export default function HomeScreen() {
             {editorsRecipes.map((recipe) => (
               <TouchableOpacity
                 key={recipe.id}
-                style={styles.editorCard}
+                style={[styles.editorCard, isTablet && styles.editorCardTablet]}
                 onPress={() => router.push(`/recipe/${recipe.slug}`)}
                 activeOpacity={0.85}
               >
@@ -275,10 +278,10 @@ export default function HomeScreen() {
 
       {/* Section 5: Mutfaktan Blog */}
       {latestBlog.length > 0 && (
-        <View style={styles.section}>
+        <View style={[styles.section, { paddingHorizontal: horizontalPadding }]}>
           <View style={styles.sectionHeader}>
             <Ionicons name="document-text" size={18} color="#1a1a1a" />
-            <Text style={styles.sectionTitle}>Mutfaktan Blog</Text>
+            <Text style={[styles.sectionTitle, { fontSize: rf(17, fontScale) }]}>Mutfaktan Blog</Text>
             <TouchableOpacity onPress={() => router.push('/blog')}>
               <Text style={styles.seeAll}>Tümü →</Text>
             </TouchableOpacity>
@@ -310,17 +313,17 @@ export default function HomeScreen() {
 
       {/* Section 6: Menü Showcase */}
       {menus.length > 0 && (
-        <View style={styles.section}>
+        <View style={[styles.section, { paddingHorizontal: horizontalPadding }]}>
           <View style={styles.menuShowcaseBadge}>
             <Ionicons name="trophy" size={13} color="#db4c3f" />
             <Text style={styles.menuShowcaseBadgeText}>Şefin Tavsiyesi</Text>
           </View>
-          <Text style={styles.menuShowcaseTitle}>
+          <Text style={[styles.menuShowcaseTitle, { fontSize: rf(20, fontScale) }]}>
             "Bugün ne pişirsem?" derdine{' '}
             <Text style={styles.menuShowcaseTitleAccent}>ilaç gibi</Text>
             {' '}menüler.
           </Text>
-          <Text style={styles.menuShowcaseDesc}>
+          <Text style={[styles.menuShowcaseDesc, { fontSize: rf(13, fontScale) }]}>
             Sizin yerinize düşündük, planladık, eşleştirdik. Siz sadece mutfağa girin ve şovunuzu yapın. (Teşekküre gerek yok, bi' tabak gönderirsiniz.)
           </Text>
           {menus.map((item) => (
@@ -381,10 +384,10 @@ export default function HomeScreen() {
       )}
 
       {/* Section 7: Hangi Moddasın? */}
-      <View style={styles.section}>
+      <View style={[styles.section, { paddingHorizontal: horizontalPadding }]}>
         <View style={styles.sectionHeader}>
           <Ionicons name="color-palette" size={18} color="#1a1a1a" />
-          <Text style={styles.sectionTitle}>Hangi Moddasın?</Text>
+          <Text style={[styles.sectionTitle, { fontSize: rf(17, fontScale) }]}>Hangi Moddasın?</Text>
         </View>
         <View style={styles.moodsGrid}>
           {MOODS.map((mood) => (
@@ -395,29 +398,29 @@ export default function HomeScreen() {
               activeOpacity={0.8}
             >
               <Ionicons name={mood.icon} size={22} color="#ffffff" />
-              <Text style={styles.moodLabel}>{mood.label}</Text>
+              <Text style={[styles.moodLabel, { fontSize: rf(13, fontScale) }]}>{mood.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
       {/* Section 8: Akıllı Banner */}
-      <View style={styles.bannerSection}>
+      <View style={[styles.bannerSection, { paddingHorizontal: horizontalPadding }]}>
         <View style={styles.banner}>
           <Ionicons name="sparkles" size={32} color="#ffffff" />
-          <Text style={styles.bannerTitle}>AI ile Tarif Keşfet</Text>
-          <Text style={styles.bannerSubtitle}>
+          <Text style={[styles.bannerTitle, { fontSize: rf(20, fontScale) }]}>AI ile Tarif Keşfet</Text>
+          <Text style={[styles.bannerSubtitle, { fontSize: rf(14, fontScale) }]}>
             Elindeki malzemelere göre yapay zeka destekli tarif önerileri al.
           </Text>
           <TouchableOpacity style={styles.bannerButton} onPress={() => router.push('/pantry')}>
-            <Text style={styles.bannerButtonText}>Hemen Dene</Text>
+            <Text style={[styles.bannerButtonText, { fontSize: rf(15, fontScale) }]}>Hemen Dene</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Hızlı Erişim</Text>
+      <View style={[styles.section, { paddingHorizontal: horizontalPadding }]}>
+        <Text style={[styles.sectionTitle, { fontSize: rf(17, fontScale) }]}>Hızlı Erişim</Text>
         <View style={styles.actionsGrid}>
           {[
             { label: 'Dolabım', icon: 'basket-outline' as IoniconName, route: '/pantry' },
@@ -431,7 +434,7 @@ export default function HomeScreen() {
               onPress={() => router.push(action.route as any)}
             >
               <Ionicons name={action.icon} size={24} color="#e74c3c" />
-              <Text style={styles.actionLabel}>{action.label}</Text>
+              <Text style={[styles.actionLabel, { fontSize: rf(13, fontScale) }]}>{action.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -449,8 +452,9 @@ const styles = StyleSheet.create({
   },
   hero: {
     backgroundColor: '#fcfcfc',
-    padding: 28,
+    paddingHorizontal: 28,
     paddingTop: 32,
+    paddingBottom: 28,
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#f0e8e8',
@@ -529,7 +533,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   section: {
-    paddingHorizontal: 16,
     paddingTop: 36,
   },
   sectionHeader: {
@@ -594,6 +597,9 @@ const styles = StyleSheet.create({
     height: 130,
     borderRadius: 12,
     overflow: 'hidden',
+  },
+  editorCardTablet: {
+    height: 180,
   },
   editorImage: {
     width: '100%',
@@ -802,7 +808,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   bannerSection: {
-    paddingHorizontal: 16,
     paddingTop: 24,
   },
   banner: {

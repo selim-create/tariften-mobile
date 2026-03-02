@@ -5,6 +5,8 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Recipe } from '../lib/types';
 import ImagePlaceholder, { isPlaceholderImage } from './ImagePlaceholder';
+import { useResponsive } from '../hooks/useResponsive';
+import { rf } from '../utils/responsiveFont';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -14,22 +16,33 @@ interface RecipeCardProps {
 
 export default function RecipeCard({ recipe, horizontal = false, badge }: RecipeCardProps) {
   const router = useRouter();
+  const { isTablet, cardWidth, fontScale } = useResponsive();
+
+  const horizontalCardWidth = isTablet ? 260 : 200;
+  const imageHeight = isTablet ? 220 : 180;
+  const horizontalImageHeight = isTablet ? 160 : 140;
+  const contentPadding = isTablet ? 16 : 12;
 
   return (
     <TouchableOpacity
-      style={[styles.card, horizontal && styles.horizontalCard]}
+      style={[
+        styles.card,
+        !horizontal && { width: cardWidth },
+        horizontal && { width: horizontalCardWidth },
+        horizontal && styles.horizontalCardBase,
+      ]}
       onPress={() => router.push(`/recipe/${recipe.slug}`)}
       activeOpacity={0.8}
     >
       {isPlaceholderImage(recipe.image) ? (
         <ImagePlaceholder
           title={recipe.title}
-          style={[styles.image, horizontal && styles.horizontalImage]}
+          style={[styles.image, { height: horizontal ? horizontalImageHeight : imageHeight }]}
         />
       ) : (
         <Image
           source={{ uri: recipe.image }}
-          style={[styles.image, horizontal && styles.horizontalImage]}
+          style={[styles.image, { height: horizontal ? horizontalImageHeight : imageHeight }]}
           contentFit="cover"
           transition={200}
         />
@@ -39,12 +52,12 @@ export default function RecipeCard({ recipe, horizontal = false, badge }: Recipe
           <Text style={styles.badgeText}>{badge}</Text>
         </View>
       ) : null}
-      <View style={styles.content}>
-        <Text style={styles.title} numberOfLines={2}>
+      <View style={[styles.content, { padding: contentPadding }]}>
+        <Text style={[styles.title, { fontSize: rf(15, fontScale) }]} numberOfLines={2}>
           {recipe.title}
         </Text>
         {recipe.excerpt ? (
-          <Text style={styles.excerpt} numberOfLines={2}>
+          <Text style={[styles.excerpt, { fontSize: rf(13, fontScale) }]} numberOfLines={2}>
             {recipe.excerpt}
           </Text>
         ) : null}
@@ -52,26 +65,26 @@ export default function RecipeCard({ recipe, horizontal = false, badge }: Recipe
           {recipe.prep_time ? (
             <View style={styles.metaItem}>
               <Ionicons name="time-outline" size={11} color="#666666" />
-              <Text style={styles.metaText}>{recipe.prep_time} dk</Text>
+              <Text style={[styles.metaText, { fontSize: rf(12, fontScale) }]}>{recipe.prep_time} dk</Text>
             </View>
           ) : null}
           {recipe.difficulty?.length > 0 ? (
             <View style={styles.metaItem}>
               <Ionicons name="stats-chart-outline" size={11} color="#666666" />
-              <Text style={styles.metaText}>{recipe.difficulty[0]}</Text>
+              <Text style={[styles.metaText, { fontSize: rf(12, fontScale) }]}>{recipe.difficulty[0]}</Text>
             </View>
           ) : null}
           {recipe.calories ? (
             <View style={styles.metaItem}>
               <Ionicons name="flame-outline" size={11} color="#666666" />
-              <Text style={styles.metaText}>{recipe.calories} kcal</Text>
+              <Text style={[styles.metaText, { fontSize: rf(12, fontScale) }]}>{recipe.calories} kcal</Text>
             </View>
           ) : null}
         </View>
         {recipe.average_rating && recipe.average_rating > 0 ? (
           <View style={styles.ratingRow}>
             <Ionicons name="star" size={12} color="#e74c3c" />
-            <Text style={styles.rating}>{recipe.average_rating.toFixed(1)}</Text>
+            <Text style={[styles.rating, { fontSize: rf(13, fontScale) }]}>{recipe.average_rating.toFixed(1)}</Text>
           </View>
         ) : null}
       </View>
@@ -88,17 +101,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e5e5',
   },
-  horizontalCard: {
-    width: 200,
+  horizontalCardBase: {
     marginRight: 12,
     marginBottom: 0,
   },
   image: {
     width: '100%',
-    height: 180,
-  },
-  horizontalImage: {
-    height: 140,
   },
   badge: {
     position: 'absolute',
