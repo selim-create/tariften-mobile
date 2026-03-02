@@ -1,12 +1,25 @@
-import { Stack } from 'expo-router';
+import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { AuthProvider } from '../context/AuthContext';
+import ErrorBoundary from '../components/ErrorBoundary';
+import { logScreenView } from '../lib/analytics';
+
+function ScreenTracker() {
+  const pathname = usePathname();
+  useEffect(() => {
+    logScreenView(pathname).catch((e) => console.warn('[Analytics] logScreenView error:', e));
+  }, [pathname]);
+  return null;
+}
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }}>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ScreenTracker />
+        <StatusBar style="dark" />
+        <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
           name="recipe/[slug]"
@@ -98,7 +111,8 @@ export default function RootLayout() {
             headerTintColor: '#e74c3c',
           }}
         />
-      </Stack>
-    </AuthProvider>
+        </Stack>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
