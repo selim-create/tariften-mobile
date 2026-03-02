@@ -158,7 +158,7 @@ export default function HomeScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Section 1: Hero */}
-      <View style={[styles.hero, { paddingHorizontal: horizontalPadding, minHeight: heroImageHeight }]}>
+      <View style={[styles.hero, { paddingHorizontal: horizontalPadding, ...(isTablet ? {} : { minHeight: heroImageHeight }) }]}>
         <View style={styles.heroBadge}>
           <Ionicons name="sparkles" size={13} color="#db4c3f" />
           <Text style={[styles.heroBadgeText, { fontSize: rf(12, fontScale) }]}>Yapay Zeka Mutfak Asistanı</Text>
@@ -271,7 +271,9 @@ export default function HomeScreen() {
           {isTablet ? (
             <View style={styles.popularGridTablet}>
               {popularRecipes.map((item) => (
-                <RecipeCard key={item.id} recipe={item} badge="Popüler" />
+                <View key={item.id} style={{ width: '31.5%' }}>
+                  <RecipeCard recipe={item} badge="Popüler" />
+                </View>
               ))}
             </View>
           ) : (
@@ -436,7 +438,7 @@ export default function HomeScreen() {
           {MOODS.map((mood) => (
             <TouchableOpacity
               key={mood.label}
-              style={[styles.moodButton, { backgroundColor: mood.color }]}
+              style={[styles.moodButton, { backgroundColor: mood.color }, isTablet && { width: '31%' }]}
               onPress={() => navigateWithFilter(mood.param)}
               activeOpacity={0.8}
             >
@@ -473,7 +475,7 @@ export default function HomeScreen() {
           ].map((action) => (
             <TouchableOpacity
               key={action.route}
-              style={styles.actionCard}
+              style={[styles.actionCard, isTablet && { width: '22.5%' }]}
               onPress={() => router.push(action.route as any)}
             >
               <Ionicons name={action.icon} size={24} color="#e74c3c" />
@@ -910,6 +912,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     paddingTop: 12,
+    justifyContent: 'center',
   },
   cuisineGridTablet: {
     flexDirection: 'row',
@@ -925,14 +928,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+    justifyContent: 'flex-start',
   },
   menuGridTablet: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+    justifyContent: 'flex-start',
   },
   menuCardTablet: {
-    width: '48%',
+    width: '31.5%',
     marginBottom: 0,
   },
   bottomPadding: {
