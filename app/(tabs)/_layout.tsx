@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useAuth } from '../../context/AuthContext';
 import { useResponsive } from '../../hooks/useResponsive';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -27,7 +28,8 @@ export default function TabLayout() {
   const { user } = useAuth();
   const { isTablet } = useResponsive();
 
-  const tabBarHeight = isTablet ? 72 : 60;
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = (isTablet ? 72 : 60) + insets.bottom;
   const tabBarLabelSize = isTablet ? 13 : 11;
   const headerTitleSize = isTablet ? 22 : 18;
 
@@ -39,7 +41,7 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: '#ffffff',
           borderTopColor: '#e5e5e5',
-          paddingBottom: isTablet ? 8 : 4,
+          paddingBottom: (isTablet ? 8 : 4) + insets.bottom,
           height: tabBarHeight,
         },
         tabBarLabelStyle: {
