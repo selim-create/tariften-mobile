@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { AuthProvider } from '../context/AuthContext';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { logScreenView } from '../lib/analytics';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 function ScreenTracker() {
   const pathname = usePathname();
@@ -15,6 +16,7 @@ function ScreenTracker() {
 
 export default function RootLayout() {
   return (
+    <SafeAreaProvider>
     <ErrorBoundary>
       <AuthProvider>
         <ScreenTracker />
@@ -114,5 +116,6 @@ export default function RootLayout() {
         </Stack>
       </AuthProvider>
     </ErrorBoundary>
+    </SafeAreaProvider>
   );
 }
