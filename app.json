@@ -3,7 +3,7 @@
     "name": "Tariften",
     "slug": "tariften-mobile",
     "scheme": "tariften",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -33,7 +33,6 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.tariften.app",
-      "versionCode": 1,
       "googleServicesFile": "./google-services.json",
       "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE", "RECORD_AUDIO", "INTERNET", "VIBRATE"]
     },
