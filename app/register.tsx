@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuth } from '../context/AuthContext';
 import { useResponsive } from '../hooks/useResponsive';
 
@@ -33,7 +34,7 @@ const LEVEL_OPTIONS = [
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { register } = useAuth();
+  const { register, loginWithApple } = useAuth();
   const { isTablet } = useResponsive();
   const [formData, setFormData] = useState({
     username: '',
@@ -89,6 +90,29 @@ export default function RegisterScreen() {
     Alert.alert('Yakında', 'Google ile giriş özelliği yakında eklenecek.');
   };
 
+  const handleAppleSignIn = async () => {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (credential.identityToken) {
+        const fullName = credential.fullName?.givenName || credential.fullName?.familyName
+          ? `${credential.fullName.givenName || ''} ${credential.fullName.familyName || ''}`.trim()
+          : undefined;
+        await loginWithApple(credential.identityToken, fullName);
+        router.replace('/(tabs)');
+      }
+    } catch (error: any) {
+      if (error.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert('Hata', 'Apple ile giriş yapılamadı.');
+      }
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -110,10 +134,15 @@ export default function RegisterScreen() {
           <TouchableOpacity style={styles.socialButton} onPress={handleGoogleSignIn}>
             <Text style={styles.socialButtonText}>🔵 Google</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.socialButton, styles.socialButtonDisabled]} disabled>
-            <Text style={[styles.socialButtonText, styles.socialButtonTextDisabled]}>🍎 Apple</Text>
-            <Text style={styles.soonBadge}>Yakında</Text>
-          </TouchableOpacity>
+          {Platform.OS === 'ios' ? (
+            <TouchableOpacity style={styles.socialButton} onPress={handleAppleSignIn}>
+              <Text style={styles.socialButtonText}>🍎 Apple</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={[styles.socialButton, styles.socialButtonDisabled]} disabled>
+              <Text style={[styles.socialButtonText, styles.socialButtonTextDisabled]}>🍎 Apple</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.divider}>
