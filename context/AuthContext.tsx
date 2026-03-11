@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { User } from '../lib/types';
-import { getMe, login as apiLogin, register as apiRegister, googleAuth, RegisterData } from '../lib/api';
+import { getMe, login as apiLogin, register as apiRegister, googleAuth, appleAuth, RegisterData } from '../lib/api';
 
 const TOKEN_KEY = 'auth_token';
 
@@ -11,6 +11,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
+  loginWithApple: (identityToken: string, fullName?: string) => Promise<void>;
   register: (userData: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -65,6 +66,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(userData);
   };
 
+  const loginWithApple = async (identityToken: string, fullName?: string) => {
+    const data = await appleAuth(identityToken, fullName);
+    const jwt = data.token;
+    await SecureStore.setItemAsync(TOKEN_KEY, jwt);
+    setToken(jwt);
+    const userData = await getMe(jwt);
+    setUser(userData);
+  };
+
   const register = async (userData: RegisterData) => {
     await apiRegister(userData);
   };
@@ -86,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, loginWithGoogle, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, loginWithGoogle, loginWithApple, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

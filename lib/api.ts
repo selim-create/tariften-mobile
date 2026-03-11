@@ -210,6 +210,18 @@ export async function googleAuth(idToken: string) {
   return data;
 }
 
+export async function appleAuth(identityToken: string, fullName?: string) {
+  const res = await fetch(`${API_URL}/tariften/v1/auth/apple`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identity_token: identityToken, full_name: fullName }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Apple girişi yapılamadı');
+  return data;
+}
+
 export async function getMe(token: string): Promise<import('./types').User | null> {
   const data = await fetchData(`${API_URL}/tariften/v1/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },

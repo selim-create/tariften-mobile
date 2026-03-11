@@ -16,6 +16,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.tariften.app",
       "buildNumber": "1",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Profil fotoğrafı ve tarif fotoğrafları çekmek için kamera erişimi gereklidir.",
         "NSPhotoLibraryUsageDescription": "Profil fotoğrafı ve tarif fotoğrafları seçmek için galeri erişimi gereklidir.",
@@ -43,7 +44,8 @@
       "expo-router",
       "expo-secure-store",
       "expo-image",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-apple-authentication"
     ]
   }
 }
