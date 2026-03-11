@@ -15,13 +15,13 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tariften.app",
-      "buildNumber": "1",
-      "usesAppleSignIn": true,
+      "buildNumber": "2",
       "infoPlist": {
         "NSCameraUsageDescription": "Profil fotoğrafı ve tarif fotoğrafları çekmek için kamera erişimi gereklidir.",
         "NSPhotoLibraryUsageDescription": "Profil fotoğrafı ve tarif fotoğrafları seçmek için galeri erişimi gereklidir.",
         "NSMicrophoneUsageDescription": "Sesli tarif arama için mikrofon erişimi gereklidir.",
-        "NSSpeechRecognitionUsageDescription": "Sesli arama özelliği için konuşma tanıma erişimi gereklidir."
+        "NSSpeechRecognitionUsageDescription": "Sesli arama özelliği için konuşma tanıma erişimi gereklidir.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -34,7 +34,13 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.tariften.app",
       "googleServicesFile": "./google-services.json",
-      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE", "RECORD_AUDIO", "INTERNET", "VIBRATE"]
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "RECORD_AUDIO",
+        "INTERNET",
+        "VIBRATE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -44,8 +50,13 @@
       "expo-router",
       "expo-secure-store",
       "expo-image",
-      "expo-web-browser",
-      "expo-apple-authentication"
-    ]
+      "expo-web-browser"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "775efa67-ee9e-45a1-8c43-0afec950d009"
+      }
+    }
   }
 }
