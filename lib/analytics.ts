@@ -32,18 +32,13 @@ async function getFirebaseAnalytics() {
 }
 
 export async function logScreenView(screenName: string): Promise<void> {
-  try {
-    const a = await getFirebaseAnalytics();
-    if (a) {
-      firebaseLogEvent(a, 'screen_view', {
-        screen_name: screenName,
-        screen_class: screenName,
-        platform: Platform.OS,
-      });
-    }
-  } catch {
-    // silently fail
-  }
+  // The typed firebase overload rejects some canonical event names when
+  // passed as a string literal. Use our existing safe wrapper consistently.
+  await logEvent('screen_view', {
+    screen_name: screenName,
+    screen_class: screenName,
+    platform: Platform.OS,
+  });
 }
 
 export async function logEvent(eventName: string, params?: Record<string, string | number | boolean>): Promise<void> {
