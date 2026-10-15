@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,7 +11,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
-import { generateAIMenu } from '../../lib/api';
+import * as SecureStore from 'expo-secure-store';
+import * as Crypto from 'expo-crypto';
+import { beginMenu, readMenu, findMenu, advanceMenu, retryMenu, type MenuJob } from '../../lib/menu-jobs';
+import { fetchAccountQuotas, reached, resetDate, useQuotas } from '../../lib/quotas';
+import QuotaCard from '../../components/QuotaCard';
 
 const MEAL_TYPES = ['Kahvaltı', 'Öğle Yemeği', 'Beş Çayı', 'Akşam Yemeği', 'Kokteyl'];
 const DIET_OPTIONS = ['Normal', 'Vejetaryen', 'Vegan', 'Glutensiz', 'Düşük Karb'];
@@ -20,6 +25,13 @@ export default function CreateMenuScreen() {
   const { user, token } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [job, setJob] = useState<MenuJob | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [recoveryDone, setRecoveryDone] = useState(false);
+  const busy = useRef(false);
+  const quotas = useQuotas(token);
+  const savedKey = `tariften_menu_job_${user?.id || 0}`;
+
 
   const [concept, setConcept] = useState('');
   const [guestCount, setGuestCount] = useState(4);
@@ -32,24 +44,160 @@ export default function CreateMenuScreen() {
     }
   }, [user, token, router]);
 
-  const handleCreate = async () => {
+  // SecureStore is account-scoped; never open another user's pending job.
+  useEffect(() => {
+    if (!token || !user?.id) { setRecoveryDone(false); setJob(null); return; }
+    let active = true;
+    setRecoveryDone(false);
+    (async () => {
+      try {
+        const raw = await SecureStore.getItemAsync(savedKey);
+        if (!raw) return;
+        const saved = JSON.parse(raw) as { id?: number; requestId?: string; concept?: string; guestCount?: number; eventType?: string; diet?: string };
+        if (saved.concept) setConcept(saved.concept);
+        if (saved.guestCount) setGuestCount(saved.guestCount);
+        if (saved.eventType) setEventType(saved.eventType);
+        if (saved.diet) setDiet(saved.diet);
+        const recovered = saved.id ? await readMenu(token, saved.id)
+          : saved.requestId ? await findMenu(token, saved.requestId) : null;
+        if (!active) return;
+        if (recovered) {
+          setJob(recovered);
+          setStep(3);
+          if (recovered.status === 'ready') {
+            await SecureStore.deleteItemAsync(savedKey);
+            router.replace(`/menu/${recovered.slug}`);
+          }
+        } else {
+          setErrorMessage('Önceki menü bulunamadı. Yeni menü oluşturmadan önce kayıtlarınızı kontrol edin.');
+        }
+      } catch (err) {
+        if (active) setErrorMessage(err instanceof Error ? err.message : 'Önceki menü kontrol edilemedi.');
+      } finally { if (active) setRecoveryDone(true); }
+    })();
+    return () => { active = false; };
+  }, [token, user?.id, savedKey, router]);
+
+  const runJob = async (initial: MenuJob) => {
     if (!token) return;
+    let current = initial;
+    let unchanged = 0;
+    for (let attempts = 0; attempts < 100; attempts++) {
+      if (current.status === 'ready') {
+        await SecureStore.deleteItemAsync(savedKey);
+        await quotas.refresh();
+        router.replace(`/menu/${current.slug}`);
+        return;
+      }
+      if (current.status === 'needs_attention') {
+        setErrorMessage(current.message || 'Bazı tarifler oluşturulamadı. Menü taslakta korunuyor.');
+        return;
+      }
+      const completed = current.completed;
+      try {
+        current = await advanceMenu(token, current.id);
+      } catch (error) {
+        // A timed-out HTTP connection does not mean a paid recipe was lost.
+        try {
+          const saved = await readMenu(token, current.id);
+          current = saved;
+          setJob(saved);
+          if (saved.completed > completed || saved.status !== 'generating') continue;
+        } catch {
+          throw new Error('Bağlantı kesildi. Menü kaydedildi; biraz sonra Kaldığım Yerden Devam Et seçeneğini kullanın.');
+        }
+        throw error;
+      }
+      setJob(current);
+      const previous = await SecureStore.getItemAsync(savedKey);
+      const data = previous ? JSON.parse(previous) as Record<string, unknown> : {};
+      await SecureStore.setItemAsync(savedKey, JSON.stringify({ ...data, id: current.id }));
+      if (current.completed === completed) {
+        unchanged++;
+        // A PHP worker may still be billed while its claim is active.
+        // Do not spin through 100 repeated requests against one claimed item.
+        if (unchanged >= 3) {
+          throw new Error('Önceki tarif işlemi sunucuda sürüyor olabilir. Menü kaydedildi; biraz sonra aynı işten devam edebilirsiniz.');
+        }
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      } else {
+        unchanged = 0;
+      }
+    }
+    throw new Error('İşlem beklenenden uzun sürdü; mevcut menü kaydedildi. Sonra tekrar devam edebilirsiniz.');
+  };
+
+  const handleCreate = async () => {
+    if (!token || !user?.id || !recoveryDone || busy.current) return;
+    busy.current = true;
+    setErrorMessage('');
     setLoading(true);
     try {
-      const result = await generateAIMenu(token, {
-        concept,
-        guest_count: guestCount,
-        event_type: eventType,
-        diet,
-        cuisine: 'Türk',
-      });
-      const slug = result?.data?.slug || result?.slug;
-      if (slug) {
-        router.replace(`/menu/${slug}`);
+      if (job) {
+        if (job.status === 'needs_attention') {
+          Alert.alert(
+            'Ücretli yeniden deneme',
+            'Başarısız tariflerin yeniden üretilmesi API maliyeti oluşturabilir. Devam edilsin mi?',
+            [
+              { text: 'Vazgeç', style: 'cancel' },
+              { text: 'Devam Et', onPress: () => { void handleRetry(); } },
+            ]
+          );
+          return;
+        }
+        await runJob(job);
+        return;
       }
+      const stored = await SecureStore.getItemAsync(savedKey);
+      if (!stored) {
+        const available = await fetchAccountQuotas(token).catch(() => null);
+        if (reached(available, 'menu_month')) {
+          setErrorMessage('Bu ayki menü hakkın doldu. Yeni hak: ' + resetDate(available, 'menu_month'));
+          return;
+        }
+      }
+      const form = { concept, guest_count: guestCount, event_type: eventType, diet, cuisine: 'Türk' };
+      const requestId = stored
+        ? (JSON.parse(stored) as { requestId: string }).requestId
+        : Crypto.randomUUID();
+      if (!stored) await SecureStore.setItemAsync(savedKey, JSON.stringify({
+        requestId, concept, guestCount, eventType, diet,
+      }));
+      let started: MenuJob | null = null;
+      try {
+        started = await beginMenu(token, form, requestId);
+      } catch (error) {
+        // Do not create a second job when the first response was lost.
+        try { started = await findMenu(token, requestId); } catch { /* preserve original error */ }
+        if (!started) throw error;
+      }
+      setJob(started);
+      await SecureStore.setItemAsync(savedKey, JSON.stringify({
+        requestId, id: started.id, concept, guestCount, eventType, diet,
+      }));
+      await quotas.refresh();
+      await runJob(started);
     } catch (error) {
-      console.error('Create menu error:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Menü oluşturulamadı; kayıtlı işiniz korunuyor.');
     } finally {
+      setLoading(false);
+      busy.current = false;
+    }
+  };
+
+  const handleRetry = async () => {
+    if (!token || !job || busy.current) return;
+    busy.current = true;
+    setLoading(true);
+    setErrorMessage('');
+    try {
+      const result = await retryMenu(token, job.id);
+      setJob(result);
+      await runJob(result);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Yeniden deneme başarısız.');
+    } finally {
+      busy.current = false;
       setLoading(false);
     }
   };
@@ -60,6 +208,7 @@ export default function CreateMenuScreen() {
         <Text style={styles.loadingIcon}>✨</Text>
         <Text style={styles.loadingTitle}>Sihir Yapılıyor...</Text>
         <Text style={styles.loadingSubtitle}>{concept} · {guestCount} Kişi</Text>
+        {job && <Text style={styles.loadingSubtitle}>{job.completed} / {job.total} tarif hazır. Tamamlananlar kaydedildi.</Text>}
         <ActivityIndicator size="large" color="#e74c3c" style={styles.spinner} />
       </View>
     );
@@ -191,8 +340,15 @@ export default function CreateMenuScreen() {
             <SummaryRow label="Öğün Tipi" value={eventType} />
             <SummaryRow label="Diyet Tercihi" value={diet} />
           </View>
-          <TouchableOpacity style={styles.createButton} onPress={handleCreate} activeOpacity={0.85}>
-            <Text style={styles.primaryButtonText}>✨ Menüyü Oluştur</Text>
+          <QuotaCard data={quotas.data} error={quotas.error} loading={quotas.loading} kinds={['menu_month']} />
+          {job && <View style={styles.summaryCard}><Text style={styles.summaryLabel}>Kayıtlı menü: {job.completed} / {job.total} tarif hazır.</Text></View>}
+          {!!errorMessage && <View style={styles.summaryCard}><Text style={{ color: '#925326', lineHeight: 20 }}>{errorMessage}</Text></View>}
+          <TouchableOpacity
+            style={[styles.createButton, (!recoveryDone || (!job && reached(quotas.data, 'menu_month'))) && { opacity: 0.45 }]}
+            onPress={handleCreate}
+            disabled={!recoveryDone || (!job && reached(quotas.data, 'menu_month'))}
+            activeOpacity={0.85}>
+            <Text style={styles.primaryButtonText}>{job ? (job.status === 'needs_attention' ? 'Başarısızları Yeniden Dene' : 'Kaldığım Yerden Devam Et') : '✨ Menüyü Oluştur'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryButton} onPress={() => setStep(2)} activeOpacity={0.85}>
             <Text style={styles.secondaryButtonText}>Düzenle</Text>

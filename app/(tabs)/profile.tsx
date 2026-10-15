@@ -14,6 +14,8 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import QuotaCard from '../../components/QuotaCard';
+import { useQuotas } from '../../lib/quotas';
 import { deleteAccount, getInteractions, getUserRecipes } from '../../lib/api';
 import { Recipe } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
@@ -25,6 +27,7 @@ type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, token, logout } = useAuth();
+  const quotas = useQuotas(token);
   const [activeTab, setActiveTab] = useState<ProfileTab>('favorites');
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(false);
@@ -152,6 +155,8 @@ export default function ProfileScreen() {
             <Text style={styles.logoutText}>Çıkış Yap</Text>
           </TouchableOpacity>
         </View>
+
+        <QuotaCard data={quotas.data} error={quotas.error} loading={quotas.loading} />
 
         {/* Tabs */}
         <View style={styles.tabsContainer}>
