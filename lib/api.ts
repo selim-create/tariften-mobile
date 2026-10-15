@@ -182,20 +182,18 @@ export async function register(userData: RegisterData) {
 }
 
 export async function forgotPassword(email: string) {
-  try {
-    const res = await fetch(`${API_URL}/tariften/v1/auth/forgot-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'İşlem başarısız.');
-    return data;
-  } catch (error) {
-    // Fallback: simulate success if endpoint not available
-    console.warn('forgotPassword endpoint error (using simulation):', error);
-    return { success: true };
+  // Never pretend an account-recovery email was sent when the endpoint is
+  // offline or misconfigured. Core 1.0.15 implements the real endpoint.
+  const res = await fetch(`${API_URL}/tariften/v1/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json();
+  if (!res.ok || data.success !== true) {
+    throw new Error(data?.message || 'Şifre sıfırlama isteği gönderilemedi.');
   }
+  return data;
 }
 
 export async function googleAuth(idToken: string) {
