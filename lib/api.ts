@@ -438,13 +438,41 @@ export async function subscribeNewsletter(email: string) {
 
 // --- COMMENTS ---
 
-export async function getComments(recipeId: number, page: number = 1, perPage: number = 10) {
-  const response = await fetch(
-    `${API_URL}/tariften/v1/recipes/${recipeId}/comments?page=${page}&per_page=${perPage}`
-  );
+export async function getComments(recipeId: number, page: number = 1, perPage: number = 10): Promise<{
+  success: boolean;
+  comments: import('./types').Comment[];
+  pages: number;
+  total: number;
+}> {
+  // Fail visibly on non-200 responses. A 404 route error is NOT an empty
+  // comment list; returning [] would hide a broken Core deployment.
+  let response: Response;
+  try {
+    response = await fetch(
+      `${API_URL}/tariften/v1/recipes/${recipeId}/comments?page=${page}&per_page=${perPage}`
+    );
+  } catch {
+    throw new Error('Yorum servisine bağlanılamadı. Bağlantıyı kontrol edip tekrar deneyin.');
+  }
 
-  if (!response.ok) throw new Error('Yorumlar yüklenemedi');
-  return response.json();
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error('Yorum sunucusu beklenmeyen bir yanıt verdi. Lütfen tekrar deneyin.');
+  }
+  if (!response.ok) {
+    const wpError = data && typeof data === 'object' && 'message' in data && typeof data.message === 'string'
+      ? data.message : 'Yorumlar yüklenemedi.';
+    throw new Error(response.status === 404 && data && typeof data === 'object' &&
+      'code' in data && data.code === 'rest_no_route'
+        ? 'Yorum servisi henüz kullanıma hazır değil. Lütfen daha sonra tekrar deneyin.'
+        : wpError);
+  }
+  if (!data || typeof data !== 'object' || !('comments' in data) || !Array.isArray(data.comments)) {
+    throw new Error('Yorum listesinin yanıtı geçersiz. Lütfen tekrar deneyin.');
+  }
+  return data as { success: boolean; comments: import('./types').Comment[]; pages: number; total: number };
 }
 
 export async function addComment(token: string, recipeId: number, content: string) {
