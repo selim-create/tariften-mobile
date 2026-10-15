@@ -61,10 +61,13 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
     if (!token || !newComment.trim()) return;
     setSubmitting(true);
     try {
-      await addComment(token, recipeId, newComment.trim());
+      const result = await addComment(token, recipeId, newComment.trim());
       setNewComment('');
       setPage(1);
       await loadComments(1);
+      if (result && result.approved === false) {
+        Alert.alert('Yorum onay bekliyor', 'Yorumunuz moderasyon kontrolünden sonra yayımlanacak.');
+      }
     } catch (error: unknown) {
       Alert.alert('Hata', error instanceof Error ? error.message : 'Yorum eklenemedi');
     } finally {
