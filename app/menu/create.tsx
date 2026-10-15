@@ -81,6 +81,7 @@ export default function CreateMenuScreen() {
   const runJob = async (initial: MenuJob) => {
     if (!token) return;
     let current = initial;
+    let unchanged = 0;
     for (let attempts = 0; attempts < 100; attempts++) {
       if (current.status === 'ready') {
         await SecureStore.deleteItemAsync(savedKey);
@@ -111,7 +112,17 @@ export default function CreateMenuScreen() {
       const previous = await SecureStore.getItemAsync(savedKey);
       const data = previous ? JSON.parse(previous) as Record<string, unknown> : {};
       await SecureStore.setItemAsync(savedKey, JSON.stringify({ ...data, id: current.id }));
-      if (current.completed === completed) await new Promise(resolve => setTimeout(resolve, 1500));
+      if (current.completed === completed) {
+        unchanged++;
+        // A PHP worker may still be billed while its claim is active.
+        // Do not spin through 100 repeated requests against one claimed item.
+        if (unchanged >= 3) {
+          throw new Error('Önceki tarif işlemi sunucuda sürüyor olabilir. Menü kaydedildi; biraz sonra aynı işten devam edebilirsiniz.');
+        }
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      } else {
+        unchanged = 0;
+      }
     }
     throw new Error('İşlem beklenenden uzun sürdü; mevcut menü kaydedildi. Sonra tekrar devam edebilirsiniz.');
   };
