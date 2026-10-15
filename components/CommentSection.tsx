@@ -26,19 +26,26 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
   const [newComment, setNewComment] = useState('');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   const loadComments = useCallback(
     async (pageNum: number = 1) => {
+      if (pageNum === 1) setLoading(true);
+      setLoadError('');
       try {
         const data = await getComments(recipeId, pageNum, 10);
         if (pageNum === 1) {
           setComments(data.comments || []);
+          setPage(1);
         } else {
           setComments((prev) => [...prev, ...(data.comments || [])]);
         }
         setHasMore(pageNum < (data.pages || 1));
       } catch (error) {
-        console.error('Comments load error:', error);
+        // A comment service failure must never cover the recipe with a
+        // React Native LogBox. Surface it in the section, with a retry.
+        setLoadError(error instanceof Error ? error.message : 'Yorumlar yüklenemedi.');
+        setHasMore(false);
       } finally {
         setLoading(false);
       }
@@ -92,7 +99,7 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
         prev.map((c) => (c.id === commentId ? { ...c, likes: result.likes } : c))
       );
     } catch (error) {
-      console.error('Like error:', error);
+      Alert.alert('Beğeni kaydedilemedi', error instanceof Error ? error.message : 'Lütfen yeniden deneyin.');
     }
   };
 
@@ -143,6 +150,20 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Yorumlar ({comments.length})</Text>
+      {!!loadError && (
+        <View style={styles.errorBox} accessibilityRole="alert">
+          <Text style={styles.errorText}>{loadError}</Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Yorumları yeniden yükle"
+            style={styles.retryButton}
+            onPress={() => { void loadComments(1); }}
+          >
+            <Text style={styles.retryText}>Yeniden Dene</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
 
       {token ? (
         <View style={styles.inputContainer}>
@@ -179,7 +200,7 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>Henüz yorum yok. İlk yorumu siz yapın!</Text>
+          loadError ? null : <Text style={styles.emptyText}>Henüz yorum yok. İlk yorumu siz yapın!</Text>
         }
       />
     </View>
@@ -296,6 +317,32 @@ const styles = StyleSheet.create({
   likeText: {
     fontSize: 13,
     color: '#666666',
+  },
+  errorBox: {
+    backgroundColor: '#fff7ed',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    padding: 14,
+    marginBottom: 12,
+    gap: 10,
+  },
+  errorText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#92400e',
+  },
+  retryButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 9,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    backgroundColor: '#292524',
+  },
+  retryText: {
+    fontWeight: '700',
+    fontSize: 13,
+    color: '#ffffff',
   },
   emptyText: {
     fontSize: 14,
