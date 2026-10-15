@@ -1,0 +1,21 @@
+name: Mobile TypeScript CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Typecheck Expo React Native project
+        run: npx tsc --noEmit
