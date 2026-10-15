@@ -20,6 +20,8 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import ResponsiveGrid from '../../components/ResponsiveGrid';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import QuotaCard from '../../components/QuotaCard';
+import { fetchAccountQuotas, reached, resetDate, useQuotas } from '../../lib/quotas';
 
 const AI_LOADING_MESSAGES = [
   'Şef malzemeleri kokluyor... 👃',
@@ -40,6 +42,7 @@ export default function RecipesScreen() {
   }>();
   const router = useRouter();
   const { token } = useAuth();
+  const quotas = useQuotas(token);
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,6 +164,14 @@ export default function RecipesScreen() {
       Alert.alert('Hata', 'Tarif oluşturmak için önce bir arama yapın.');
       return;
     }
+    // The backend remains authoritative. A fresh read avoids accidentally
+    // charging an AI request when the user has no save rights left.
+    const fresh = await fetchAccountQuotas(token).catch(() => null);
+    if (reached(fresh, 'recipe_ai_day') || reached(fresh, 'recipe_day')) {
+      const key = reached(fresh, 'recipe_ai_day') ? 'recipe_ai_day' : 'recipe_day';
+      Alert.alert('Kullanım hakkın doldu', 'Yeni hak: ' + resetDate(fresh, key));
+      return;
+    }
     setAiModalVisible(true);
     setAiLoading(true);
     let msgIdx = 0;
@@ -172,8 +183,10 @@ export default function RecipesScreen() {
       const aiResponse = await generateAIRecipe(token, searchQuery);
 
       if (aiResponse.success && aiResponse.recipe) {
+        void quotas.refresh();
         // 2-step flow: generate then save (mirrors web implementation)
         const saveResponse = await createRecipe(token, aiResponse.recipe);
+        void quotas.refresh();
 
         if (aiMsgIntervalRef.current) {
           clearInterval(aiMsgIntervalRef.current);
@@ -212,7 +225,7 @@ export default function RecipesScreen() {
     } finally {
       setAiLoading(false);
     }
-  }, [token, filters.query, query, router]);
+  }, [token, filters.query, query, router, quotas.refresh]);
 
   useEffect(() => {
     return () => {
@@ -323,7 +336,12 @@ export default function RecipesScreen() {
               <Text style={styles.emptyText}>Tarif bulunamadı.</Text>
               <Text style={styles.emptySubtext}>Farklı filtreler deneyin.</Text>
               {(filters.query || query) ? (
-                <TouchableOpacity style={styles.aiCard} onPress={handleGenerateAI}>
+                <View>
+                  <QuotaCard data={quotas.data} error={quotas.error} loading={quotas.loading} kinds={['recipe_day', 'recipe_ai_day']} />
+                  <TouchableOpacity
+                    style={[styles.aiCard, (reached(quotas.data, 'recipe_day') || reached(quotas.data, 'recipe_ai_day')) && { opacity: 0.45 }]}
+                    disabled={reached(quotas.data, 'recipe_day') || reached(quotas.data, 'recipe_ai_day')}
+                    onPress={handleGenerateAI}>
                   <View style={styles.aiCardHeader}>
                     <Ionicons name="sparkles" size={20} color="#ffffff" />
                     <Text style={styles.aiCardTitle}>AI ile Tarif Oluştur</Text>
@@ -331,7 +349,8 @@ export default function RecipesScreen() {
                   <Text style={styles.aiCardDesc}>
                     "{filters.query || query}" için yapay zeka ile özel bir tarif hazırlayalım.
                   </Text>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                </View>
               ) : null}
             </View>
           }
