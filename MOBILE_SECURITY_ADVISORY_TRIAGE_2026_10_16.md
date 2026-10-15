@@ -1,13 +1,13 @@
 # Mobile security advisory triage — 2026-10-16
 
-## Baseline and scope
+## Historical baseline (before Firebase removal)
 
 - Baseline: `main` at `9de2ea266cd809900a611b9aceca7105de63e165`, Expo SDK 55.0.31, Expo Router 55.0.18, React Native 0.83.10.
 - Evidence: GitHub Actions job [38808883703](https://github.com/selim-create/tariften-mobile/actions/runs/38808883703), archived `mobile-production-npm-audit` JSON.
 - `npm audit --omit=dev` snapshot: **39 vulnerability entries** (0 critical, 25 high, 14 moderate). This counts *dependency nodes*, not 39 separately proven exploitable app paths.
 - Vulnerability entries trace back to **six directly vulnerable transitive packages / seven advisories**, with secondary entries propagated through dependent packages.
 - `--omit=dev` audits the production dependency **installation tree**, NOT only JavaScript reachable in an iOS/Android release bundle. Expo CLI, Metro, React Native Jest and iOS build tooling can appear in this scan because they are depended on through production-listed Expo/React Native packages.
-- This is a snapshot, not a guarantee that the app is free of vulnerabilities. CI blocks **new critical** findings but intentionally reports, rather than ignores, current high/moderate advisories.
+- This historical snapshot is not a guarantee that the app is free of vulnerabilities. CI blocks **new critical** findings but intentionally reports, rather than ignores, high/moderate advisories. See the updated post-removal audit below.
 
 ## Root advisories and treatment
 
@@ -22,7 +22,7 @@
 
 ## Firebase Analytics decision
 
-- `lib/analytics.ts` imports the official supported Firebase **modular** API from `firebase/app` and `firebase/analytics`; `app/_layout.tsx` invokes `logScreenView`.
+- Before PR #34, `lib/analytics.ts` imported the official Firebase **modular** API from `firebase/app` and `firebase/analytics`; `app/_layout.tsx` invoked `logScreenView`. PR #34 removes this unsupported native-app web analytics setup, its unused configuration files and its transitive dependencies.
 - The Firebase Web Analytics SDK is intended for browser environments and its `isSupported()` checks web capabilities. Do not assume this provides working native iOS/Android analytics; a separate analytics instrumentation strategy would need a deliberate product/platform decision.
 - Direct `@firebase/app` / `@firebase/analytics` npm packages explicitly state they are **not intended for direct use**. Do not swap to internal unsupported packages just to remove Firestore from `npm audit` or reduce the count.
 - The appropriate long-term route is to confirm actual analytics requirements, then use an official supported SDK or backend instrumentation with iOS/Android test coverage.
@@ -41,3 +41,14 @@
 2. Keep supported Expo SDK 55 native module versions; test Android/iOS navigation, user profile and quota display, recipes and pantry before merging any dependency override.
 3. Review new upstream patches for `braces` and `node-forge`; prioritize Firebase/gRPC and Expo Router URL/deep-link exposure because they have potential externally influenced inputs.
 4. Never claim "zero high risk" until affected versions or package paths are actually removed and verified in a fresh npm install + CI audit.
+
+## Post-removal follow-up — PR #34
+
+- PR: [Remove unsupported Firebase Web Analytics](https://github.com/selim-create/tariften-mobile/pull/34).
+- CI: [Actions run 38814928363](https://github.com/selim-create/tariften-mobile/actions/runs/38814928363), full clean `npm ci` + TypeScript + required Expo SDK 55 compatibility + critical-advisory gate: **passed**.
+- `npm audit --omit=dev`: **35 entries**, **0 critical**, **21 high**, **14 moderate**. This replaces the earlier 39-entry *snapshot* for this PR.
+- Removing the unused `firebase` direct dependency pruned **65 packages** (including Firestore, `@grpc/grpc-js` and `websocket-driver`). The reduction in reported advisories is **4 high vulnerability entries**, not 65 separate security fixes.
+- Remaining root advisory groups are from Expo/Metro/React Native/Router tooling and indirect dependencies (`braces`, `node-forge`, `decode-uri-component`, `sprintf-js`, `uuid`). Continue tracking, do not `npm audit fix --force`.
+- Firebase native Analytics functionality is intentionally **disabled**: no mobile `screen_view` or event analytics should be expected until a deliberately designed, supported analytics integration is introduced.
+- Removal of native Firebase config means a future Google/Firebase native integration will require its own design/build configuration; existing Google login UI is currently only a placeholder.
+- User should verify the iPhone simulator's home, profile, recipe detail and pantry screens after merging. iOS/Android signed release builds are not proven by TypeScript/Expo Go checks.
