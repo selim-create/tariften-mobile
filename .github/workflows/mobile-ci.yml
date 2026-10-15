@@ -21,7 +21,6 @@ jobs:
         run: npx tsc --noEmit
       - name: Check recommended Expo native dependency versions
         run: npx expo install --check
-        continue-on-error: true
         env:
           CI: '1'
       - name: Report production dependency security advisories
@@ -40,3 +39,30 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      - name: Reject critical advisories or missing audit evidence
+        if: always()
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const file = 'npm-audit-production.json';
+          let report;
+          try {
+            report = JSON.parse(fs.readFileSync(file, 'utf8'));
+          } catch (error) {
+            console.error('Security gate: audit report unavailable or invalid:', error.message);
+            process.exit(1);
+          }
+          const totals = report.metadata?.vulnerabilities;
+          const critical = totals?.critical;
+          if (!totals || !Number.isInteger(critical) || critical < 0 || !report.vulnerabilities || typeof report.vulnerabilities !== 'object') {
+            console.error('Security gate: audit failed or returned an incomplete report.');
+            process.exit(1);
+          }
+          const listedCritical = Object.values(report.vulnerabilities).filter(item => item.severity === 'critical');
+          console.log('Production dependency tree audit:', JSON.stringify(totals));
+          if (critical > 0 || listedCritical.length > 0) {
+            console.error('Security gate failed: critical advisories:', listedCritical.map(item => item.name).join(', ') || critical);
+            process.exit(1);
+          }
+          console.log('Security gate passed: no critical advisories. High/moderate findings remain tracked.');
+          NODE
