@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -24,12 +25,11 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
     try {
       await forgotPassword(email.trim());
+      setIsSent(true);
     } catch (error) {
-      // ignore errors per spec; show success (simulation fallback)
-      console.warn('forgotPassword error:', error);
+      Alert.alert('Bağlantı gönderilemedi', error instanceof Error ? error.message : 'Lütfen biraz sonra tekrar deneyin.');
     } finally {
       setLoading(false);
-      setIsSent(true);
     }
   };
 
