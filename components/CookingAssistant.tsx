@@ -20,6 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import { parseCookingCommand } from '../lib/cooking-commands';
+import { extractCookingTranscript } from '../lib/native-cooking-transcript';
 import { playTimerStartSound } from '../lib/timer-start-sound';
 
 // Chirp voice playback and local/native fixed-command recognition are separate services.
@@ -110,8 +111,13 @@ export default function CookingAssistant({
   const [micAvailable, setMicAvailable] = useState(false);
   const [micError, setMicError] = useState('');
   const [lastSpokenCommand, setLastSpokenCommand] = useState('');
+  const [micFeedback, setMicFeedback] = useState('');
+  const [heardPhrase, setHeardPhrase] = useState('');
   const nativeRecognizerRef = useRef<{
-    start: (config: { lang: string; continuous: boolean; interimResults: boolean; maxAlternatives: number }) => void;
+    start: (config: {
+      lang: string; continuous: boolean; interimResults: boolean; maxAlternatives: number;
+      contextualStrings?: string[];
+    }) => void;
     stop: () => void;
     abort: () => void;
     requestPermissionsAsync: () => Promise<{ granted: boolean }>;
@@ -121,6 +127,9 @@ export default function CookingAssistant({
   const voiceRestartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nativeRecognizingRef = useRef(false);
   const commandCooldownRef = useRef(0);
+  const lastCommandValueRef = useRef('');
+  const segmentConsumedRef = useRef(false);
+  const recognizerRestartDelayRef = useRef(850);
 
   // Timer
   const [timerSeconds, setTimerSeconds] = useState<number | null>(null);
@@ -547,6 +556,8 @@ export default function CookingAssistant({
     setMicListening(false);
     setMicError('');
     setLastSpokenCommand('');
+    setMicFeedback('Mikrofon hazırlanıyor…');
+    setHeardPhrase('');
     if (Constants.appOwnership === 'expo') {
       setMicAvailable(false);
       setMicError('Sesli komutlar için Tariften development build gereklidir. Expo Go bu native modülü içermez.');
@@ -573,8 +584,18 @@ export default function CookingAssistant({
       if (disposed || !voiceWantedRef.current || !visibleRef.current || nativeRecognizingRef.current) return;
       if (AppState.currentState === 'background' || AppState.currentState === 'inactive') return;
       try {
-        api.start({ lang: 'tr-TR', continuous: true, interimResults: false, maxAlternatives: 1 });
+        // iOS does not deliver timely final-only results while continuously listening.
+        // Short sessions + interim results give commands immediately, then onend
+        // automatically starts another session while this screen stays visible.
+        nativeRecognizingRef.current = true;
+        segmentConsumedRef.current = false;
+        api.start({
+          lang: 'tr-TR', continuous: false, interimResults: true, maxAlternatives: 1,
+          contextualStrings: ['sonraki', 'önceki', 'ileri', 'geri', 'oku', 'tekrar oku',
+            'sayacı durdur', 'sayacı sürdür', 'sayacı iptal et', 'beş dakika başlat'],
+        });
       } catch {
+        nativeRecognizingRef.current = false;
         setMicError('Mikrofon otomatik açılamadı. Mikrofona dokunup tekrar deneyebilirsin.');
       }
     };
@@ -582,21 +603,60 @@ export default function CookingAssistant({
       api.addListener('start', () => {
         if (disposed) return;
         nativeRecognizingRef.current = true;
+        recognizerRestartDelayRef.current = 850;
         setMicListening(true);
+        setMicFeedback('Mikrofon dinliyor. Komut söyleyebilirsin.');
         setMicError('');
+      }),
+      api.addListener('audiostart', () => {
+        if (!disposed) setMicFeedback('Ses girişi aktif; konuşmanı bekliyorum.');
       }),
       api.addListener('result', (event: any) => {
         if (disposed || !voiceWantedRef.current) return;
-        const transcript = event.results?.[0]?.transcript;
-        if (typeof transcript === 'string') handleCommandRef.current(transcript);
+        const transcript = extractCookingTranscript(event);
+        if (!transcript) return;
+        // Display what iOS actually transcribed, even when no action matches.
+        // No transcripts are logged, uploaded, or persisted.
+        setHeardPhrase(transcript);
+        if (segmentConsumedRef.current) return;
+
+        const command = parseCookingCommand(transcript);
+        if (!command) {
+          setMicFeedback('Duyuldu ancak komut henüz eşleşmedi. Sonraki, Önceki veya Oku diyebilirsin.');
+          return;
+        }
+
+        const normalized = transcript.toLocaleLowerCase('tr-TR').trim();
+        const now = Date.now();
+        if (normalized === lastCommandValueRef.current && now - commandCooldownRef.current < 650) return;
+        lastCommandValueRef.current = normalized;
+        commandCooldownRef.current = now;
+        segmentConsumedRef.current = true;
+        setMicFeedback('Komut uygulandı: ' + transcript);
+        // Stop the current capture to prevent one iOS partial-result stream
+        // from executing the same command repeatedly. onend restarts capture.
+        try { api.stop(); } catch { /* recognition may already be ending */ }
+        handleCommandRef.current(transcript);
+      }),
+      api.addListener('nomatch', () => {
+        if (!disposed) setMicFeedback('Konuşma duyuldu ama anlaşılamadı; tekrar söyleyebilirsin.');
       }),
       api.addListener('error', (event: any) => {
         if (disposed) return;
         const code = String(event.error || 'unknown');
-        if (code === 'no-speech' || code === 'aborted') return;
+        if (code === 'aborted') return;
+        if (code === 'no-speech') {
+          setMicFeedback('Konuşma duyulmadı; mikrofon yeniden dinlemeye başlayacak.');
+          return;
+        }
+        if (code === 'network' || code === 'busy' || code === 'audio-capture') {
+          recognizerRestartDelayRef.current = 1900;
+        }
         setMicError(code === 'not-allowed'
           ? 'Mikrofon veya konuşma tanıma izni reddedildi. Telefon ayarlarından izin ver.'
-          : 'Sesli komut algılanamadı (' + code + '). Mikrofona yeniden dokunabilirsin.');
+          : 'Konuşma tanıma hatası (' + code + ')' +
+            (event.message ? ': ' + String(event.message).slice(0, 110) : '') +
+            '. Dinleme yeniden denenecek.');
         if (code === 'not-allowed' || code === 'service-not-allowed') {
           voiceWantedRef.current = false;
         }
@@ -604,10 +664,11 @@ export default function CookingAssistant({
       api.addListener('end', () => {
         if (disposed) return;
         nativeRecognizingRef.current = false;
+        segmentConsumedRef.current = false;
         setMicListening(false);
         if (voiceRestartRef.current) clearTimeout(voiceRestartRef.current);
         if (voiceWantedRef.current) {
-          voiceRestartRef.current = setTimeout(startListening, 950);
+          voiceRestartRef.current = setTimeout(startListening, recognizerRestartDelayRef.current);
         }
       }),
     ];
@@ -660,8 +721,16 @@ export default function CookingAssistant({
       if (!grant.granted) { setMicError('Mikrofon izinleri reddedildi.'); return; }
       voiceWantedRef.current = true;
       setMicError('');
-      api.start({ lang: 'tr-TR', continuous: true, interimResults: false, maxAlternatives: 1 });
-    } catch { setMicError('Sesli komutları başlatamadık. Telefon ayarlarını kontrol et.'); }
+      nativeRecognizingRef.current = true;
+      segmentConsumedRef.current = false;
+      api.start({
+        lang: 'tr-TR', continuous: false, interimResults: true, maxAlternatives: 1,
+        contextualStrings: ['sonraki', 'önceki', 'ileri', 'geri', 'oku', 'tekrar oku', 'sayacı durdur'],
+      });
+    } catch {
+      nativeRecognizingRef.current = false;
+      setMicError('Sesli komutları başlatamadık. Telefon ayarlarını kontrol et.');
+    }
   }, []);
 
   // Quick editorial tips; these are not responses generated by an AI model.
@@ -722,7 +791,15 @@ export default function CookingAssistant({
             <Text style={styles.speechError} accessibilityRole="alert">{speechError}</Text>
           )}
           {!!micError && <Text style={styles.micErrorText}>{micError}</Text>}
-          {micListening && <Text style={styles.micListeningText}>● SESLİ KOMUTLAR AÇIK {lastSpokenCommand ? '· ' + lastSpokenCommand : ''}</Text>}
+          {micListening && <Text style={styles.micListeningText}>● SESLİ KOMUTLAR AÇIK</Text>}
+          {micAvailable && (
+            <View style={styles.micDiagnostics}>
+              <Text style={styles.micDiagnosticsText} numberOfLines={1}>
+                {heardPhrase ? 'Duyulan: ' + heardPhrase : micListening ? 'Henüz ifade algılanmadı' : 'Mikrofon yeniden bağlanıyor…'}
+              </Text>
+              {!!micFeedback && <Text style={styles.micDiagnosticsSubtext} numberOfLines={2}>{micFeedback}</Text>}
+            </View>
+          )}
           <ScrollView
             contentContainerStyle={[styles.mainContent, compactViewport && styles.mainContentCompact]}
             showsVerticalScrollIndicator={false}
@@ -1203,6 +1280,9 @@ const styles = StyleSheet.create({
   micActive: { backgroundColor: 'rgba(219,76,63,0.32)', borderColor: 'rgba(219,76,63,0.65)' },
   micErrorText: { paddingHorizontal: 14, paddingVertical: 5, fontSize: 11, color: '#ffd8d5', backgroundColor: '#441c1e' },
   micListeningText: { paddingHorizontal: 14, paddingVertical: 4, fontSize: 10, color: '#b6efc8', backgroundColor: 'rgba(24,95,60,0.18)', fontWeight: '800' },
+  micDiagnostics: { backgroundColor: 'rgba(24,95,60,0.10)', paddingHorizontal: 14, paddingVertical: 5 },
+  micDiagnosticsText: { fontSize: 11, color: '#e7efe9', lineHeight: 15 },
+  micDiagnosticsSubtext: { fontSize: 10, color: '#b6c9c2', lineHeight: 14 },
   mainContentCompact: { paddingTop: 9, paddingBottom: 10 },
   readingCardCompact: { minHeight: 175, paddingVertical: 16, paddingHorizontal: 18, marginBottom: 11 },
   stepContentCompact: { fontSize: 17.5, lineHeight: 25, marginVertical: 12 },
