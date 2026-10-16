@@ -49,7 +49,16 @@
       "expo-router",
       "expo-secure-store",
       "expo-image",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Sesli tarif arama için mikrofon erişimi gereklidir.",
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
+        }
+      ]
     ],
     "extra": {
       "router": {},
