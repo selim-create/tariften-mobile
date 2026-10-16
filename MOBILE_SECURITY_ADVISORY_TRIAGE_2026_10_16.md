@@ -32,7 +32,7 @@
 - `npm ci` must pass and `CI=1 npx expo install --check` is now blocking to prevent SDK 55 drift.
 - CI writes and uploads `npm-audit-production.json` even while known high/moderate findings remain.
 - A final audit gate rejects incomplete/missing reports or **any critical advisory**, including advisory records that disagree with summary totals.
-- High and moderate advisories are visible in logs and artifact but do not fail CI **yet**; they are *not resolved, dismissed or accepted as risk-free*.
+- Existing reviewed high/moderate advisories are visible in logs and artifact; since PR #37, **new affected high package names** or **high/moderate count increases** fail CI. Since PR #39, newly reported **GHSA IDs** also fail CI even if the package names/counts do not change. Existing advisories are *not resolved, dismissed or accepted as risk-free*.
 - `npm audit fix --force` is prohibited for this phase: npm currently suggests incompatible downgrades/upgrades such as Expo 44, React Native 0.88, Expo Router 58, Firebase 9.
 
 ## Required verification and next review
@@ -82,3 +82,14 @@
 - The baseline regression gate's moderate ceiling was tightened from 14 to **8** in this follow-up commit. After the last commit, reverify CI before merging to ensure the tightened budget passes on the installed tree.
 
 - Audit comparisons: the reviewed October 16 prior-to-override 35 count is historical. Post-UUID target/verified on CI is **29 (21 high, 8 moderate, zero critical)**, and future regressions must be assessed against this lower 8-moderate budget. Baseline severity counts do not imply vulnerable application-runtime paths are reachable.
+
+## Final Expo SDK 55 advisory review — PR #39
+
+- Post-PR #38 / October 16 verified installation: **29 affected package entries** (0 critical, 21 high, 8 moderate). The `package-lock.json` contains `braces@3.0.3`, `node-forge@1.4.0`, `decode-uri-component@0.2.2`, `sprintf-js@1.0.3`, while `uuid` is fixed at patched `11.1.1`. The 29 counts represent npm dependency nodes, **not 29 distinct exploits or reachable app paths**.
+- As of October 16, upstream GHSA records list **no published patched versions** for [braces: GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm), [node-forge: GHSA-86w9-cpqp-85rv](https://github.com/advisories/GHSA-86w9-cpqp-85rv), or [sprintf-js: GHSA-hp3w-g68c-fv3c](https://github.com/advisories/GHSA-hp3w-g68c-fv3c).
+- [decode-uri-component: GHSA-vcc3-ghjq-m6fr](https://github.com/advisories/GHSA-vcc3-ghjq-m6fr) is patched in `0.5.0`, but Expo Router SDK 55's `query-string@7` uses a CommonJS import incompatible with the patched ESM-only release. The PR #36 test tracks current Router direct usage. This advisory is **still unresolved**.
+- These paths primarily flow through Metro/micromatch, Expo certificate tooling, Jest/coverage tooling, and Expo Router. Build-time reachability does not prove a malicious input is reachable from mobile screens; conversely, build-tool exposure is not automatically harmless (notably certificate handling). Avoid blindly overriding crypto/build dependencies.
+- **Defense in depth:** prior CI rejects new high-package names, high/moderate count increases and any critical vulnerability. PR #39 adds a **separate GHSA-identity allowlist** based on the reviewed advisory URLs in npm's structured `via` entries. A new GHSA affecting an already-listed high-risk package will now fail CI even if the npm count is unchanged.
+- The `scripts/check-known-advisories.cjs` allowlist is an **explicit review record**, not an npm-audit ignore feature. It does not remove or suppress advisories; CI continues producing `npm-audit-production.json`. Updating the allowlist requires a deliberate reviewed PR to assess severity, affected range, provenance, exploitation conditions and available fixes.
+- Scope limit: GitHub advisory IDs are the source of truth for this check. Non-GHSA reporting channels, a new vulnerability inside already-allowed GHSA, and newly malicious code without an advisory remain outside this guard. Manually inspect dependencies and test signed release builds ahead of launch.
+- **Go/no-go:** Expo SDK 55, TypeScript, URI/UUID tests and full CI must pass before merging. Physical iOS/Android UX, sign-in, recipe detail, profile, Dolap, deep links, quotas and EAS signed builds have not been verified from GitHub CI. This security phase does not certify an App Store-ready release.
