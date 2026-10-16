@@ -45,3 +45,31 @@ test('native module uses a real build, permission and visibility guards', () => 
   assert.match(assistant, /voiceWantedRef\.current = true/);
   assert.ok(app.expo.plugins.some((plugin) => Array.isArray(plugin) && plugin[0] === 'expo-speech-recognition'));
 });
+
+test('native iOS direct and nested speech payloads yield immediate transcripts', () => {
+  const input = fs.readFileSync(path.join(__dirname, '..', 'lib/native-cooking-transcript.ts'), 'utf8');
+  const compiled = ts.transpileModule(input, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const native = { exports: {} };
+  Function('module', 'exports', compiled)(native, native.exports);
+  const extract = native.exports.extractCookingTranscript;
+  assert.equal(extract({ results: [{ transcript: 'Sonraki', isFinal: false }], isFinal: false }), 'Sonraki');
+  assert.equal(extract({ results: [{ transcript: '  sayacı  durdur  ' }] }), 'sayacı durdur');
+  assert.equal(extract({ resultIndex: 1, results: [[{ transcript: 'test' }], [{ transcript: 'Önceki' }]] }), 'Önceki');
+  assert.equal(extract({ results: [] }), null);
+  assert.equal(extract({ results: [{ unknown: true }] }), null);
+  assert.equal(extract(null), null);
+});
+
+test('iOS recognition processes interim speech and restarts sessions after command', () => {
+  const assistant = fs.readFileSync(path.join(__dirname, '..', 'components/CookingAssistant.tsx'), 'utf8');
+  assert.match(assistant, /interimResults: true/);
+  assert.doesNotMatch(assistant, /interimResults: false/);
+  assert.match(assistant, /continuous: false/);
+  assert.match(assistant, /api\.addListener\('result'/);
+  assert.match(assistant, /extractCookingTranscript\(event\)/);
+  assert.match(assistant, /segmentConsumedRef\.current = true/);
+  assert.match(assistant, /try \{ api\.stop\(\); \} catch/);
+  assert.match(assistant, /setHeardPhrase\(transcript\)/);
+  assert.match(assistant, /setMicFeedback\('Komut uygulandı: '/);
+  assert.match(assistant, /voiceRestartRef\.current = setTimeout\(startListening/);
+});
