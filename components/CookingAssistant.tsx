@@ -11,6 +11,7 @@ import {
   Text,
   TouchableOpacity,
   Vibration,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import { parseCookingCommand } from '../lib/cooking-commands';
+import { playTimerStartSound } from '../lib/timer-start-sound';
 
 // Chirp voice playback and local/native fixed-command recognition are separate services.
 import * as Speech from 'expo-speech';
@@ -77,6 +79,8 @@ export default function CookingAssistant({
 }: CookingAssistantProps) {
   const router = useRouter();
   const { token } = useAuth();
+  const { height: viewportHeight } = useWindowDimensions();
+  const compactViewport = viewportHeight < 790;
 
   const totalSteps = steps.length;
   const visibleRef = useRef(visible);
@@ -426,6 +430,8 @@ export default function CookingAssistant({
     setIsTimerPaused(false);
     setIsAlarmPlaying(false);
     Vibration.cancel();
+    Vibration.vibrate([0, 35, 90, 35]);
+    void playTimerStartSound();
   }, []);
 
   const toggleTimerPause = useCallback(() => {
@@ -680,27 +686,32 @@ export default function CookingAssistant({
         {/* ── HEADER ── */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <TouchableOpacity onPress={closeAssistant} style={styles.backButton}>
+            <TouchableOpacity onPress={closeAssistant} style={styles.backButton} accessibilityLabel="Tarife dön">
               <Ionicons name="arrow-back" size={20} color="rgba(255,255,255,0.8)" />
             </TouchableOpacity>
+            <Image source={require('../assets/icon.png')} style={styles.brandLogo} resizeMode="cover" accessibilityLabel="Tariften logosu" />
             <View style={styles.headerTitleGroup}>
               <View style={styles.liveIndicator}>
                 <Animated.View style={[styles.ledDot, { opacity: ledPulse }]} />
-                <Text style={styles.liveText}>TARİFTEN / PİŞİRME</Text>
+                <Text style={styles.liveText}>TARİFTEN · PİŞİRME</Text>
               </View>
               <Text style={styles.headerTitle} numberOfLines={1}>{recipeTitle}</Text>
             </View>
           </View>
           <View style={styles.headerRight}>
+            <TouchableOpacity onPress={() => void toggleNativeMicrophone()} style={[styles.headerIconBtn, micListening && styles.micActive]}
+              accessibilityLabel={micListening ? 'Sesli komutları kapat' : 'Sesli komutları aç'} accessibilityState={{ selected: micListening }}>
+              <Ionicons name={micListening ? 'mic' : 'mic-off-outline'} size={20} color={micListening ? '#ffffff' : 'rgba(255,255,255,0.75)'} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => setIsHelpOpen(true)} style={styles.headerIconBtn}>
               <Ionicons name="help-circle-outline" size={22} color="rgba(255,255,255,0.6)" />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={openVoiceSettings}
               style={styles.headerIconBtn}
-              accessibilityLabel="Sesleri Karşılaştır"
+              accessibilityLabel="Ses profilini değiştir"
             >
-              <Ionicons name="options-outline" size={22} color="rgba(255,255,255,0.85)" />
+              <Ionicons name="swap-horizontal-outline" size={22} color="rgba(255,255,255,0.85)" />
             </TouchableOpacity>
           </View>
         </View>
@@ -710,8 +721,10 @@ export default function CookingAssistant({
           {!!speechError && (
             <Text style={styles.speechError} accessibilityRole="alert">{speechError}</Text>
           )}
+          {!!micError && <Text style={styles.micErrorText}>{micError}</Text>}
+          {micListening && <Text style={styles.micListeningText}>● SESLİ KOMUTLAR AÇIK {lastSpokenCommand ? '· ' + lastSpokenCommand : ''}</Text>}
           <ScrollView
-            contentContainerStyle={styles.mainContent}
+            contentContainerStyle={[styles.mainContent, compactViewport && styles.mainContentCompact]}
             showsVerticalScrollIndicator={false}
           >
             {/* Premium editorial reading stage */}
@@ -721,44 +734,46 @@ export default function CookingAssistant({
               <View style={styles.stepCounterLine} />
               <Text style={styles.stepCountLabel}>{currentIndex + 1} / {totalSteps}</Text>
             </View>
-            <View style={styles.readingCard}>
-              <LinearGradient colors={['rgba(248,129,96,0.13)', 'rgba(255,255,255,0.025)', 'transparent']}
-                style={StyleSheet.absoluteFillObject} pointerEvents="none" />
-              <View style={styles.readingCardTop}>
-                <Text style={styles.readingEyebrow}>ADIM {String(currentIndex + 1).padStart(2, '0')}</Text>
-                <Text style={styles.readingWatermark} accessibilityElementsHidden>
-                  {String(currentIndex + 1).padStart(2, '0')}
-                </Text>
-              </View>
-              <Text style={styles.stepContent}>
-                {currentStep.content || 'Bu tarifte henüz hazırlanış adımı bulunmuyor.'}
-              </Text>
-              <View style={styles.readingCardFooter}>
-                <View style={styles.voiceStatusDot} />
-                <Ionicons name="volume-medium-outline" size={15} color="#ffa58c" />
-                <Text style={styles.readingVoiceText} numberOfLines={1}>
-                  {cloudMode
-                    ? 'CHIRP 3 HD · ' + (CHIRP3_VOICES.find((item) => item.id === cloudVoice)?.label.split(' · ')[0] || 'Enceladus')
-                    : 'CİHAZ SESİ · TÜRKÇE'}
-                </Text>
-              </View>
-            </View>
-
-            {/* Active timer */}
-            {timerRunning && timerSeconds !== null && (
-              <TouchableOpacity
-                style={[styles.timerCard, isTimerPaused && styles.timerCardPaused]}
-                onPress={toggleTimerPause}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.timerDisplay}>{formatTime(timerSeconds)}</Text>
-                <View style={styles.timerPauseIcon}>
-                  <Ionicons name={isTimerPaused ? 'play' : 'pause'} size={14} color="rgba(255,255,255,0.8)" />
+            {timerRunning && timerSeconds !== null ? (
+              <View style={[styles.timerFocusCard, compactViewport && styles.timerFocusCompact]}>
+                <Text style={styles.timerFocusEyebrow}>{isTimerPaused ? 'SAYAÇ DURAKLATILDI' : 'SAYAÇ ÇALIŞIYOR'}</Text>
+                <Text style={[styles.timerFocusDigits, compactViewport && styles.timerFocusDigitsCompact]}>{formatTime(timerSeconds)}</Text>
+                <Text style={styles.timerStepPreview} numberOfLines={2}>{currentStep.content}</Text>
+                <View style={styles.timerActionRow}>
+                  <TouchableOpacity style={styles.timerFocusButton} onPress={toggleTimerPause} accessibilityLabel={isTimerPaused ? 'Sayacı sürdür' : 'Sayacı duraklat'}>
+                    <Ionicons name={isTimerPaused ? 'play' : 'pause'} size={18} color="#ffffff" />
+                    <Text style={styles.timerFocusButtonText}>{isTimerPaused ? 'Sürdür' : 'Duraklat'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.timerFocusButtonSecondary} onPress={() => { stopTimer(); setTimerSeconds(null); }} accessibilityLabel="Sayacı iptal et">
+                    <Text style={styles.timerFocusButtonText}>İptal</Text>
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.timerHint}>
-                  {isTimerPaused ? 'Devam etmek için dokun' : 'Duraklatmak için dokun'}
+              </View>
+            ) : (
+              <View style={[styles.readingCard, compactViewport && styles.readingCardCompact]}>
+                <LinearGradient colors={['rgba(219,76,63,0.12)', 'rgba(255,255,255,0.02)', 'transparent']}
+                  style={StyleSheet.absoluteFillObject} pointerEvents="none" />
+                <View style={styles.readingCardTop}>
+                  <Text style={styles.readingEyebrow}>ADIM {String(currentIndex + 1).padStart(2, '0')}</Text>
+                  <Text style={styles.readingWatermark} accessibilityElementsHidden>
+                    {String(currentIndex + 1).padStart(2, '0')}
+                  </Text>
+                </View>
+                <Text style={[styles.stepContent, compactViewport && styles.stepContentCompact]}>
+                  {currentStep.content || 'Bu tarifte henüz hazırlanış adımı bulunmuyor.'}
                 </Text>
-              </TouchableOpacity>
+                <TouchableOpacity onPress={openVoiceSettings} style={styles.readingCardFooter}
+                  accessibilityRole="button" accessibilityLabel="Ses profilini değiştir">
+                  <View style={styles.voiceStatusDot} />
+                  <Ionicons name="volume-medium-outline" size={15} color="#f0a69c" />
+                  <Text style={styles.readingVoiceText} numberOfLines={1}>
+                    {cloudMode
+                      ? 'CHIRP 3 HD · ' + (CHIRP3_VOICES.find((item) => item.id === cloudVoice)?.label.split(' · ')[0] || 'Enceladus')
+                      : 'CİHAZ SESİ · TÜRKÇE'}
+                  </Text>
+                  <Ionicons name="swap-horizontal-outline" size={17} color="#ffffff" />
+                </TouchableOpacity>
+              </View>
             )}
 
             {/* Quick actions */}
@@ -812,7 +827,7 @@ export default function CookingAssistant({
               <Text style={[styles.navBtnText, isFirst && styles.navBtnTextDisabled]}>Önceki</Text>
             </TouchableOpacity>
 
-            {/* Explicit local TTS playback controls; no microphone or fake live session. */}
+            {/* Natural Chirp speech playback controls, separate from hands-free command recognition. */}
             <TouchableOpacity
               onPress={() => {
                 if (speechStatus === 'playing') pauseSpeech();
@@ -823,7 +838,7 @@ export default function CookingAssistant({
               accessibilityLabel={speechStatus === 'playing' ? 'Okumayı duraklat' : speechStatus === 'paused' ? 'Okumaya devam et' : 'Tarif adımını oku'}
               activeOpacity={0.85}
             >
-              <LinearGradient colors={['#f47b60', '#d95543']} style={styles.micFAB}>
+              <LinearGradient colors={['#db4c3f', '#b03d32']} style={styles.micFAB}>
                 <Ionicons name={speechStatus === 'playing' ? 'pause' : 'volume-high'} size={28} color="#ffffff" />
                 <Text style={styles.micFABText}>
                   {cloudBusy ? 'Hazırlanıyor' : speechStatus === 'playing' ? 'Duraklat' : speechStatus === 'paused' ? (!cloudMode && Platform.OS === 'android' ? 'Baştan Oku' : 'Devam') : 'Oku'}
@@ -861,7 +876,7 @@ export default function CookingAssistant({
               <View style={[styles.modalHeader, styles.helpHeader]}>
                 <View style={styles.modalHeaderTitle}>
                   <Ionicons name="options-outline" size={21} color="#60a5fa" />
-                  <Text style={styles.modalHeaderText}>Sesleri Karşılaştır</Text>
+                  <Text style={styles.modalHeaderText}>Ses Profilini Değiştir</Text>
                 </View>
                 <TouchableOpacity
                   onPress={closeVoiceSettings}
@@ -912,7 +927,7 @@ export default function CookingAssistant({
                           accessibilityRole="button"
                           accessibilityState={{ selected: cloudMode && cloudVoice === item.id }}
                         >
-                          <Ionicons name={cloudMode && cloudVoice === item.id ? 'radio-button-on' : 'radio-button-off'} size={19} color="#fda4af" />
+                          <Ionicons name={cloudMode && cloudVoice === item.id ? 'radio-button-on' : 'radio-button-off'} size={19} color="#db4c3f" />
                           <View style={styles.voiceItemText}>
                             <Text style={styles.voiceName}>{item.label}</Text>
                             <Text style={styles.voiceMeta}>Google · Türkçe doğal ses</Text>
@@ -958,7 +973,7 @@ export default function CookingAssistant({
                     <Ionicons
                       name={selectedVoiceId === null ? 'radio-button-on' : 'radio-button-off'}
                       size={19}
-                      color={selectedVoiceId === null ? '#fda4af' : '#94a3b8'}
+                      color={selectedVoiceId === null ? '#db4c3f' : '#94a3b8'}
                     />
                     <View style={styles.voiceItemText}>
                       <Text style={styles.voiceName}>Otomatik seçim</Text>
@@ -989,7 +1004,7 @@ export default function CookingAssistant({
                       <Ionicons
                         name={selectedVoiceId === voice.identifier ? 'radio-button-on' : 'radio-button-off'}
                         size={19}
-                        color={selectedVoiceId === voice.identifier ? '#fda4af' : '#94a3b8'}
+                        color={selectedVoiceId === voice.identifier ? '#db4c3f' : '#94a3b8'}
                       />
                       <View style={styles.voiceItemText}>
                         <Text style={styles.voiceName} numberOfLines={2}>{voice.name}</Text>
@@ -1184,8 +1199,30 @@ export default function CookingAssistant({
 // Styles
 // ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
+  brandLogo: { width: 34, height: 34, borderRadius: 10, marginRight: -3 },
+  micActive: { backgroundColor: 'rgba(219,76,63,0.32)', borderColor: 'rgba(219,76,63,0.65)' },
+  micErrorText: { paddingHorizontal: 14, paddingVertical: 5, fontSize: 11, color: '#ffd8d5', backgroundColor: '#441c1e' },
+  micListeningText: { paddingHorizontal: 14, paddingVertical: 4, fontSize: 10, color: '#b6efc8', backgroundColor: 'rgba(24,95,60,0.18)', fontWeight: '800' },
+  mainContentCompact: { paddingTop: 9, paddingBottom: 10 },
+  readingCardCompact: { minHeight: 175, paddingVertical: 16, paddingHorizontal: 18, marginBottom: 11 },
+  stepContentCompact: { fontSize: 17.5, lineHeight: 25, marginVertical: 12 },
+  timerFocusCard: {
+    minHeight: 255, borderRadius: 25, borderWidth: 1,
+    backgroundColor: '#1c2532', borderColor: 'rgba(219,76,63,0.45)',
+    padding: 21, marginBottom: 16, justifyContent: 'space-between',
+  },
+  timerFocusCompact: { minHeight: 190, paddingVertical: 13, paddingHorizontal: 18 },
+  timerFocusEyebrow: { fontSize: 10, fontWeight: '900', color: '#df8278', letterSpacing: 2.5 },
+  timerFocusDigits: { fontSize: 76, fontWeight: '900', color: '#ffffff', fontVariant: ['tabular-nums'], letterSpacing: -3, textAlign: 'center' },
+  timerFocusDigitsCompact: { fontSize: 56 },
+  timerStepPreview: { color: '#b9c3cf', fontSize: 12, lineHeight: 17, textAlign: 'center', marginBottom: 11 },
+  timerActionRow: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
+  timerFocusButton: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 42, backgroundColor: '#db4c3f', borderRadius: 12, paddingHorizontal: 18 },
+  timerFocusButtonSecondary: { minHeight: 42, backgroundColor: 'rgba(255,255,255,0.09)', borderRadius: 12, paddingHorizontal: 18, justifyContent: 'center' },
+  timerFocusButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+
   // Premium cooking canvas
-  phaseDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#f18368' },
+  phaseDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#db4c3f' },
   stepCountLabel: { color: '#e9b9aa', fontSize: 12, fontWeight: '800', letterSpacing: 1.5 },
   readingCard: {
     width: '100%', minHeight: 285, justifyContent: 'space-between', overflow: 'hidden',
@@ -1193,13 +1230,13 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(249,187,158,0.18)', paddingHorizontal: 26, paddingVertical: 27, marginBottom: 24,
   },
   readingCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 38 },
-  readingEyebrow: { fontSize: 10, color: '#e89e8c', fontWeight: '800', letterSpacing: 3 },
+  readingEyebrow: { fontSize: 10, color: '#db4c3f', fontWeight: '800', letterSpacing: 3 },
   readingWatermark: { position: 'absolute', top: -27, right: -12, fontSize: 88, fontWeight: '900', color: 'rgba(255,255,255,0.035)' },
   readingCardFooter: {
     flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.09)', paddingTop: 17, marginTop: 20,
   },
-  voiceStatusDot: { width: 6, height: 6, backgroundColor: '#f18368', borderRadius: 3 },
+  voiceStatusDot: { width: 6, height: 6, backgroundColor: '#db4c3f', borderRadius: 3 },
   readingVoiceText: { color: '#d3bac0', fontSize: 10, fontWeight: '800', letterSpacing: 1.1, flex: 1 },
   progressHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   progressLabel: { color: '#9fa9b9', fontSize: 9, fontWeight: '800', letterSpacing: 2 },
@@ -1242,7 +1279,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ef4444',
   },
   liveText: {
-    fontSize: 9, fontWeight: '800', color: '#eea58d', letterSpacing: 2.1,
+    fontSize: 9, fontWeight: '800', color: '#db4c3f', letterSpacing: 2.1,
   },
   headerTitle: {
     fontSize: 16, fontWeight: '700', color: '#f9f2eb', maxWidth: 220, letterSpacing: -0.3,
@@ -1316,7 +1353,7 @@ const styles = StyleSheet.create({
     flex: 1, height: 1, backgroundColor: 'rgba(242,135,109,0.20)',
   },
   stepCounterText: {
-    fontSize: 11, fontWeight: '800', color: '#f69b7c', letterSpacing: 2.2,
+    fontSize: 11, fontWeight: '800', color: '#db4c3f', letterSpacing: 2.2,
   },
   stepContent: {
     fontSize: 23, fontWeight: '700', color: '#fff7ed', textAlign: 'left',
@@ -1390,7 +1427,7 @@ const styles = StyleSheet.create({
     borderRadius: 6, marginBottom: 17, overflow: 'hidden',
   },
   progressBarFill: {
-    height: '100%', backgroundColor: '#ee795d', borderRadius: 6,
+    height: '100%', backgroundColor: '#db4c3f', borderRadius: 6,
   },
   controls: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10,
@@ -1451,7 +1488,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   voiceSectionTitle: {
-    color: '#fda4af',
+    color: '#db4c3f',
     fontWeight: '800',
     fontSize: 11,
     letterSpacing: 1,
@@ -1494,7 +1531,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   voiceSelected: {
-    backgroundColor: 'rgba(244,126,99,0.14)', borderColor: '#f1876b',
+    backgroundColor: 'rgba(244,126,99,0.14)', borderColor: '#db4c3f',
   },
   voiceChoice: {
     flex: 1,
