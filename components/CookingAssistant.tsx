@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  AppState,
   Modal,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -15,14 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 
-// ---------------------------------------------------------------------------
-// Optional package imports (installed via: npx expo install expo-speech expo-speech-recognition)
-// ---------------------------------------------------------------------------
-let SpeechModule: { speak: (t: string, o?: object) => void; stop: () => void } | null = null;
-try { SpeechModule = require('expo-speech'); } catch { /* not installed */ }
-
-let SpeechRecognitionLib: any = null;
-try { SpeechRecognitionLib = require('expo-speech-recognition'); } catch { /* not installed */ }
+// Standard assistant: local speech only. No microphone or paid AI integration.
+import * as Speech from 'expo-speech';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,33 +45,15 @@ function normalizeStep(step: Step | string): Step {
   return step;
 }
 
-const NUMBER_WORD_MAP: { [key: string]: number } = {
-  'bir': 1, 'iki': 2, 'üç': 3, 'dört': 4, 'beş': 5,
-  'altı': 6, 'yedi': 7, 'sekiz': 8, 'dokuz': 9, 'on': 10,
-  'on bir': 11, 'on iki': 12, 'on beş': 15, 'yirmi': 20,
-  'yirmi beş': 25, 'otuz': 30, 'kırk': 40, 'elli': 50, 'altmış': 60,
-  'yarım': 0.5, 'buçuk': 0.5,
-};
-
-const textToNumber = (text: string): number | null => {
-  const digitMatch = text.match(/\d+/);
-  if (digitMatch) return parseInt(digitMatch[0]);
-  for (const [key, value] of Object.entries(NUMBER_WORD_MAP)) {
-    if (text.includes(key)) return value;
-  }
-  return null;
-};
-
 type SosKey = 'burnt' | 'salty' | 'watery' | 'other';
 
 const SOS_RESPONSES: Record<SosKey, string> = {
-  burnt: 'Tencereyi hemen ocaktan al ve dibi tutmayan kısımları başka bir kaba aktar. İçine yarım dilim ekmek koyup kapağı kapat, yanık kokusunu alacaktır.',
-  salty: 'Yemeğe bir adet soyulmuş bütün patates at ve biraz daha pişir. Patates fazla tuzu emecektir.',
-  watery: 'Kapağı aç ve yüksek ateşte suyunu çektir. Veya ayrı bir yerde biraz nişastayı suyla açıp yemeğe ekle.',
-  other: 'Eksik malzeme için alternatifler: Krema yerine yoğurt+un, yumurta yerine muz veya keten tohumu jeli kullanabilirsiniz.',
+  burnt: 'Önce ocağı kapat. Yanmamış üst kısmı dibi kazımadan temiz bir kaba aktar; yanık kokusu veya tadı belirginse servis etme.',
+  salty: 'Tarif uygunsa tuzsuz malzeme veya sıvıyla seyrelterek tadı tekrar kontrol et. Patatesin fazla tuzu seçici biçimde emdiği doğru değildir.',
+  watery: 'Tarife uygunsa kapağı açık ve kontrollü şekilde biraz daha pişir. Kıvamı sık sık kontrol et; her yemek için yüksek ateş uygun değildir.',
+  other: 'Malzeme değişimi her tarifte farklı sonuç verir. Alerjenleri ve tarifin yapısını kontrol ederek uygun alternatifi seç.',
 };
 
-const AI_RESPONSE_DELAY_MS = 1500;
 
 // ---------------------------------------------------------------------------
 // Component
@@ -90,6 +68,13 @@ export default function CookingAssistant({
   const router = useRouter();
 
   const totalSteps = steps.length;
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
+  const speechGenerationRef = useRef(0);
+  const speechQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const preferredTurkishVoiceRef = useRef<string | undefined>(undefined);
+  const [speechStatus, setSpeechStatus] = useState<'idle' | 'playing' | 'paused' | 'error'>('idle');
+  const [speechError, setSpeechError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
 
   // Timer
@@ -97,14 +82,10 @@ export default function CookingAssistant({
   const [timerRunning, setTimerRunning] = useState(false);
   const [isTimerPaused, setIsTimerPaused] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerDeadlineRef = useRef<number | null>(null);
 
   // Alarm
   const [isAlarmPlaying, setIsAlarmPlaying] = useState(false);
-
-  // Voice
-  const [isListening, setIsListening] = useState(false);
-  const [lastCommand, setLastCommand] = useState('');
-  const isListeningRef = useRef(false);
 
   // Modals
   const [isSOSOpen, setIsSOSOpen] = useState(false);
@@ -114,14 +95,12 @@ export default function CookingAssistant({
 
   // Animations
   const ledPulse = useRef(new Animated.Value(0.4)).current;
-  const micScale = useRef(new Animated.Value(1)).current;
-  const micRingOpacity = useRef(new Animated.Value(0)).current;
   const alarmScale = useRef(new Animated.Value(1)).current;
 
   const isFirst = currentIndex === 0;
-  const isLast = currentIndex === totalSteps - 1;
-  const progress = ((currentIndex + 1) / totalSteps) * 100;
-  const currentStep = normalizeStep(steps[currentIndex]);
+  const isLast = totalSteps > 0 && currentIndex === totalSteps - 1;
+  const progress = totalSteps > 0 ? ((currentIndex + 1) / totalSteps) * 100 : 0;
+  const currentStep = steps[currentIndex] ? normalizeStep(steps[currentIndex]) : { content: '' };
 
   // --- Animations ---
   useEffect(() => {
@@ -136,29 +115,6 @@ export default function CookingAssistant({
   }, [ledPulse]);
 
   useEffect(() => {
-    let anim: Animated.CompositeAnimation;
-    if (isListening) {
-      anim = Animated.loop(
-        Animated.sequence([
-          Animated.timing(micRingOpacity, { toValue: 0.8, duration: 500, useNativeDriver: true }),
-          Animated.timing(micRingOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
-        ]),
-      );
-      anim.start();
-    } else {
-      micRingOpacity.setValue(0);
-      anim = Animated.loop(
-        Animated.sequence([
-          Animated.timing(micScale, { toValue: 1.05, duration: 1200, useNativeDriver: true }),
-          Animated.timing(micScale, { toValue: 1, duration: 1200, useNativeDriver: true }),
-        ]),
-      );
-      anim.start();
-    }
-    return () => anim.stop();
-  }, [isListening, micScale, micRingOpacity]);
-
-  useEffect(() => {
     if (!isAlarmPlaying) return;
     const anim = Animated.loop(
       Animated.sequence([
@@ -170,177 +126,204 @@ export default function CookingAssistant({
     return () => { anim.stop(); alarmScale.setValue(1); };
   }, [isAlarmPlaying, alarmScale]);
 
-  // --- TTS ---
-  const speak = useCallback((text: string) => {
-    if (!SpeechModule) return;
-    SpeechModule.stop();
-    SpeechModule.speak(text, { language: 'tr-TR', rate: 0.9, pitch: 1.0 });
+  // --- On-device Turkish text-to-speech ---
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    void Speech.getAvailableVoicesAsync().then((voices) => {
+      if (!active) return;
+      const turkish = voices.filter((voice) => voice.language.toLowerCase().startsWith('tr'));
+      const enhanced = turkish.find((voice) => voice.quality === Speech.VoiceQuality.Enhanced);
+      preferredTurkishVoiceRef.current = (enhanced || turkish[0])?.identifier;
+    }).catch(() => { preferredTurkishVoiceRef.current = undefined; });
+    return () => { active = false; };
+  }, [visible]);
+
+  const stopSpeech = useCallback(() => {
+    ++speechGenerationRef.current;
+    setSpeechStatus('idle');
+    speechQueueRef.current = speechQueueRef.current.catch(() => {}).then(() => Speech.stop());
+    void speechQueueRef.current.catch(() => {
+      if (visibleRef.current) setSpeechError('Ses durdurulamadı. Lütfen tekrar deneyin.');
+    });
   }, []);
 
-  // --- Timer ---
-  useEffect(() => {
-    if (!timerRunning || isTimerPaused) {
-      if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+  const speak = useCallback((text: string) => {
+    if (!visibleRef.current) return;
+    const words = text.trim();
+    if (!words) {
+      setSpeechStatus('idle');
+      setSpeechError('Bu adımda okunacak metin bulunmuyor.');
       return;
     }
-    intervalRef.current = setInterval(() => {
-      setTimerSeconds((prev) => {
-        if (prev === null || prev <= 1) return 0;
-        return prev - 1;
+    const generation = ++speechGenerationRef.current;
+    setSpeechStatus('idle');
+    setSpeechError(null);
+    // Serialize stop/speak operations so an older async stop cannot cancel new audio.
+    speechQueueRef.current = speechQueueRef.current.catch(() => {}).then(async () => {
+      await Speech.stop();
+      if (!visibleRef.current || generation !== speechGenerationRef.current) return;
+      Speech.speak(words, {
+        language: 'tr-TR',
+        rate: 0.95,
+        pitch: 1,
+        voice: preferredTurkishVoiceRef.current,
+        onStart: () => {
+          if (visibleRef.current && generation === speechGenerationRef.current) setSpeechStatus('playing');
+        },
+        onDone: () => {
+          if (visibleRef.current && generation === speechGenerationRef.current) setSpeechStatus('idle');
+        },
+        onStopped: () => {
+          if (visibleRef.current && generation === speechGenerationRef.current) setSpeechStatus('idle');
+        },
+        onError: () => {
+          if (visibleRef.current && generation === speechGenerationRef.current) {
+            setSpeechStatus('error');
+            setSpeechError('Ses okunamadı. Cihazın Türkçe ses ayarlarını kontrol edin.');
+          }
+        },
       });
-    }, 1000);
-    return () => { if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; } };
-  }, [timerRunning, isTimerPaused]);
-
-  useEffect(() => {
-    if (timerRunning && !isTimerPaused && timerSeconds === 0) {
-      setTimerRunning(false);
-      setIsAlarmPlaying(true);
-      Vibration.vibrate([0, 500, 200, 500, 200, 500]);
-    }
-  }, [timerSeconds, timerRunning, isTimerPaused]);
-
-  const startTimer = useCallback((minutes: number) => {
-    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
-    setTimerSeconds(Math.round(minutes * 60));
-    setTimerRunning(true);
-    setIsTimerPaused(false);
-    setIsAlarmPlaying(false);
+    });
+    void speechQueueRef.current.catch(() => {
+      if (visibleRef.current && generation === speechGenerationRef.current) {
+        setSpeechStatus('error');
+        setSpeechError('Ses başlatılamadı. Cihazın ses ayarlarını kontrol edin.');
+      }
+    });
   }, []);
 
+  const pauseSpeech = useCallback(() => {
+    if (speechStatus !== 'playing') return;
+    if (Platform.OS === 'ios' || Platform.OS === 'web') {
+      const generation = speechGenerationRef.current;
+      void Speech.pause().then(() => {
+        if (visibleRef.current && generation === speechGenerationRef.current) setSpeechStatus('paused');
+      }).catch(() => setSpeechError('Ses duraklatılamadı.'));
+    } else {
+      // expo-speech has no pause/resume API on Android; resume restarts the step.
+      stopSpeech();
+      setSpeechStatus('paused');
+    }
+  }, [speechStatus, stopSpeech]);
+
+  const resumeSpeech = useCallback(() => {
+    if (speechStatus !== 'paused') return;
+    if (Platform.OS === 'ios' || Platform.OS === 'web') {
+      const generation = speechGenerationRef.current;
+      void Speech.resume().then(() => {
+        if (visibleRef.current && generation === speechGenerationRef.current) setSpeechStatus('playing');
+      }).catch(() => setSpeechError('Ses devam ettirilemedi.'));
+    } else {
+      speak(currentStep.content);
+    }
+  }, [speechStatus, speak, currentStep.content]);
+
+  // --- Wall-clock timer (survives background JS timer suspension) ---
+  const syncTimer = useCallback(() => {
+    if (timerDeadlineRef.current === null) return;
+    const remaining = Math.max(0, Math.ceil((timerDeadlineRef.current - Date.now()) / 1000));
+    setTimerSeconds(remaining);
+  }, []);
+
+  useEffect(() => {
+    if (!timerRunning || isTimerPaused) return;
+    syncTimer();
+    intervalRef.current = setInterval(syncTimer, 1000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    };
+  }, [timerRunning, isTimerPaused, syncTimer]);
+
   const stopTimer = useCallback(() => {
-    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+    timerDeadlineRef.current = null;
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = null;
     setTimerRunning(false);
     setIsTimerPaused(false);
   }, []);
 
-  // --- Reset on close ---
-  useEffect(() => {
-    if (!visible) {
-      stopTimer();
-      setCurrentIndex(0);
-      setIsSOSOpen(false);
-      setIsHelpOpen(false);
-      setIsFinishedOpen(false);
-      setSosMessage(null);
-      setLastCommand('');
-      setIsAlarmPlaying(false);
-      setIsListening(false);
-      isListeningRef.current = false;
-    }
-  }, [visible, stopTimer]);
-
-  useEffect(() => {
-    return () => {
-      stopTimer();
-      if (SpeechModule) SpeechModule.stop();
-    };
-  }, [stopTimer]);
-
-  // --- Command handler ---
-  const handleCommand = useCallback((command: string) => {
-    const lowerCmd = command.toLowerCase().trim();
-    setLastCommand(lowerCmd);
-
-    // 1. Modal control
-    if (lowerCmd.includes('kapat') || lowerCmd.includes('gizle')) {
-      if (isHelpOpen) { setIsHelpOpen(false); speak('Yardım kapatıldı.'); return; }
-      if (isSOSOpen) { setIsSOSOpen(false); speak('Acil durum kapatıldı.'); return; }
-      if (isAlarmPlaying) { setIsAlarmPlaying(false); speak('Alarm susturuldu.'); return; }
-    }
-
-    // 2. Navigation
-    if (lowerCmd.includes('ileri') || lowerCmd.includes('sonraki') || lowerCmd.includes('geç') || lowerCmd.includes('tamam')) {
-      if (currentIndex < totalSteps - 1) {
-        setCurrentIndex((prev) => prev + 1);
-        speak('Sonraki adım.');
-      } else {
-        speak('Tebrikler şefim! Tarif tamamlandı.');
-        setIsFinishedOpen(true);
-      }
-    } else if (lowerCmd.includes('geri') || lowerCmd.includes('önceki')) {
-      if (currentIndex > 0) { setCurrentIndex((prev) => prev - 1); speak('Önceki adıma dönüldü.'); }
-    } else if (lowerCmd.includes('oku') || lowerCmd.includes('tekrar')) {
-      speak(normalizeStep(steps[currentIndex]).content);
-    }
-
-    // 3. Timer
-    else if (lowerCmd.includes('süre') || lowerCmd.includes('başlat') || lowerCmd.includes('dakika')) {
-      if (lowerCmd.includes('iptal')) {
-        stopTimer(); setTimerSeconds(0); setIsAlarmPlaying(false);
-        speak('Süre iptal edildi.');
-      } else if (lowerCmd.includes('durdur')) {
-        if (timerRunning && !isTimerPaused) { setIsTimerPaused(true); speak('Süre duraklatıldı.'); }
-      } else if (lowerCmd.includes('devam')) {
-        if (timerRunning && isTimerPaused) { setIsTimerPaused(false); speak('Süre devam ediyor.'); }
-      } else {
-        const minutes = textToNumber(lowerCmd);
-        if (minutes) { startTimer(minutes); speak(`${minutes} dakika süre başlatıldı.`); }
-      }
-    }
-
-    // 4. Alarm dismiss
-    else if (isAlarmPlaying && (lowerCmd.includes('dur') || lowerCmd.includes('tamam') || lowerCmd.includes('sus') || lowerCmd.includes('kapat'))) {
-      setIsAlarmPlaying(false); speak('Alarm kapatıldı.');
-    }
-
-    // 5. Help / SOS
-    else if (lowerCmd.includes('yardım') || lowerCmd.includes('ne diyebilirim')) {
-      setIsHelpOpen(true); speak('Yardım menüsü açıldı.');
-    } else if (lowerCmd.includes('acil') || lowerCmd.includes('sos') || lowerCmd.includes('sorun')) {
-      setIsSOSOpen(true); speak('Acil durum menüsü açıldı.');
-    }
-  }, [currentIndex, steps, totalSteps, speak, timerRunning, isTimerPaused, isAlarmPlaying, isHelpOpen, isSOSOpen, startTimer, stopTimer]);
-
-  const handleCommandRef = useRef(handleCommand);
-  useEffect(() => { handleCommandRef.current = handleCommand; }, [handleCommand]);
-
-  // --- Speech Recognition (expo-speech-recognition) ---
-  useEffect(() => {
-    const lib = SpeechRecognitionLib;
-    if (!lib?.ExpoSpeechRecognitionModule) return;
-    const module = lib.ExpoSpeechRecognitionModule;
-    const resultSub = module.addListener?.('result', (event: any) => {
-      const transcript: string = event.results?.[0]?.[0]?.transcript || '';
-      if (transcript) handleCommandRef.current(transcript);
-    });
-    const endSub = module.addListener?.('end', () => {
-      if (isListeningRef.current) {
-        try { module.start({ lang: 'tr-TR', continuous: false }); } catch { /* ignore */ }
-      }
-    });
-    return () => { resultSub?.remove?.(); endSub?.remove?.(); };
+  const startTimer = useCallback((minutes: number) => {
+    if (!Number.isFinite(minutes) || minutes <= 0) return;
+    const seconds = Math.round(minutes * 60);
+    timerDeadlineRef.current = Date.now() + seconds * 1000;
+    setTimerSeconds(seconds);
+    setTimerRunning(true);
+    setIsTimerPaused(false);
+    setIsAlarmPlaying(false);
+    Vibration.cancel();
   }, []);
 
-  const toggleListening = useCallback(() => {
-    const lib = SpeechRecognitionLib;
-    if (!lib?.ExpoSpeechRecognitionModule) {
-      speak('Sesli komutlar için expo-speech-recognition kurulumu gerekiyor.');
-      return;
-    }
-    const module = lib.ExpoSpeechRecognitionModule;
-    if (isListening) {
-      isListeningRef.current = false;
-      setIsListening(false);
-      try { module.stop(); } catch { /* ignore */ }
-      speak('Sesli asistan kapatıldı.');
+  const toggleTimerPause = useCallback(() => {
+    if (!timerRunning) return;
+    if (!isTimerPaused) {
+      const remaining = timerDeadlineRef.current === null
+        ? (timerSeconds ?? 0)
+        : Math.max(0, Math.ceil((timerDeadlineRef.current - Date.now()) / 1000));
+      setTimerSeconds(remaining);
+      timerDeadlineRef.current = null;
+      setIsTimerPaused(true);
     } else {
-      isListeningRef.current = true;
-      setIsListening(true);
-      speak('Sizi dinliyorum şefim.');
-      try { module.start({ lang: 'tr-TR', continuous: false }); } catch { /* ignore */ }
+      timerDeadlineRef.current = Date.now() + (timerSeconds ?? 0) * 1000;
+      setIsTimerPaused(false);
     }
-  }, [isListening, speak]);
+  }, [timerRunning, isTimerPaused, timerSeconds]);
 
-  // --- SOS Action ---
+  useEffect(() => {
+    if (timerRunning && !isTimerPaused && timerSeconds === 0) {
+      stopTimer();
+      if (visibleRef.current) {
+        setIsAlarmPlaying(true);
+        Vibration.vibrate([0, 500, 200, 500, 200, 500]);
+      }
+    }
+  }, [timerSeconds, timerRunning, isTimerPaused, stopTimer]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') syncTimer();
+      else stopSpeech();
+    });
+    return () => sub.remove();
+  }, [syncTimer, stopSpeech]);
+
+  // --- Cleanup on close, hiding and unmount ---
+  useEffect(() => {
+    if (visible) return;
+    stopSpeech();
+    stopTimer();
+    Vibration.cancel();
+    setCurrentIndex(0);
+    setIsSOSOpen(false);
+    setIsHelpOpen(false);
+    setIsFinishedOpen(false);
+    setSosMessage(null);
+    setIsAlarmPlaying(false);
+  }, [visible, stopSpeech, stopTimer]);
+
+  useEffect(() => () => {
+    visibleRef.current = false;
+    ++speechGenerationRef.current;
+    void Speech.stop().catch(() => {});
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    Vibration.cancel();
+  }, []);
+
+  const closeAssistant = useCallback(() => {
+    stopSpeech();
+    onClose();
+  }, [stopSpeech, onClose]);
+
+  const changeStep = useCallback((delta: number) => {
+    stopSpeech();
+    setCurrentIndex((index) => Math.max(0, Math.min(totalSteps - 1, index + delta)));
+  }, [stopSpeech, totalSteps]);
+
+  // Quick editorial tips; these are not responses generated by an AI model.
   const handleSOSAction = useCallback((problem: SosKey) => {
-    setSosMessage('Yapay Zeka Şef düşünüyor...');
-    setTimeout(() => {
-      const msg = SOS_RESPONSES[problem];
-      setSosMessage(msg);
-      speak(msg);
-    }, AI_RESPONSE_DELAY_MS);
-  }, [speak]);
+    setSosMessage(SOS_RESPONSES[problem]);
+  }, []);
 
   // --- Format time ---
   const formatTime = (seconds: number) => {
@@ -350,7 +333,7 @@ export default function CookingAssistant({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={closeAssistant}>
       <SafeAreaProvider>
         <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
         <SafeAreaView style={styles.container}>
@@ -358,13 +341,13 @@ export default function CookingAssistant({
         {/* ── HEADER ── */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <TouchableOpacity onPress={onClose} style={styles.backButton}>
+            <TouchableOpacity onPress={closeAssistant} style={styles.backButton}>
               <Ionicons name="arrow-back" size={20} color="rgba(255,255,255,0.8)" />
             </TouchableOpacity>
             <View style={styles.headerTitleGroup}>
               <View style={styles.liveIndicator}>
                 <Animated.View style={[styles.ledDot, { opacity: ledPulse }]} />
-                <Text style={styles.liveText}>CANLI PİLOT</Text>
+                <Text style={styles.liveText}>PİŞİRME REHBERİ</Text>
               </View>
               <Text style={styles.headerTitle} numberOfLines={1}>{recipeTitle}</Text>
             </View>
@@ -373,26 +356,16 @@ export default function CookingAssistant({
             <TouchableOpacity onPress={() => setIsHelpOpen(true)} style={styles.headerIconBtn}>
               <Ionicons name="help-circle-outline" size={22} color="rgba(255,255,255,0.6)" />
             </TouchableOpacity>
-            {isListening ? (
-              <View style={styles.listeningBadge}>
-                <View style={styles.listeningDot} />
-                <Text style={styles.listeningText}>Dinliyor...</Text>
-              </View>
-            ) : (
-              <TouchableOpacity onPress={toggleListening} style={styles.headerIconBtn}>
-                <Ionicons name="volume-high-outline" size={22} color="rgba(255,255,255,0.6)" />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity onPress={() => speak(currentStep.content)} style={styles.headerIconBtn} disabled={!currentStep.content.trim()}>
+              <Ionicons name="volume-high-outline" size={22} color="rgba(255,255,255,0.6)" />
+            </TouchableOpacity>
           </View>
         </View>
 
         {/* ── MAIN CONTENT ── */}
         <View style={styles.mainWrapper}>
-          {/* Last command pill */}
-          {!!lastCommand && (
-            <View style={styles.lastCommandPill}>
-              <Text style={styles.lastCommandText}>"{lastCommand}"</Text>
-            </View>
+          {!!speechError && (
+            <Text style={styles.speechError} accessibilityRole="alert">{speechError}</Text>
           )}
           <ScrollView
             contentContainerStyle={styles.mainContent}
@@ -401,18 +374,18 @@ export default function CookingAssistant({
             {/* Step counter */}
             <View style={styles.stepCounterRow}>
               <View style={styles.stepCounterLine} />
-              <Text style={styles.stepCounterText}>Adım {currentIndex + 1} / {totalSteps}</Text>
+              <Text style={styles.stepCounterText}>Adım {totalSteps ? currentIndex + 1 : 0} / {totalSteps}</Text>
               <View style={styles.stepCounterLine} />
             </View>
 
             {/* Step text */}
-            <Text style={styles.stepContent}>"{currentStep.content}"</Text>
+            <Text style={styles.stepContent}>{currentStep.content || "Bu tarifte henüz hazırlanış adımı bulunmuyor."}</Text>
 
             {/* Active timer */}
             {timerRunning && timerSeconds !== null && (
               <TouchableOpacity
                 style={[styles.timerCard, isTimerPaused && styles.timerCardPaused]}
-                onPress={() => setIsTimerPaused((p) => !p)}
+                onPress={toggleTimerPause}
                 activeOpacity={0.8}
               >
                 <Text style={styles.timerDisplay}>{formatTime(timerSeconds)}</Text>
@@ -430,19 +403,25 @@ export default function CookingAssistant({
               {!timerRunning && (
                 <TouchableOpacity
                   style={styles.quickBtn}
-                  onPress={() => { startTimer(10); speak('10 dakika süre başlatıldı.'); }}
+                  onPress={() => startTimer(10)}
                 >
                   <Ionicons name="play" size={10} color="rgba(255,255,255,0.7)" />
                   <Text style={styles.quickBtnText}>10dk Başlat</Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={styles.quickBtn} onPress={() => speak(currentStep.content)}>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => speak(currentStep.content)} disabled={!currentStep.content.trim()}>
                 <Ionicons name="volume-high" size={10} color="rgba(255,255,255,0.7)" />
-                <Text style={styles.quickBtnText}>Oku</Text>
+                <Text style={styles.quickBtnText}>{speechStatus === 'idle' || speechStatus === 'error' ? 'Oku' : 'Tekrar'}</Text>
               </TouchableOpacity>
+              {(speechStatus === 'playing' || speechStatus === 'paused') && (
+                <TouchableOpacity style={styles.quickBtn} onPress={stopSpeech} accessibilityLabel="Okumayı durdur">
+                  <Ionicons name="stop" size={10} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.quickBtnText}>Durdur</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity style={[styles.quickBtn, styles.quickBtnSOS]} onPress={() => setIsSOSOpen(true)}>
                 <Ionicons name="warning" size={10} color="#f87171" />
-                <Text style={[styles.quickBtnText, styles.quickBtnSOSText]}>Acil Durum / SOS</Text>
+                <Text style={[styles.quickBtnText, styles.quickBtnSOSText]}>Mutfak İpuçları</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -458,38 +437,42 @@ export default function CookingAssistant({
             <TouchableOpacity
               style={[styles.navBtn, isFirst && styles.navBtnDisabled]}
               onPress={() => {
-                if (!isFirst) { setCurrentIndex((i) => i - 1); speak('Önceki adıma dönüldü.'); }
+                if (!isFirst) changeStep(-1);
               }}
-              disabled={isFirst}
+              disabled={isFirst || totalSteps === 0}
             >
               <Ionicons name="chevron-back" size={20} color={isFirst ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.8)'} />
               <Text style={[styles.navBtnText, isFirst && styles.navBtnTextDisabled]}>Önceki</Text>
             </TouchableOpacity>
 
-            {/* Mic FAB */}
-            <Animated.View style={{ transform: [{ scale: micScale }] }}>
-              <TouchableOpacity onPress={toggleListening} activeOpacity={0.85}>
-                <LinearGradient
-                  colors={isListening ? ['#dc2626', '#991b1b'] : ['#db4c3f', '#b03d32']}
-                  style={styles.micFAB}
-                >
-                  <Animated.View
-                    style={[styles.micRing, { opacity: micRingOpacity }]}
-                    pointerEvents="none"
-                  />
-                  <Ionicons name="mic" size={28} color="#ffffff" />
-                  <Text style={styles.micFABText}>{isListening ? '...' : 'Sesli'}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </Animated.View>
+            {/* Explicit local TTS playback controls; no microphone or fake live session. */}
+            <TouchableOpacity
+              onPress={() => {
+                if (speechStatus === 'playing') pauseSpeech();
+                else if (speechStatus === 'paused') resumeSpeech();
+                else speak(currentStep.content);
+              }}
+              disabled={!currentStep.content.trim()}
+              accessibilityLabel={speechStatus === 'playing' ? 'Okumayı duraklat' : speechStatus === 'paused' ? 'Okumaya devam et' : 'Tarif adımını oku'}
+              activeOpacity={0.85}
+            >
+              <LinearGradient colors={['#db4c3f', '#b03d32']} style={styles.micFAB}>
+                <Ionicons name={speechStatus === 'playing' ? 'pause' : 'volume-high'} size={28} color="#ffffff" />
+                <Text style={styles.micFABText}>
+                  {speechStatus === 'playing' ? 'Duraklat' : speechStatus === 'paused' ? (Platform.OS === 'android' ? 'Baştan Oku' : 'Devam') : 'Oku'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
 
             {/* Next / Finish */}
             <TouchableOpacity
               style={styles.nextBtn}
               onPress={() => {
-                if (!isLast) { setCurrentIndex((i) => i + 1); speak('Sonraki adım.'); }
-                else { speak('Tebrikler şefim! Tarif tamamlandı.'); setIsFinishedOpen(true); }
+                if (!totalSteps) return;
+                if (!isLast) changeStep(1);
+                else { stopSpeech(); setIsFinishedOpen(true); }
               }}
+              disabled={totalSteps === 0}
             >
               <Text style={styles.nextBtnText}>{isLast ? 'Bitir' : 'Sonraki'}</Text>
               <Ionicons name={isLast ? 'checkmark' : 'chevron-forward'} size={20} color="#0f172a" />
@@ -537,13 +520,11 @@ export default function CookingAssistant({
                     <View style={styles.sosSolutionIcon}>
                       <Ionicons name="sparkles" size={24} color="#db4c3f" />
                     </View>
-                    <Text style={styles.sosSolutionTitle}>Çözüm Önerisi</Text>
+                    <Text style={styles.sosSolutionTitle}>Genel Mutfak Önerisi</Text>
                     <Text style={styles.sosSolutionText}>{sosMessage}</Text>
-                    {sosMessage !== 'Yapay Zeka Şef düşünüyor...' && (
-                      <TouchableOpacity onPress={() => setSosMessage(null)}>
-                        <Text style={styles.sosSolutionBack}>Geri Dön</Text>
-                      </TouchableOpacity>
-                    )}
+                    <TouchableOpacity onPress={() => setSosMessage(null)}>
+                      <Text style={styles.sosSolutionBack}>Geri Dön</Text>
+                    </TouchableOpacity>
                   </View>
                 )}
               </View>
@@ -563,39 +544,19 @@ export default function CookingAssistant({
               <View style={[styles.modalHeader, styles.helpHeader]}>
                 <View style={styles.modalHeaderTitle}>
                   <Ionicons name="list" size={20} color="#60a5fa" />
-                  <Text style={styles.modalHeaderText}>Sesli Komutlar</Text>
+                  <Text style={styles.modalHeaderText}>Sesli Okuma Yardımı</Text>
                 </View>
                 <TouchableOpacity onPress={() => setIsHelpOpen(false)}>
                   <Ionicons name="close" size={22} color="rgba(255,255,255,0.6)" />
                 </TouchableOpacity>
               </View>
               <ScrollView style={styles.modalBody}>
-                <Text style={styles.helpCategory}>NAVİGASYON</Text>
-                {[
-                  { cmd: '"İleri / Sonraki"', desc: 'Sonraki Adım' },
-                  { cmd: '"Geri / Önceki"', desc: 'Önceki Adım' },
-                  { cmd: '"Oku / Tekrar Et"', desc: 'Adımı Oku' },
-                ].map((r) => (
-                  <View key={r.cmd} style={styles.helpRow}>
-                    <Text style={styles.helpCmd}>{r.cmd}</Text>
-                    <Text style={styles.helpDesc}>{r.desc}</Text>
-                  </View>
-                ))}
-                <Text style={[styles.helpCategory, { marginTop: 12 }]}>ARAÇLAR</Text>
-                {[
-                  { cmd: '"5 Dakika Başlat"', desc: 'Sayaç Kur' },
-                  { cmd: '"Süreyi Durdur"', desc: 'Duraklat' },
-                  { cmd: '"Süreyi İptal Et"', desc: 'Sıfırla' },
-                  { cmd: '"Devam"', desc: 'Devam Et' },
-                  { cmd: '"Kapat / Gizle"', desc: 'Menüleri Kapat' },
-                  { cmd: '"Acil / SOS"', desc: 'SOS Aç' },
-                  { cmd: '"Yardım"', desc: 'Bu Menüyü Aç' },
-                ].map((r) => (
-                  <View key={r.cmd} style={styles.helpRow}>
-                    <Text style={styles.helpCmd}>{r.cmd}</Text>
-                    <Text style={styles.helpDesc}>{r.desc}</Text>
-                  </View>
-                ))}
+                <Text style={styles.helpCategory}>PİŞİRME REHBERİ</Text>
+                <Text style={styles.helpDesc}>Adımı sesli okumak için Oku düğmesine dokunun. Önceki ve Sonraki düğmeleri mevcut sesi durdurur; tarif adımlarını değiştirmez.</Text>
+                <Text style={[styles.helpCategory, { marginTop: 12 }]}>SES KONTROLÜ</Text>
+                <Text style={styles.helpDesc}>iPhone'da Duraklat ve Devam desteklenir. Android'de devam etmek için mevcut adım baştan okunur. Uygulama arka plana geçtiğinde ses durur.</Text>
+                <Text style={[styles.helpCategory, { marginTop: 12 }]}>ZAMANLAYICI</Text>
+                <Text style={styles.helpDesc}>Zamanlayıcıya dokunarak duraklatabilir veya devam ettirebilirsiniz. Arka planda geçen süre, uygulamaya döndüğünüzde hesaba katılır.</Text>
               </ScrollView>
             </View>
           </View>
@@ -619,7 +580,7 @@ export default function CookingAssistant({
                 <Ionicons name="notifications-off" size={20} color="#0f172a" />
                 <Text style={styles.alarmButtonText}>Alarmı Sustur</Text>
               </TouchableOpacity>
-              <Text style={styles.alarmHint}>"Tamam" veya "Sus" diyerek de kapatabilirsiniz.</Text>
+              <Text style={styles.alarmHint}>Alarmı kapatmak için yukarıdaki düğmeye dokunun.</Text>
             </View>
           </View>
         </Modal>
@@ -648,7 +609,7 @@ export default function CookingAssistant({
               </Text>
               <TouchableOpacity
                 style={styles.finishHomeBtn}
-                onPress={() => { setIsFinishedOpen(false); onClose(); try { router.replace('/(tabs)' as any); } catch { /* ignore */ } }}
+                onPress={() => { setIsFinishedOpen(false); closeAssistant(); try { router.replace('/(tabs)' as any); } catch { /* ignore */ } }}
               >
                 <Text style={styles.finishHomeBtnText}>Ana Sayfaya Dön</Text>
               </TouchableOpacity>
@@ -762,6 +723,13 @@ const styles = StyleSheet.create({
   },
 
   // MAIN
+  speechError: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    color: '#fecaca',
+    backgroundColor: '#7f1d1d',
+    fontSize: 13,
+  },
   mainWrapper: {
     flex: 1,
     position: 'relative',
