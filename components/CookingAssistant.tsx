@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Modal,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
   Vibration,
   View,
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -351,8 +351,9 @@ export default function CookingAssistant({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
-      <SafeAreaView style={styles.container}>
+      <SafeAreaProvider>
+        <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+        <SafeAreaView style={styles.container}>
 
         {/* ── HEADER ── */}
         <View style={styles.header}>
@@ -658,7 +659,8 @@ export default function CookingAssistant({
           </View>
         </Modal>
 
-      </SafeAreaView>
+        </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 }

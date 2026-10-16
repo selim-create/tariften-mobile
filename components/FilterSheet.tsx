@@ -6,8 +6,8 @@ import {
   Text,
   TouchableOpacity,
   View,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { RecipeFilters } from '../lib/types';
 
@@ -76,7 +76,8 @@ export default function FilterSheet({ visible, onClose, filters, onFiltersChange
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Filtrele</Text>
           <TouchableOpacity onPress={onClose}>
@@ -139,7 +140,8 @@ export default function FilterSheet({ visible, onClose, filters, onFiltersChange
             <Text style={styles.applyButtonText}>Uygula</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 }
