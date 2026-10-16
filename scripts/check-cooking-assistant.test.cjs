@@ -9,9 +9,14 @@ const test = require('node:test');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'components', 'CookingAssistant.tsx'), 'utf8');
 
-test('standard cooking assistant has no recognition loop or paid audio API', () => {
+test('fixed-command recognition is native-only and never uses paid AI APIs', () => {
   assert.match(source, /import \* as Speech from 'expo-speech'/);
-  assert.doesNotMatch(source, /ExpoSpeechRecognitionModule|SpeechRecognitionLib|module\.start\(|expo-speech-recognition/);
+  assert.match(source, /Constants\.appOwnership === 'expo'/);
+  assert.match(source, /require\('expo-speech-recognition'\)/);
+  assert.match(source, /api\.requestPermissionsAsync\(\)/);
+  assert.match(source, /voiceWantedRef\.current = true/);
+  assert.match(source, /lang: 'tr-TR'/);
+  assert.match(source, /subscriptions\.forEach\(\(item\) => item\.remove\(\)\)/);
   assert.doesNotMatch(source, /gpt-live|ai\/generate|text-to-speech\/synthesize/i);
 });
 
