@@ -60,16 +60,31 @@ test('native iOS direct and nested speech payloads yield immediate transcripts',
   assert.equal(extract(null), null);
 });
 
-test('iOS recognition processes interim speech and restarts sessions after command', () => {
+test('iOS recognition is continuous with interim actions and no forced stop on commands', () => {
   const assistant = fs.readFileSync(path.join(__dirname, '..', 'components/CookingAssistant.tsx'), 'utf8');
+  assert.match(assistant, /continuous: true/);
+  assert.doesNotMatch(assistant, /continuous: false/);
   assert.match(assistant, /interimResults: true/);
-  assert.doesNotMatch(assistant, /interimResults: false/);
-  assert.match(assistant, /continuous: false/);
+  assert.match(assistant, /iosTaskHint: 'confirmation'/);
+  assert.match(assistant, /api\.start\(COOKING_RECOGNITION_OPTIONS\)/);
   assert.match(assistant, /api\.addListener\('result'/);
   assert.match(assistant, /extractCookingTranscript\(event\)/);
-  assert.match(assistant, /segmentConsumedRef\.current = true/);
-  assert.match(assistant, /try \{ api\.stop\(\); \} catch/);
   assert.match(assistant, /setHeardPhrase\(transcript\)/);
   assert.match(assistant, /setMicFeedback\('Komut uygulandı: '/);
+  assert.match(assistant, /actionKey === lastCommandKeyRef\.current/);
+  assert.doesNotMatch(assistant, /segmentConsumedRef/);
+  assert.match(assistant, /if \(code === 'no-speech'\)/);
   assert.match(assistant, /voiceRestartRef\.current = setTimeout\(startListening/);
+  const onResult = assistant.split("api.addListener('result', (event: any) => {")[1].split("api.addListener('nomatch'")[0];
+  assert.doesNotMatch(onResult, /api\.(stop|abort)\(\)/);
+});
+
+test('common short natural Turkish commands are not rejected', () => {
+  assert.deepEqual(parse('devam'), { type: 'resume_voice' });
+  assert.deepEqual(parse('Sonraki adım'), { type: 'next' });
+  assert.deepEqual(parse('Bir sonraki'), { type: 'next' });
+  assert.deepEqual(parse('ileri git'), { type: 'next' });
+  assert.deepEqual(parse('geri git'), { type: 'previous' });
+  assert.deepEqual(parse('tekrar'), { type: 'read' });
+  assert.equal(parse('sıradaki malzemeyi ekle'), null);
 });
