@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   AppState,
+  Image,
   Modal,
   Platform,
   ScrollView,
@@ -16,8 +17,10 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
+import { parseCookingCommand } from '../lib/cooking-commands';
 
-// Standard assistant: local speech only. No microphone or paid AI integration.
+// Chirp voice playback and local/native fixed-command recognition are separate services.
 import * as Speech from 'expo-speech';
 import { createAudioPlayer } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -99,6 +102,21 @@ export default function CookingAssistant({
   const cloudControllerRef = useRef<AbortController | null>(null);
   const cloudGenerationRef = useRef(0);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [micListening, setMicListening] = useState(false);
+  const [micAvailable, setMicAvailable] = useState(false);
+  const [micError, setMicError] = useState('');
+  const [lastSpokenCommand, setLastSpokenCommand] = useState('');
+  const nativeRecognizerRef = useRef<{
+    start: (config: { lang: string; continuous: boolean; interimResults: boolean; maxAlternatives: number }) => void;
+    stop: () => void;
+    abort: () => void;
+    requestPermissionsAsync: () => Promise<{ granted: boolean }>;
+    addListener: (name: string, callback: (event: any) => void) => { remove: () => void };
+  } | null>(null);
+  const voiceWantedRef = useRef(false);
+  const voiceRestartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nativeRecognizingRef = useRef(false);
+  const commandCooldownRef = useRef(0);
 
   // Timer
   const [timerSeconds, setTimerSeconds] = useState<number | null>(null);
@@ -486,6 +504,159 @@ export default function CookingAssistant({
     stopSpeech();
     setCurrentIndex((index) => Math.max(0, Math.min(totalSteps - 1, index + delta)));
   }, [stopSpeech, totalSteps]);
+
+  const handleNativeVoiceCommand = useCallback((transcript: string) => {
+    const command = parseCookingCommand(transcript);
+    if (!command) return;
+    const now = Date.now();
+    if (now - commandCooldownRef.current < 950) return;
+    commandCooldownRef.current = now;
+    setLastSpokenCommand(transcript.trim());
+    switch (command.type) {
+      case 'next':
+        if (isLast) { stopSpeech(); setIsFinishedOpen(true); }
+        else changeStep(1);
+        return;
+      case 'previous': changeStep(-1); return;
+      case 'read': speak(currentStep.content); return;
+      case 'pause_voice': pauseSpeech(); return;
+      case 'resume_voice': resumeSpeech(); return;
+      case 'stop_voice': stopSpeech(); return;
+      case 'start_timer': startTimer(command.minutes); return;
+      case 'pause_timer': if (timerRunning && !isTimerPaused) toggleTimerPause(); return;
+      case 'resume_timer': if (timerRunning && isTimerPaused) toggleTimerPause(); return;
+      case 'cancel_timer': stopTimer(); setTimerSeconds(null); return;
+      case 'help': setIsHelpOpen(true); return;
+    }
+  }, [isLast, changeStep, speak, currentStep.content, pauseSpeech, resumeSpeech, stopSpeech,
+      startTimer, timerRunning, isTimerPaused, toggleTimerPause, stopTimer]);
+
+  const handleCommandRef = useRef(handleNativeVoiceCommand);
+  useEffect(() => { handleCommandRef.current = handleNativeVoiceCommand; }, [handleNativeVoiceCommand]);
+
+  // Native iOS/Android speech recognition is not included in Expo Go.
+  // Only use it inside an app-specific development/production build.
+  useEffect(() => {
+    if (!visible) return;
+    setMicListening(false);
+    setMicError('');
+    setLastSpokenCommand('');
+    if (Constants.appOwnership === 'expo') {
+      setMicAvailable(false);
+      setMicError('Sesli komutlar için Tariften development build gereklidir. Expo Go bu native modülü içermez.');
+      return;
+    }
+
+    let disposed = false;
+    let moduleApi: typeof nativeRecognizerRef.current = null;
+    try {
+      // Dynamic loading keeps Expo Go capable of testing the existing TTS UI.
+      moduleApi = require('expo-speech-recognition').ExpoSpeechRecognitionModule;
+      if (!moduleApi?.start || !moduleApi?.addListener) throw new Error('native module unavailable');
+    } catch {
+      setMicAvailable(false);
+      setMicError('Cihazın native konuşma tanıma modülü bulunamadı. Yeni bir development build gerekiyor.');
+      return;
+    }
+
+    const api = moduleApi;
+    nativeRecognizerRef.current = api;
+    setMicAvailable(true);
+    voiceWantedRef.current = true; // automatically listen while the cooking screen is open
+    const startListening = () => {
+      if (disposed || !voiceWantedRef.current || !visibleRef.current || nativeRecognizingRef.current) return;
+      if (AppState.currentState === 'background' || AppState.currentState === 'inactive') return;
+      try {
+        api.start({ lang: 'tr-TR', continuous: true, interimResults: false, maxAlternatives: 1 });
+      } catch {
+        setMicError('Mikrofon otomatik açılamadı. Mikrofona dokunup tekrar deneyebilirsin.');
+      }
+    };
+    const subscriptions = [
+      api.addListener('start', () => {
+        if (disposed) return;
+        nativeRecognizingRef.current = true;
+        setMicListening(true);
+        setMicError('');
+      }),
+      api.addListener('result', (event: any) => {
+        if (disposed || !voiceWantedRef.current) return;
+        const transcript = event.results?.[0]?.transcript;
+        if (typeof transcript === 'string') handleCommandRef.current(transcript);
+      }),
+      api.addListener('error', (event: any) => {
+        if (disposed) return;
+        const code = String(event.error || 'unknown');
+        if (code === 'no-speech' || code === 'aborted') return;
+        setMicError(code === 'not-allowed'
+          ? 'Mikrofon veya konuşma tanıma izni reddedildi. Telefon ayarlarından izin ver.'
+          : 'Sesli komut algılanamadı (' + code + '). Mikrofona yeniden dokunabilirsin.');
+        if (code === 'not-allowed' || code === 'service-not-allowed') {
+          voiceWantedRef.current = false;
+        }
+      }),
+      api.addListener('end', () => {
+        if (disposed) return;
+        nativeRecognizingRef.current = false;
+        setMicListening(false);
+        if (voiceRestartRef.current) clearTimeout(voiceRestartRef.current);
+        if (voiceWantedRef.current) {
+          voiceRestartRef.current = setTimeout(startListening, 950);
+        }
+      }),
+    ];
+    void api.requestPermissionsAsync()
+      .then((result) => {
+        if (disposed) return;
+        if (!result.granted) {
+          voiceWantedRef.current = false;
+          setMicError('Sesli komutların otomatik başlaması için mikrofon ve konuşma tanıma izni gerekli.');
+          return;
+        }
+        startListening();
+      })
+      .catch(() => {
+        if (!disposed) setMicError('Mikrofon izni alınamadı. Telefon ayarlarını kontrol et.');
+      });
+    const lifecycle = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') {
+        if (voiceRestartRef.current) clearTimeout(voiceRestartRef.current);
+        try { api.stop(); } catch { /* already stopped */ }
+      } else if (voiceWantedRef.current && visibleRef.current) {
+        voiceRestartRef.current = setTimeout(startListening, 700);
+      }
+    });
+
+    return () => {
+      disposed = true;
+      voiceWantedRef.current = false;
+      if (voiceRestartRef.current) clearTimeout(voiceRestartRef.current);
+      try { api.abort(); } catch { /* ignore */ }
+      subscriptions.forEach((item) => item.remove());
+      lifecycle.remove();
+      nativeRecognizerRef.current = null;
+      nativeRecognizingRef.current = false;
+    };
+  }, [visible]);
+
+  const toggleNativeMicrophone = useCallback(async () => {
+    const api = nativeRecognizerRef.current;
+    if (!api) { setMicError('Sesli komutlar için development build gerekli.'); return; }
+    if (voiceWantedRef.current) {
+      voiceWantedRef.current = false;
+      if (voiceRestartRef.current) clearTimeout(voiceRestartRef.current);
+      try { api.stop(); } catch { /* already stopped */ }
+      setMicListening(false);
+      return;
+    }
+    try {
+      const grant = await api.requestPermissionsAsync();
+      if (!grant.granted) { setMicError('Mikrofon izinleri reddedildi.'); return; }
+      voiceWantedRef.current = true;
+      setMicError('');
+      api.start({ lang: 'tr-TR', continuous: true, interimResults: false, maxAlternatives: 1 });
+    } catch { setMicError('Sesli komutları başlatamadık. Telefon ayarlarını kontrol et.'); }
+  }, []);
 
   // Quick editorial tips; these are not responses generated by an AI model.
   const handleSOSAction = useCallback((problem: SosKey) => {
