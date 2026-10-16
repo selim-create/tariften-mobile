@@ -50,6 +50,6 @@ test('voice selection helper stays offline and without stored audio', () => {
   assert.doesNotMatch(input, /fetch\(|https?:\/\/|openai|chirp|writeFile|mp3|audio\/mpeg/i);
   const source = fs.readFileSync(path.join(__dirname, '..', 'components', 'CookingAssistant.tsx'), 'utf8');
   assert.match(source, /chooseTurkishVoiceId/);
-  assert.match(source, /Sesleri Karşılaştır/);
-  assert.doesNotMatch(source, /ExpoSpeechRecognitionModule|SpeechRecognitionLib/);
+  assert.match(source, /Ses Profilini Değiştir/);
+  assert.match(source, /Constants\.appOwnership === 'expo'/);
 });

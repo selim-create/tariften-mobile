@@ -19,8 +19,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Profil fotoğrafı ve tarif fotoğrafları çekmek için kamera erişimi gereklidir.",
         "NSPhotoLibraryUsageDescription": "Profil fotoğrafı ve tarif fotoğrafları seçmek için galeri erişimi gereklidir.",
-        "NSMicrophoneUsageDescription": "Sesli tarif arama için mikrofon erişimi gereklidir.",
-        "NSSpeechRecognitionUsageDescription": "Sesli arama özelliği için konuşma tanıma erişimi gereklidir.",
+        "NSMicrophoneUsageDescription": "Pişirme rehberinde eller serbest sesli komutları algılamak için mikrofon erişimi gereklidir.",
+        "NSSpeechRecognitionUsageDescription": "Pişirme rehberinde konuşulan Türkçe komutları tanımak için konuşma tanıma erişimi gereklidir.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -57,6 +57,13 @@
           "recordAudioAndroid": false,
           "enableBackgroundPlayback": false,
           "enableBackgroundRecording": false
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Tariften pişirme rehberinde eller serbest sesli komutlar için mikrofon erişimi gereklidir.",
+          "speechRecognitionPermission": "Tariften pişirme rehberinde sonraki, önceki ve oku komutlarını algılamak için konuşma tanıma izni gereklidir."
         }
       ]
     ],
