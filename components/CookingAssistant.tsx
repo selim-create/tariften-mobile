@@ -411,8 +411,14 @@ export default function CookingAssistant({
               )}
               <TouchableOpacity style={styles.quickBtn} onPress={() => speak(currentStep.content)} disabled={!currentStep.content.trim()}>
                 <Ionicons name="volume-high" size={10} color="rgba(255,255,255,0.7)" />
-                <Text style={styles.quickBtnText}>Oku</Text>
+                <Text style={styles.quickBtnText}>{speechStatus === 'idle' || speechStatus === 'error' ? 'Oku' : 'Tekrar'}</Text>
               </TouchableOpacity>
+              {(speechStatus === 'playing' || speechStatus === 'paused') && (
+                <TouchableOpacity style={styles.quickBtn} onPress={stopSpeech} accessibilityLabel="Okumayı durdur">
+                  <Ionicons name="stop" size={10} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.quickBtnText}>Durdur</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity style={[styles.quickBtn, styles.quickBtnSOS]} onPress={() => setIsSOSOpen(true)}>
                 <Ionicons name="warning" size={10} color="#f87171" />
                 <Text style={[styles.quickBtnText, styles.quickBtnSOSText]}>Mutfak İpuçları</Text>
@@ -433,7 +439,7 @@ export default function CookingAssistant({
               onPress={() => {
                 if (!isFirst) changeStep(-1);
               }}
-              disabled={isFirst}
+              disabled={isFirst || totalSteps === 0}
             >
               <Ionicons name="chevron-back" size={20} color={isFirst ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.8)'} />
               <Text style={[styles.navBtnText, isFirst && styles.navBtnTextDisabled]}>Önceki</Text>
@@ -462,9 +468,11 @@ export default function CookingAssistant({
             <TouchableOpacity
               style={styles.nextBtn}
               onPress={() => {
+                if (!totalSteps) return;
                 if (!isLast) changeStep(1);
-                else if (totalSteps > 0) { stopSpeech(); setIsFinishedOpen(true); }
+                else { stopSpeech(); setIsFinishedOpen(true); }
               }}
+              disabled={totalSteps === 0}
             >
               <Text style={styles.nextBtnText}>{isLast ? 'Bitir' : 'Sonraki'}</Text>
               <Ionicons name={isLast ? 'checkmark' : 'chevron-forward'} size={20} color="#0f172a" />
@@ -536,7 +544,7 @@ export default function CookingAssistant({
               <View style={[styles.modalHeader, styles.helpHeader]}>
                 <View style={styles.modalHeaderTitle}>
                   <Ionicons name="list" size={20} color="#60a5fa" />
-                  <Text style={styles.modalHeaderText}>Sesli Komutlar</Text>
+                  <Text style={styles.modalHeaderText}>Sesli Okuma Yardımı</Text>
                 </View>
                 <TouchableOpacity onPress={() => setIsHelpOpen(false)}>
                   <Ionicons name="close" size={22} color="rgba(255,255,255,0.6)" />
