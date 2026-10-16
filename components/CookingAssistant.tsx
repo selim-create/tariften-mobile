@@ -286,6 +286,8 @@ export default function CookingAssistant({
       void speakCloud(currentIndex, cloudVoice);
       return;
     }
+    // An explicit offline voice preview must never overlap an existing MP3.
+    if (cloudPlayerRef.current) clearCloud();
     if (!visibleRef.current) return;
     const words = text.trim();
     if (!words) {
@@ -334,7 +336,7 @@ export default function CookingAssistant({
         setSpeechError('Ses başlatılamadı. Cihazın ses ayarlarını kontrol edin.');
       }
     });
-  }, [voiceOptions, selectedVoiceId, speechRate, cloudMode, cloudVoice, currentIndex, speakCloud]);
+  }, [voiceOptions, selectedVoiceId, speechRate, cloudMode, cloudVoice, currentIndex, speakCloud, clearCloud]);
 
   const pauseSpeech = useCallback(() => {
     if (speechStatus !== 'playing') return;
