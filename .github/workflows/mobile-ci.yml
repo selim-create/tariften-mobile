@@ -75,3 +75,8 @@ jobs:
         run: |
           node --test scripts/check-audit-regressions.test.cjs
           node scripts/check-audit-regressions.cjs npm-audit-production.json
+      - name: Reject unreviewed GitHub Security Advisory IDs
+        if: always()
+        run: |
+          node --test scripts/check-known-advisories.test.cjs
+          node scripts/check-known-advisories.cjs npm-audit-production.json
