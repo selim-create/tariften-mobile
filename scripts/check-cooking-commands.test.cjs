@@ -162,3 +162,25 @@ test('diagnostic UI shows a temporary phrase, clears it on silence and explains 
   assert.match(source, /}, 1100\)/);
   assert.match(source, /Misafir modunda cihaz sesi kullanılır/);
 });
+
+test('no stale command is replayed when silence is followed by an identical native snapshot', () => {
+  const stream = new Stream();
+  assert.deepEqual(stream.accept('sonraki', 100).commands, [{ type: 'next' }]);
+  stream.clearPending();
+  assert.deepEqual(stream.accept('sonraki', 2400).commands, []);
+  assert.deepEqual(stream.accept('sonraki sonraki', 2800).commands, [{ type: 'next' }]);
+});
+
+test('long native cumulative transcripts do not stop at the old 180-character cap', () => {
+  const input = fs.readFileSync(path.join(__dirname, '..', 'lib/native-cooking-transcript.ts'), 'utf8');
+  const compiled = ts.transpileModule(input, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+  }).outputText;
+  const mod = { exports: {} };
+  Function('module', 'exports', compiled)(mod, mod.exports);
+  const raw = 'malzemeleri karıştır '.repeat(20) + 'sonraki';
+  assert.ok(raw.length > 180);
+  const extracted = mod.exports.extractCookingTranscript({ results: [{ transcript: raw }] });
+  assert.ok(extracted.endsWith('sonraki'));
+  assert.ok(extracted.length > 180);
+});
