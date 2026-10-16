@@ -658,8 +658,16 @@ export default function CookingAssistant({
                 && now - commandCooldownRef.current < 260) continue;
             lastCommandKeyRef.current = actionKey;
             commandCooldownRef.current = now;
-            setLastSpokenCommand(actionKey);
-            setMicFeedback('Komut uygulandı: ' + actionKey);
+            const commandLabel: Record<string, string> = {
+              next: 'Sonraki', previous: 'Önceki', read: 'Oku',
+              pause_voice: 'Okumayı duraklat', resume_voice: 'Devam',
+              stop_voice: 'Sesi durdur', start_timer: 'Sayaç başlat',
+              pause_timer: 'Sayacı durdur', resume_timer: 'Sayacı sürdür',
+              cancel_timer: 'Sayacı iptal et', help: 'Yardım',
+            };
+            const label = commandLabel[command.type] || 'Komut';
+            setLastSpokenCommand(label);
+            setMicFeedback('Komut uygulandı: ' + label);
             handleCommandRef.current(command);
           }
         } else if (pending) {
