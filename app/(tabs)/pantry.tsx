@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Modal,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
@@ -393,7 +393,7 @@ export default function PantryScreen() {
   if (loading) return <LoadingSpinner fullScreen />;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right']}>
       {/* Save Status Indicator */}
       {saveStatus === 'saving' && (
         <View style={styles.saveIndicatorSaving}>
