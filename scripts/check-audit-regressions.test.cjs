@@ -27,7 +27,7 @@ function baselineReport() {
   };
 }
 
-test('accepts the reviewed 21 high / 14 moderate baseline', () => {
+test('accepts the reviewed 21 high / 8 moderate baseline', () => {
   assert.equal(checkAuditRegression(baselineReport()).ok, true);
 });
 
