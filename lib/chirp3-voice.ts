@@ -1,5 +1,5 @@
 // WordPress Core owns identity, per-user quotas, and every paid Google call.
-// These calls never contain a Google service account or Cloud Run HMAC secret.
+// The client carries only a WordPress bearer token; cloud credentials stay on the server.
 export const CHIRP3_VOICES = [
   { id: 'tr-TR-Chirp3-HD-Enceladus', label: 'Enceladus · Varsayılan' },
   { id: 'tr-TR-Chirp3-HD-Zephyr', label: 'Zephyr' },
