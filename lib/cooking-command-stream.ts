@@ -52,7 +52,6 @@ export class CookingCommandStream {
   private previousWords: string[] = [];
   private pendingWords: string[] = [];
   private lastResultAt = 0;
-  private lastAcceptedAt = 0;
 
   clearPending(): void {
     this.pendingWords = [];
@@ -62,7 +61,6 @@ export class CookingCommandStream {
     this.previousWords = [];
     this.pendingWords = [];
     this.lastResultAt = 0;
-    this.lastAcceptedAt = 0;
   }
 
   accept(raw: string, now: number = Date.now()): CookingStreamResult {
@@ -111,7 +109,6 @@ export class CookingCommandStream {
       if (command) {
         commands.push(command);
         this.pendingWords = [];
-        this.lastAcceptedAt = now;
       } else if (!potentiallyValid(phrase)) {
         this.pendingWords = [];
         discardedNoise = true;
