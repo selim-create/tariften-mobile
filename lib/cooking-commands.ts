@@ -11,11 +11,11 @@ const numbers: Record<string, number> = {
 export function parseCookingCommand(transcript: string): CookingCommand | null {
   const cmd = transcript.toLocaleLowerCase('tr-TR').trim().replace(/[.,!?]/g, '').replace(/\s+/g, ' ');
   if (!cmd || cmd.split(' ').length > 6) return null;
-  if (/^(sonraki|sonraki adım|ileri|ileri geç|geç|sonraki adıma geç)$/.test(cmd)) return { type: 'next' };
-  if (/^(önceki|önceki adım|geri|geri dön|önceki adıma dön)$/.test(cmd)) return { type: 'previous' };
-  if (/^(oku|tekrar oku|tekrar et|adımı oku|seslendir)$/.test(cmd)) return { type: 'read' };
+  if (/^(sonraki|sonraki adım|bir sonraki|bir sonraki adım|ileri|ileri geç|ileri git|geç|sonraki adıma geç)$/.test(cmd)) return { type: 'next' };
+  if (/^(önceki|önceki adım|bir önceki|geri|geri dön|geri git|önceki adıma dön)$/.test(cmd)) return { type: 'previous' };
+  if (/^(oku|tekrar|tekrar oku|tekrar et|adımı oku|adımı tekrar oku|seslendir)$/.test(cmd)) return { type: 'read' };
   if (/^(duraklat|okumayı duraklat)$/.test(cmd)) return { type: 'pause_voice' };
-  if (/^(devam et|okumaya devam et)$/.test(cmd)) return { type: 'resume_voice' };
+  if (/^(devam|devam et|okumaya devam et)$/.test(cmd)) return { type: 'resume_voice' };
   if (/^(sesi durdur|okumayı durdur)$/.test(cmd)) return { type: 'stop_voice' };
   if (/^(süreyi durdur|sayacı durdur|süreyi duraklat)$/.test(cmd)) return { type: 'pause_timer' };
   if (/^(süreyi sürdür|sayacı sürdür)$/.test(cmd)) return { type: 'resume_timer' };
