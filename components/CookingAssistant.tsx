@@ -502,8 +502,9 @@ export default function CookingAssistant({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={closeAssistant}>
       <SafeAreaProvider>
-        <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+        <StatusBar barStyle="light-content" backgroundColor="#0b111b" />
         <SafeAreaView style={styles.container}>
+          <LinearGradient colors={['#151d2a', '#0a1019', '#090d16']} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
 
         {/* ── HEADER ── */}
         <View style={styles.header}>
@@ -514,7 +515,7 @@ export default function CookingAssistant({
             <View style={styles.headerTitleGroup}>
               <View style={styles.liveIndicator}>
                 <Animated.View style={[styles.ledDot, { opacity: ledPulse }]} />
-                <Text style={styles.liveText}>PİŞİRME REHBERİ</Text>
+                <Text style={styles.liveText}>TARİFTEN / PİŞİRME</Text>
               </View>
               <Text style={styles.headerTitle} numberOfLines={1}>{recipeTitle}</Text>
             </View>
@@ -542,15 +543,35 @@ export default function CookingAssistant({
             contentContainerStyle={styles.mainContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* Step counter */}
+            {/* Premium editorial reading stage */}
             <View style={styles.stepCounterRow}>
+              <View style={styles.phaseDot} />
+              <Text style={styles.stepCounterText}>ŞİMDİ SIRADA</Text>
               <View style={styles.stepCounterLine} />
-              <Text style={styles.stepCounterText}>Adım {totalSteps ? currentIndex + 1 : 0} / {totalSteps}</Text>
-              <View style={styles.stepCounterLine} />
+              <Text style={styles.stepCountLabel}>{currentIndex + 1} / {totalSteps}</Text>
             </View>
-
-            {/* Step text */}
-            <Text style={styles.stepContent}>{currentStep.content || "Bu tarifte henüz hazırlanış adımı bulunmuyor."}</Text>
+            <View style={styles.readingCard}>
+              <LinearGradient colors={['rgba(248,129,96,0.13)', 'rgba(255,255,255,0.025)', 'transparent']}
+                style={StyleSheet.absoluteFillObject} pointerEvents="none" />
+              <View style={styles.readingCardTop}>
+                <Text style={styles.readingEyebrow}>ADIM {String(currentIndex + 1).padStart(2, '0')}</Text>
+                <Text style={styles.readingWatermark} accessibilityElementsHidden>
+                  {String(currentIndex + 1).padStart(2, '0')}
+                </Text>
+              </View>
+              <Text style={styles.stepContent}>
+                {currentStep.content || 'Bu tarifte henüz hazırlanış adımı bulunmuyor.'}
+              </Text>
+              <View style={styles.readingCardFooter}>
+                <View style={styles.voiceStatusDot} />
+                <Ionicons name="volume-medium-outline" size={15} color="#ffa58c" />
+                <Text style={styles.readingVoiceText} numberOfLines={1}>
+                  {cloudMode
+                    ? 'CHIRP 3 HD · ' + (CHIRP3_VOICES.find((item) => item.id === cloudVoice)?.label.split(' · ')[0] || 'Enceladus')
+                    : 'CİHAZ SESİ · TÜRKÇE'}
+                </Text>
+              </View>
+            </View>
 
             {/* Active timer */}
             {timerRunning && timerSeconds !== null && (
@@ -600,6 +621,10 @@ export default function CookingAssistant({
 
         {/* ── FOOTER ── */}
         <View style={styles.footer}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressLabel}>PİŞİRME İLERLEMESİ</Text>
+            <Text style={styles.progressFraction}>{totalSteps ? currentIndex + 1 : 0} / {totalSteps}</Text>
+          </View>
           <View style={styles.progressBarBg}>
             <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
           </View>
@@ -627,7 +652,7 @@ export default function CookingAssistant({
               accessibilityLabel={speechStatus === 'playing' ? 'Okumayı duraklat' : speechStatus === 'paused' ? 'Okumaya devam et' : 'Tarif adımını oku'}
               activeOpacity={0.85}
             >
-              <LinearGradient colors={['#db4c3f', '#b03d32']} style={styles.micFAB}>
+              <LinearGradient colors={['#f47b60', '#d95543']} style={styles.micFAB}>
                 <Ionicons name={speechStatus === 'playing' ? 'pause' : 'volume-high'} size={28} color="#ffffff" />
                 <Text style={styles.micFABText}>
                   {cloudBusy ? 'Hazırlanıyor' : speechStatus === 'playing' ? 'Duraklat' : speechStatus === 'paused' ? (!cloudMode && Platform.OS === 'android' ? 'Baştan Oku' : 'Devam') : 'Oku'}
@@ -988,6 +1013,27 @@ export default function CookingAssistant({
 // Styles
 // ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
+  // Premium cooking canvas
+  phaseDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#f18368' },
+  stepCountLabel: { color: '#e9b9aa', fontSize: 12, fontWeight: '800', letterSpacing: 1.5 },
+  readingCard: {
+    width: '100%', minHeight: 285, justifyContent: 'space-between', overflow: 'hidden',
+    borderRadius: 30, backgroundColor: '#1b2330', borderWidth: 1,
+    borderColor: 'rgba(249,187,158,0.18)', paddingHorizontal: 26, paddingVertical: 27, marginBottom: 24,
+  },
+  readingCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 38 },
+  readingEyebrow: { fontSize: 10, color: '#e89e8c', fontWeight: '800', letterSpacing: 3 },
+  readingWatermark: { position: 'absolute', top: -27, right: -12, fontSize: 88, fontWeight: '900', color: 'rgba(255,255,255,0.035)' },
+  readingCardFooter: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.09)', paddingTop: 17, marginTop: 20,
+  },
+  voiceStatusDot: { width: 6, height: 6, backgroundColor: '#f18368', borderRadius: 3 },
+  readingVoiceText: { color: '#d3bac0', fontSize: 10, fontWeight: '800', letterSpacing: 1.1, flex: 1 },
+  progressHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  progressLabel: { color: '#9fa9b9', fontSize: 9, fontWeight: '800', letterSpacing: 2 },
+  progressFraction: { color: '#f8ded0', fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+
   container: {
     flex: 1,
     backgroundColor: '#0f172a',
