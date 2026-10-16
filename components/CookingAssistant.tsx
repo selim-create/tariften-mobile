@@ -1035,19 +1035,14 @@ const styles = StyleSheet.create({
   progressFraction: { color: '#f8ded0', fontSize: 12, fontWeight: '800', letterSpacing: 1 },
 
   container: {
-    flex: 1,
-    backgroundColor: '#0f172a',
+    flex: 1, backgroundColor: '#090d16',
   },
 
   // HEADER
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 17, backgroundColor: 'rgba(9,14,23,0.38)',
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.09)',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -1056,12 +1051,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 44, height: 44, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.065)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+    justifyContent: 'center', alignItems: 'center',
   },
   headerTitleGroup: {
     flex: 1,
@@ -1079,16 +1071,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#ef4444',
   },
   liveText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: 'rgba(156,163,175,1)',
-    letterSpacing: 2,
+    fontSize: 9, fontWeight: '800', color: '#eea58d', letterSpacing: 2.1,
   },
   headerTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#ffffff',
-    maxWidth: 200,
+    fontSize: 16, fontWeight: '700', color: '#f9f2eb', maxWidth: 220, letterSpacing: -0.3,
   },
   headerRight: {
     flexDirection: 'row',
@@ -1096,12 +1082,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 44, height: 44, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.055)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.075)', justifyContent: 'center', alignItems: 'center',
   },
   listeningBadge: {
     flexDirection: 'row',
@@ -1153,38 +1135,21 @@ const styles = StyleSheet.create({
     color: 'rgba(156,163,175,1)',
   },
   mainContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 52,
-    paddingBottom: 24,
+    flexGrow: 1, justifyContent: 'center', alignItems: 'stretch',
+    paddingHorizontal: 20, paddingTop: 26, paddingBottom: 22,
   },
   stepCounterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 28,
+    flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 17,
   },
   stepCounterLine: {
-    width: 28,
-    height: 1,
-    backgroundColor: 'rgba(219,76,63,0.4)',
+    flex: 1, height: 1, backgroundColor: 'rgba(242,135,109,0.20)',
   },
   stepCounterText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#db4c3f',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
+    fontSize: 11, fontWeight: '800', color: '#f69b7c', letterSpacing: 2.2,
   },
   stepContent: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#ffffff',
-    textAlign: 'center',
-    lineHeight: 34,
-    marginBottom: 28,
+    fontSize: 23, fontWeight: '700', color: '#fff7ed', textAlign: 'left',
+    lineHeight: 35, letterSpacing: -0.65, marginVertical: 27,
   },
 
   // TIMER
@@ -1226,73 +1191,43 @@ const styles = StyleSheet.create({
 
   // QUICK ACTIONS
   quickActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
+    flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start',
+    gap: 8, marginBottom: 5,
   },
   quickBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(255,255,255,0.055)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.13)',
+    paddingHorizontal: 15, paddingVertical: 12, borderRadius: 14, minHeight: 42,
   },
   quickBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: 'rgba(209,213,219,1)',
+    fontSize: 12, fontWeight: '700', color: '#dce1e7',
   },
   quickBtnSOS: {
-    backgroundColor: 'rgba(239,68,68,0.1)',
-    borderColor: 'rgba(239,68,68,0.3)',
+    backgroundColor: 'rgba(238,121,94,0.08)', borderColor: 'rgba(240,137,109,0.27)',
   },
   quickBtnSOSText: {
-    color: '#f87171',
+    color: '#f9a38c',
   },
 
   // FOOTER
   footer: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 28,
-    backgroundColor: 'rgba(15,23,42,0.95)',
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.09)',
+    paddingHorizontal: 20, paddingTop: 18, paddingBottom: 20, backgroundColor: '#0c131e',
   },
   progressBarBg: {
-    height: 3,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 2,
-    marginBottom: 20,
-    overflow: 'hidden',
+    height: 5, backgroundColor: 'rgba(255,255,255,0.09)',
+    borderRadius: 6, marginBottom: 17, overflow: 'hidden',
   },
   progressBarFill: {
-    height: '100%',
-    backgroundColor: '#db4c3f',
-    borderRadius: 2,
+    height: '100%', backgroundColor: '#ee795d', borderRadius: 6,
   },
   controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10,
   },
   navBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    height: 52,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 5, height: 56, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 18,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
   },
   navBtnDisabled: {
     opacity: 0.3,
@@ -1306,31 +1241,16 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.3)',
   },
   nextBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    height: 52,
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, height: 56, backgroundColor: '#f6eee5', borderRadius: 18,
   },
   nextBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0f172a',
+    fontSize: 14, fontWeight: '800', color: '#0e1725',
   },
   micFAB: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 2,
-    marginTop: -14,
-    borderWidth: 3,
-    borderColor: '#0f172a',
-    overflow: 'hidden',
+    width: 73, height: 73, borderRadius: 23,
+    justifyContent: 'center', alignItems: 'center', gap: 2,
+    marginTop: -9, borderWidth: 3, borderColor: '#0c131e', overflow: 'hidden',
   },
   micRing: {
     position: 'absolute',
@@ -1343,9 +1263,7 @@ const styles = StyleSheet.create({
     borderRadius: 38,
   },
   micFABText: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.9)',
+    fontSize: 10, fontWeight: '800', color: '#fff8f1', letterSpacing: 0.4,
   },
 
   // LOCAL VOICE SELECTOR
@@ -1405,8 +1323,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   voiceSelected: {
-    backgroundColor: 'rgba(219,76,63,0.17)',
-    borderColor: '#db4c3f',
+    backgroundColor: 'rgba(244,126,99,0.14)', borderColor: '#f1876b',
   },
   voiceChoice: {
     flex: 1,
@@ -1506,14 +1423,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   modalCard: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#1e293b',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    overflow: 'hidden',
-    maxHeight: '85%',
+    width: '100%', maxWidth: 420, backgroundColor: '#1b2431', borderRadius: 28,
+    borderWidth: 1, borderColor: 'rgba(249,184,149,0.18)', overflow: 'hidden', maxHeight: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1686,17 +1597,9 @@ const styles = StyleSheet.create({
 
   // FINISH
   finishCard: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: '#1e293b',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    overflow: 'hidden',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 24,
+    width: '100%', maxWidth: 360, backgroundColor: '#1d2531', borderRadius: 28,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', overflow: 'hidden',
+    alignItems: 'center', paddingHorizontal: 24, paddingTop: 32, paddingBottom: 24,
   },
   finishGradientLine: {
     position: 'absolute',
