@@ -5,7 +5,7 @@ const { resolve } = require('node:path');
 
 /**
  * Last reviewed clean npm ci + npm audit --omit=dev --json:
- * https://github.com/selim-create/tariften-mobile/actions/runs/38867798214
+ * https://github.com/selim-create/tariften-mobile/actions/runs/38870826360
  *
  * This is a maximum accepted *regression baseline*, not an assertion that
  * existing vulnerabilities are safe, fixed, or excluded from the mobile app.
@@ -13,7 +13,7 @@ const { resolve } = require('node:path');
  */
 const BASELINE = Object.freeze({
   high: 21,
-  moderate: 14,
+  moderate: 8,
   highPackages: Object.freeze([
     '@expo/cli',
     '@expo/code-signing-certificates',
