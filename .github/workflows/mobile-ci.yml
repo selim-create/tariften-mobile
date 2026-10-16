@@ -23,6 +23,8 @@ jobs:
         run: npx expo install --check
         env:
           CI: '1'
+      - name: Guard Expo Router URI parsing compatibility
+        run: node --test scripts/check-router-uri-surface.test.cjs
       - name: Report production dependency security advisories
         run: npm audit --omit=dev --json > npm-audit-production.json
         continue-on-error: true
