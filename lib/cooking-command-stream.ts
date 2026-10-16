@@ -24,7 +24,12 @@ function normalize(raw: string): string {
 function potentiallyValid(fragment: string): boolean {
   if (!fragment || fragment.length > 56 || fragment.split(' ').length > 6) return false;
   if (KNOWN_PHRASES.some((phrase) => phrase.startsWith(fragment))) return true;
-  return /^(?:\d{1,2}|bir|iki|üç|dört|beş|altı|yedi|sekiz|dokuz|on|on beş|yirmi|otuz)(?: dakika(?:lık)?(?: süre| sayaç)?(?: (?:başlat|kur))?)?$/.test(fragment);
+  const number = Number(fragment.split(' ')[0]);
+  if (Number.isInteger(number) && number >= 1 && number <= 60) {
+    return [number + ' dakika başlat', number + ' dakika sayaç kur', number + ' dakika süre başlat']
+      .some((phrase) => phrase.startsWith(fragment));
+  }
+  return false;
 }
 
 export type CookingStreamResult = {
@@ -84,12 +89,14 @@ export class CookingCommandStream {
       this.pendingWords = [];
       changed = incoming;
     } else if (matching === incoming.length) {
-      // Interim correction removed words. Do not re-emit accepted actions.
-      this.pendingWords = [];
+      // Interim correction removed an uncommitted suffix.
+      const committedPrefixLength = this.previousWords.length - this.pendingWords.length;
+      this.pendingWords = this.pendingWords.slice(0, Math.max(0, matching - committedPrefixLength));
     } else {
-      // The last interim word may be revised (e.g. "son" -> "sonraki").
-      // Rebuild the uncommitted fragment, never re-issue the common prefix.
-      this.pendingWords = [];
+      // Replace only the revised uncommitted portion, e.g. '5 dakika ba'
+      // becomes '5 dakika başlat', without losing the timer prefix.
+      const committedPrefixLength = this.previousWords.length - this.pendingWords.length;
+      this.pendingWords = this.pendingWords.slice(0, Math.max(0, matching - committedPrefixLength));
       changed = incoming.slice(matching);
     }
 
