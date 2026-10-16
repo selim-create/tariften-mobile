@@ -79,9 +79,8 @@ export class CookingCommandStream {
 
     let changed: string[] = [];
     if (matching === this.previousWords.length && matching === incoming.length) {
-      // Some recognizers reset their stream to the same short phrase after a
-      // genuine pause. Treat it as a fresh utterance only after a safe gap.
-      if (idleGap && now - this.lastAcceptedAt > 1500) changed = incoming;
+      // Exactly the same native snapshot is never a new command, even after
+      // silence. Native onend resets the stream if an actual session restarts.
     } else if (matching === this.previousWords.length) {
       changed = incoming.slice(matching);
     } else if (matching === 0) {
