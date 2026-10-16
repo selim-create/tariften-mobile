@@ -19,7 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
-import { parseCookingCommand } from '../lib/cooking-commands';
+import type { CookingCommand } from '../lib/cooking-commands';
+import { CookingCommandStream } from '../lib/cooking-command-stream';
 import { extractCookingTranscript } from '../lib/native-cooking-transcript';
 import { playTimerStartSound } from '../lib/timer-start-sound';
 
@@ -129,6 +130,8 @@ export default function CookingAssistant({
   const [lastSpokenCommand, setLastSpokenCommand] = useState('');
   const [micFeedback, setMicFeedback] = useState('');
   const [heardPhrase, setHeardPhrase] = useState('');
+  const voiceStreamRef = useRef(new CookingCommandStream());
+  const voiceSilenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nativeRecognizerRef = useRef<{
     start: (config: {
       lang: string; continuous: boolean; interimResults: boolean; maxAlternatives: number;
@@ -536,10 +539,7 @@ export default function CookingAssistant({
     setCurrentIndex((index) => Math.max(0, Math.min(totalSteps - 1, index + delta)));
   }, [stopSpeech, totalSteps]);
 
-  const handleNativeVoiceCommand = useCallback((transcript: string) => {
-    const command = parseCookingCommand(transcript);
-    if (!command) return;
-    setLastSpokenCommand(transcript.trim());
+  const handleNativeVoiceCommand = useCallback((command: CookingCommand) => {
     switch (command.type) {
       case 'next':
         if (isLast) { stopSpeech(); setIsFinishedOpen(true); }
@@ -576,6 +576,8 @@ export default function CookingAssistant({
     setLastSpokenCommand('');
     setMicFeedback('Mikrofon hazırlanıyor…');
     setHeardPhrase('');
+    voiceStreamRef.current.reset();
+    if (voiceSilenceTimerRef.current) clearTimeout(voiceSilenceTimerRef.current);
     if (Constants.appOwnership === 'expo') {
       setMicAvailable(false);
       setMicError('Sesli komutlar için Tariften development build gereklidir. Expo Go bu native modülü içermez.');
@@ -626,36 +628,57 @@ export default function CookingAssistant({
         if (disposed || !voiceWantedRef.current) return;
         const transcript = extractCookingTranscript(event);
         if (!transcript) return;
-        setHeardPhrase(transcript);
         consecutiveNoSpeechRef.current = 0;
         recognizerRestartDelayRef.current = 850;
-        const command = parseCookingCommand(transcript);
-        if (!command) {
-          setMicFeedback('Duyuldu; henüz bir komutla eşleşmedi.');
-          return;
+
+        // The native iOS stream may yield cumulative interim results.
+        // Process only newly arrived words: NEVER parse the entire previous
+        // transcript as one oversized command.
+        const { commands, pending, discardedNoise } = voiceStreamRef.current.accept(transcript);
+        setHeardPhrase(pending);
+
+        if (voiceSilenceTimerRef.current) clearTimeout(voiceSilenceTimerRef.current);
+        voiceSilenceTimerRef.current = setTimeout(() => {
+          voiceStreamRef.current.clearPending();
+          if (!disposed) {
+            setHeardPhrase('');
+            setMicFeedback((value) => value.startsWith('Komut uygulandı:')
+              ? value : 'Mikrofon dinliyor · Sonraki / Önceki / Oku');
+          }
+        }, 1100);
+
+        if (commands.length > 0) {
+          for (const command of commands) {
+            const now = Date.now();
+            const actionKey = command.type === 'start_timer'
+              ? 'start_timer:' + command.minutes : command.type;
+            // Only filter near-identical native callbacks, not another
+            // intentional "Sonraki" spoken later in the same session.
+            if (lastCommandKeyRef.current === actionKey
+                && now - commandCooldownRef.current < 260) continue;
+            lastCommandKeyRef.current = actionKey;
+            commandCooldownRef.current = now;
+            setLastSpokenCommand(actionKey);
+            setMicFeedback('Komut uygulandı: ' + actionKey);
+            handleCommandRef.current(command);
+          }
+        } else if (pending) {
+          setMicFeedback('Komut dinleniyor…');
+        } else if (discardedNoise) {
+          setMicFeedback('Komut olmayan ses temizlendi. Dinlemeye devam ediyorum.');
         }
-        // Interim results commonly repeat or refine one phrase. Deduplicate
-        // by action, not by globally muting all voice commands for 950ms.
-        const actionKey = command.type === 'start_timer'
-          ? 'start_timer:' + command.minutes : command.type;
-        const now = Date.now();
-        if (actionKey === lastCommandKeyRef.current && now - commandCooldownRef.current < 1750) return;
-        lastCommandKeyRef.current = actionKey;
-        commandCooldownRef.current = now;
-        setMicFeedback('Komut uygulandı: ' + transcript);
-        // Do not stop/restart iOS recognition after each command. Keep the
-        // audio stream active, only reinitialize when the OS ends the session.
-        handleCommandRef.current(transcript);
       }),
       api.addListener('nomatch', () => {
-        // Native recognizers may emit nomatch after partial results.
-        // No need to overwrite useful live transcript feedback.
+        voiceStreamRef.current.clearPending();
+        if (!disposed) setHeardPhrase('');
       }),
       api.addListener('error', (event: any) => {
         if (disposed) return;
         const code = String(event.error || 'unknown');
         if (code === 'aborted') return;
         if (code === 'no-speech') {
+          voiceStreamRef.current.clearPending();
+          setHeardPhrase('');
           // Silence is normal in a kitchen. Do not show repeated error
           // banners; if iOS ends the session, onend will restart it.
           consecutiveNoSpeechRef.current += 1;
@@ -681,6 +704,8 @@ export default function CookingAssistant({
       }),
       api.addListener('end', () => {
         if (disposed) return;
+        voiceStreamRef.current.reset();
+        setHeardPhrase('');
         nativeRecognizingRef.current = false;
         setMicListening(false);
         if (voiceRestartRef.current) clearTimeout(voiceRestartRef.current);
@@ -713,6 +738,8 @@ export default function CookingAssistant({
 
     return () => {
       disposed = true;
+      if (voiceSilenceTimerRef.current) clearTimeout(voiceSilenceTimerRef.current);
+      voiceStreamRef.current.reset();
       voiceWantedRef.current = false;
       if (voiceRestartRef.current) clearTimeout(voiceRestartRef.current);
       try { api.abort(); } catch { /* ignore */ }
@@ -727,6 +754,8 @@ export default function CookingAssistant({
     const api = nativeRecognizerRef.current;
     if (!api) { setMicError('Sesli komutlar için development build gerekli.'); return; }
     if (voiceWantedRef.current) {
+      voiceStreamRef.current.reset();
+      setHeardPhrase('');
       voiceWantedRef.current = false;
       if (voiceRestartRef.current) clearTimeout(voiceRestartRef.current);
       try { api.stop(); } catch { /* already stopped */ }
@@ -1036,7 +1065,13 @@ export default function CookingAssistant({
                     ))}
                   </>
                 ) : (
-                  <Text style={styles.voiceHint}>Google doğal ses betası henüz kapalı veya hesabın için erişilemiyor. Cihaz seslerini kullanabilirsin.</Text>
+                  <Text style={styles.voiceHint}>
+            {!token
+              ? 'Chirp 3 HD doğal sesler için önce Tariften hesabına giriş yapmalısın. Misafir modunda cihaz sesi kullanılır.'
+              : cloudStatus?.enabled === false
+                ? 'Chirp 3 HD servisi şu anda sunucuda etkin değil. Cihaz sesi kullanılabilir.'
+                : 'Chirp 3 HD erişimi şu anda doğrulanamıyor. Giriş durumunu veya ağ bağlantısını kontrol et.'}
+          </Text>
                 )}
 
                 <Text style={styles.voiceSectionTitle}>ÇEVRİMDIŞI TÜRKÇE SESLER</Text>
