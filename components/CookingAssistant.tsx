@@ -600,7 +600,7 @@ export default function CookingAssistant({
     voiceWantedRef.current = true; // automatically listen while the cooking screen is open
     const startListening = () => {
       if (disposed || !voiceWantedRef.current || !visibleRef.current || nativeRecognizingRef.current) return;
-      if (AppState.currentState !== 'active') return;
+      if (AppState.currentState === 'background' || AppState.currentState === 'inactive') return;
       try {
         nativeRecognizingRef.current = true;
         api.start(COOKING_RECOGNITION_OPTIONS);
