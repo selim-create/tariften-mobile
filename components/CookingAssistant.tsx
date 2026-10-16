@@ -200,7 +200,7 @@ export default function CookingAssistant({
     cloudControllerRef.current?.abort();
     cloudControllerRef.current = null;
     cloudPlayerRef.current?.pause();
-    cloudPlayerRef.current?.release();
+    cloudPlayerRef.current?.remove();
     cloudPlayerRef.current = null;
     cloudKeyRef.current = '';
     const oldUri = cloudUriRef.current;
@@ -246,7 +246,7 @@ export default function CookingAssistant({
       await FileSystem.writeAsStringAsync(tempUri, audioBase64, { encoding: FileSystem.EncodingType.Base64 });
       if (!visibleRef.current || requestGeneration !== cloudGenerationRef.current) return;
       const player = createAudioPlayer({ uri: tempUri });
-      player.playbackRate = speechRate;
+      player.setPlaybackRate(speechRate);
       cloudPlayerRef.current = player;
       cloudUriRef.current = tempUri;
       cloudKeyRef.current = key;
