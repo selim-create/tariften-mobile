@@ -19,6 +19,10 @@ import { useRouter } from 'expo-router';
 
 // Standard assistant: local speech only. No microphone or paid AI integration.
 import * as Speech from 'expo-speech';
+import { createAudioPlayer } from 'expo-audio';
+import * as FileSystem from 'expo-file-system/legacy';
+import { useAuth } from '../context/AuthContext';
+import { CHIRP3_VOICES, getVoiceStatus, synthesizeRecipeStep, VoiceStatus } from '../lib/chirp3-voice';
 import { VOICE_RATE_PRESETS, chooseTurkishVoiceId, getTurkishVoices } from '../lib/tts-voices';
 
 // ---------------------------------------------------------------------------
@@ -34,6 +38,7 @@ interface CookingAssistantProps {
   visible: boolean;
   onClose: () => void;
   recipeTitle: string;
+  recipeId: number;
   steps: (Step | string)[];
   chefTip?: string;
 }
@@ -63,10 +68,12 @@ export default function CookingAssistant({
   visible,
   onClose,
   recipeTitle,
+  recipeId,
   steps,
   chefTip,
 }: CookingAssistantProps) {
   const router = useRouter();
+  const { token } = useAuth();
 
   const totalSteps = steps.length;
   const visibleRef = useRef(visible);
@@ -82,6 +89,15 @@ export default function CookingAssistant({
   const [voiceRefresh, setVoiceRefresh] = useState(0);
   const [speechStatus, setSpeechStatus] = useState<'idle' | 'playing' | 'paused' | 'error'>('idle');
   const [speechError, setSpeechError] = useState<string | null>(null);
+  const [cloudStatus, setCloudStatus] = useState<VoiceStatus | null>(null);
+  const [cloudMode, setCloudMode] = useState(false);
+  const [cloudVoice, setCloudVoice] = useState<string>(CHIRP3_VOICES[0].id);
+  const [cloudBusy, setCloudBusy] = useState(false);
+  const cloudPlayerRef = useRef<ReturnType<typeof createAudioPlayer> | null>(null);
+  const cloudUriRef = useRef<string | null>(null);
+  const cloudKeyRef = useRef('');
+  const cloudControllerRef = useRef<AbortController | null>(null);
+  const cloudGenerationRef = useRef(0);
   const [currentIndex, setCurrentIndex] = useState(0);
 
   // Timer
@@ -160,16 +176,116 @@ export default function CookingAssistant({
     return () => { active = false; };
   }, [visible, voiceRefresh]);
 
+  // Beta is disabled by default on Core. Never call synthesis unless enabled.
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    setCloudMode(false);
+    setCloudStatus(null);
+    if (!token) return () => { active = false; };
+    void getVoiceStatus(token)
+      .then((status) => {
+        if (!active) return;
+        setCloudStatus(status);
+        setCloudMode(Boolean(status.enabled));
+      })
+      .catch(() => {
+        if (active) { setCloudStatus(null); setCloudMode(false); }
+      });
+    return () => { active = false; };
+  }, [visible, token]);
+
+  const clearCloud = useCallback(() => {
+    ++cloudGenerationRef.current;
+    cloudControllerRef.current?.abort();
+    cloudControllerRef.current = null;
+    cloudPlayerRef.current?.pause();
+    cloudPlayerRef.current?.release();
+    cloudPlayerRef.current = null;
+    cloudKeyRef.current = '';
+    const oldUri = cloudUriRef.current;
+    cloudUriRef.current = null;
+    if (oldUri) void FileSystem.deleteAsync(oldUri, { idempotent: true }).catch(() => {});
+    setCloudBusy(false);
+  }, []);
+
+  const speakCloud = useCallback(async (step: number, requestedVoice: string) => {
+    if (!visibleRef.current || !token || !cloudStatus?.enabled || !Number.isSafeInteger(recipeId) || recipeId < 1) {
+      setSpeechError('Doğal seslendirme şu anda kullanılamıyor. Cihaz sesini seçebilirsin.');
+      return;
+    }
+    const key = `${recipeId}:${step}:${requestedVoice}`;
+    if (cloudPlayerRef.current && cloudKeyRef.current === key) {
+      try {
+        await cloudPlayerRef.current.seekTo(0);
+        cloudPlayerRef.current.play();
+        setSpeechStatus('playing');
+        setSpeechError(null);
+      } catch {
+        setSpeechStatus('error');
+        setSpeechError('Ses tekrar oynatılamadı.');
+      }
+      return;
+    }
+
+    clearCloud();
+    const requestGeneration = cloudGenerationRef.current;
+    const controller = new AbortController();
+    cloudControllerRef.current = controller;
+    setCloudBusy(true);
+    setSpeechStatus('idle');
+    setSpeechError(null);
+    let tempUri: string | null = null;
+    try {
+      await Speech.stop();
+      if (requestGeneration !== cloudGenerationRef.current) return;
+      const audioBase64 = await synthesizeRecipeStep(token, recipeId, step, requestedVoice, controller.signal);
+      if (!visibleRef.current || requestGeneration !== cloudGenerationRef.current) return;
+      if (!FileSystem.cacheDirectory) throw new Error('Ses önbelleği bulunamadı.');
+      tempUri = `${FileSystem.cacheDirectory}tariften-voice-${Date.now()}-${Math.random().toString(36).slice(2)}.mp3`;
+      await FileSystem.writeAsStringAsync(tempUri, audioBase64, { encoding: FileSystem.EncodingType.Base64 });
+      if (!visibleRef.current || requestGeneration !== cloudGenerationRef.current) return;
+      const player = createAudioPlayer({ uri: tempUri });
+      player.playbackRate = speechRate;
+      cloudPlayerRef.current = player;
+      cloudUriRef.current = tempUri;
+      cloudKeyRef.current = key;
+      player.addListener('playbackStatusUpdate', (status) => {
+        if (requestGeneration === cloudGenerationRef.current && status.didJustFinish) {
+          setSpeechStatus('idle');
+        }
+      });
+      player.play();
+      setSpeechStatus('playing');
+      setCloudBusy(false);
+    } catch (reason) {
+      if (controller.signal.aborted || requestGeneration !== cloudGenerationRef.current) return;
+      setSpeechStatus('error');
+      setSpeechError(reason instanceof Error ? reason.message : 'Doğal ses oluşturulamadı. Cihaz sesini kullanabilirsin.');
+      setCloudBusy(false);
+    } finally {
+      if (tempUri && cloudUriRef.current !== tempUri) {
+        void FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(() => {});
+      }
+      if (cloudControllerRef.current === controller) cloudControllerRef.current = null;
+    }
+  }, [token, recipeId, cloudStatus?.enabled, speechRate, clearCloud]);
+
   const stopSpeech = useCallback(() => {
+    clearCloud();
     ++speechGenerationRef.current;
     setSpeechStatus('idle');
     speechQueueRef.current = speechQueueRef.current.catch(() => {}).then(() => Speech.stop());
     void speechQueueRef.current.catch(() => {
       if (visibleRef.current) setSpeechError('Ses durdurulamadı. Lütfen tekrar deneyin.');
     });
-  }, []);
+  }, [clearCloud]);
 
   const speak = useCallback((text: string, voiceOverride?: string | null) => {
+    if (cloudMode && voiceOverride === undefined) {
+      void speakCloud(currentIndex, cloudVoice);
+      return;
+    }
     if (!visibleRef.current) return;
     const words = text.trim();
     if (!words) {
@@ -218,10 +334,15 @@ export default function CookingAssistant({
         setSpeechError('Ses başlatılamadı. Cihazın ses ayarlarını kontrol edin.');
       }
     });
-  }, [voiceOptions, selectedVoiceId, speechRate]);
+  }, [voiceOptions, selectedVoiceId, speechRate, cloudMode, cloudVoice, currentIndex, speakCloud]);
 
   const pauseSpeech = useCallback(() => {
     if (speechStatus !== 'playing') return;
+    if (cloudMode && cloudPlayerRef.current) {
+      cloudPlayerRef.current.pause();
+      setSpeechStatus('paused');
+      return;
+    }
     if (Platform.OS === 'ios' || Platform.OS === 'web') {
       const generation = speechGenerationRef.current;
       void Speech.pause().then(() => {
@@ -232,10 +353,15 @@ export default function CookingAssistant({
       stopSpeech();
       setSpeechStatus('paused');
     }
-  }, [speechStatus, stopSpeech]);
+  }, [speechStatus, stopSpeech, cloudMode]);
 
   const resumeSpeech = useCallback(() => {
     if (speechStatus !== 'paused') return;
+    if (cloudMode && cloudPlayerRef.current) {
+      cloudPlayerRef.current.play();
+      setSpeechStatus('playing');
+      return;
+    }
     if (Platform.OS === 'ios' || Platform.OS === 'web') {
       const generation = speechGenerationRef.current;
       void Speech.resume().then(() => {
@@ -244,7 +370,7 @@ export default function CookingAssistant({
     } else {
       speak(currentStep.content);
     }
-  }, [speechStatus, speak, currentStep.content]);
+  }, [speechStatus, speak, currentStep.content, cloudMode]);
 
   // --- Wall-clock timer (survives background JS timer suspension) ---
   const syncTimer = useCallback(() => {
@@ -333,10 +459,11 @@ export default function CookingAssistant({
   useEffect(() => () => {
     visibleRef.current = false;
     ++speechGenerationRef.current;
+    clearCloud();
     void Speech.stop().catch(() => {});
     if (intervalRef.current) clearInterval(intervalRef.current);
     Vibration.cancel();
-  }, []);
+  }, [clearCloud]);
 
   const closeAssistant = useCallback(() => {
     stopSpeech();
@@ -451,7 +578,7 @@ export default function CookingAssistant({
                   <Text style={styles.quickBtnText}>10dk Başlat</Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={styles.quickBtn} onPress={() => speak(currentStep.content)} disabled={!currentStep.content.trim()}>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => speak(currentStep.content)} disabled={!currentStep.content.trim() || cloudBusy}>
                 <Ionicons name="volume-high" size={10} color="rgba(255,255,255,0.7)" />
                 <Text style={styles.quickBtnText}>{speechStatus === 'idle' || speechStatus === 'error' ? 'Oku' : 'Tekrar'}</Text>
               </TouchableOpacity>
@@ -494,14 +621,14 @@ export default function CookingAssistant({
                 else if (speechStatus === 'paused') resumeSpeech();
                 else speak(currentStep.content);
               }}
-              disabled={!currentStep.content.trim()}
+              disabled={!currentStep.content.trim() || cloudBusy}
               accessibilityLabel={speechStatus === 'playing' ? 'Okumayı duraklat' : speechStatus === 'paused' ? 'Okumaya devam et' : 'Tarif adımını oku'}
               activeOpacity={0.85}
             >
               <LinearGradient colors={['#db4c3f', '#b03d32']} style={styles.micFAB}>
                 <Ionicons name={speechStatus === 'playing' ? 'pause' : 'volume-high'} size={28} color="#ffffff" />
                 <Text style={styles.micFABText}>
-                  {speechStatus === 'playing' ? 'Duraklat' : speechStatus === 'paused' ? (Platform.OS === 'android' ? 'Baştan Oku' : 'Devam') : 'Oku'}
+                  {cloudBusy ? 'Hazırlanıyor' : speechStatus === 'playing' ? 'Duraklat' : speechStatus === 'paused' ? (!cloudMode && Platform.OS === 'android' ? 'Baştan Oku' : 'Devam') : 'Oku'}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -548,11 +675,11 @@ export default function CookingAssistant({
               </View>
               <ScrollView contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
                 <Text style={styles.voiceDescription}>
-                  Telefonundaki Türkçe seslerle aynı tarif adımını dinle. Beğendiğin sesi seç;
-                  sonraki okumalarda bu ses kullanılır.
+                  Doğal Chirp 3 HD seslerini veya telefonundaki çevrimdışı Türkçe sesleri seç.
+                  Doğal sesler kullanıcı kotasına tabidir.
                 </Text>
                 <Text style={styles.voiceHint}>
-                  Ses karşılaştırması ücretsizdir ve cihazında yapılır. Seçimler bu pişirme ekranı boyunca geçerlidir.
+                  Cihaz sesleri ücretsizdir. Chirp 3 HD önizlemeleri Google üzerinden üretilir ve ses kotasından düşer.
                 </Text>
 
                 <Text style={styles.voiceSectionTitle}>OKUMA HIZI</Text>
@@ -575,7 +702,39 @@ export default function CookingAssistant({
                 </View>
                 <Text style={styles.voiceHint}>Hız değişikliği bir sonraki okumada uygulanır.</Text>
 
-                <Text style={styles.voiceSectionTitle}>TÜRKÇE SESLER</Text>
+                {cloudStatus?.enabled ? (
+                  <>
+                    <Text style={styles.voiceSectionTitle}>GOOGLE CHIRP 3 HD · DOĞAL SESLER</Text>
+                    <Text style={styles.voiceHint}>Her yeni adım/ses önizlemesi ücretli API isteği oluşturabilir. Aynı dosya açık kaldığı sürece tekrar dinleme ücretsizdir.</Text>
+                    {CHIRP3_VOICES.map((item) => (
+                      <View key={item.id} style={[styles.voiceItem, cloudMode && cloudVoice === item.id && styles.voiceSelected]}>
+                        <TouchableOpacity
+                          onPress={() => { stopSpeech(); setCloudMode(true); setCloudVoice(item.id); }}
+                          style={styles.voiceChoice}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: cloudMode && cloudVoice === item.id }}
+                        >
+                          <Ionicons name={cloudMode && cloudVoice === item.id ? 'radio-button-on' : 'radio-button-off'} size={19} color="#fda4af" />
+                          <View style={styles.voiceItemText}>
+                            <Text style={styles.voiceName}>{item.label}</Text>
+                            <Text style={styles.voiceMeta}>Google · Türkçe doğal ses</Text>
+                          </View>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.voicePreviewButton}
+                          disabled={cloudBusy || !currentStep.content.trim()}
+                          onPress={() => { stopSpeech(); setCloudMode(true); setCloudVoice(item.id); void speakCloud(currentIndex, item.id); }}
+                          accessibilityLabel={item.label + ' doğal sesini dinle (kota kullanır)'}
+                        >
+                          <Text style={styles.voicePreviewText}>Dinle</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </>
+                ) : (
+                  <Text style={styles.voiceHint}>Google doğal ses betası henüz kapalı veya hesabın için erişilemiyor. Cihaz seslerini kullanabilirsin.</Text>
+                )}
+
+                <Text style={styles.voiceSectionTitle}>ÇEVRİMDIŞI TÜRKÇE SESLER</Text>
                 {voiceLoading ? <Text style={styles.voiceHint}>Cihazdaki sesler yükleniyor...</Text> : null}
                 {voiceFetchFailed ? (
                   <View style={styles.voiceNotice}>
@@ -591,9 +750,9 @@ export default function CookingAssistant({
                   </Text>
                 ) : null}
 
-                <View style={[styles.voiceItem, selectedVoiceId === null && styles.voiceSelected]}>
+                <View style={[styles.voiceItem, !cloudMode && selectedVoiceId === null && styles.voiceSelected]}>
                   <TouchableOpacity
-                    onPress={() => { stopSpeech(); setSelectedVoiceId(null); }}
+                    onPress={() => { stopSpeech(); setCloudMode(false); setSelectedVoiceId(null); }}
                     style={styles.voiceChoice}
                     accessibilityRole="button"
                     accessibilityState={{ selected: selectedVoiceId === null }}
@@ -621,10 +780,10 @@ export default function CookingAssistant({
                 {voiceOptions.map((voice) => (
                   <View
                     key={voice.identifier}
-                    style={[styles.voiceItem, selectedVoiceId === voice.identifier && styles.voiceSelected]}
+                    style={[styles.voiceItem, !cloudMode && selectedVoiceId === voice.identifier && styles.voiceSelected]}
                   >
                     <TouchableOpacity
-                      onPress={() => { stopSpeech(); setSelectedVoiceId(voice.identifier); }}
+                      onPress={() => { stopSpeech(); setCloudMode(false); setSelectedVoiceId(voice.identifier); }}
                       style={styles.voiceChoice}
                       accessibilityRole="button"
                       accessibilityState={{ selected: selectedVoiceId === voice.identifier }}
