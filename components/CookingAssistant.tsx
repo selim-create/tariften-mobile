@@ -19,6 +19,7 @@ import { useRouter } from 'expo-router';
 
 // Standard assistant: local speech only. No microphone or paid AI integration.
 import * as Speech from 'expo-speech';
+import { VOICE_RATE_PRESETS, chooseTurkishVoiceId, getTurkishVoices } from '../lib/tts-voices';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -72,7 +73,13 @@ export default function CookingAssistant({
   visibleRef.current = visible;
   const speechGenerationRef = useRef(0);
   const speechQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const preferredTurkishVoiceRef = useRef<string | undefined>(undefined);
+  const [voiceOptions, setVoiceOptions] = useState<Speech.Voice[]>([]);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string | null>(null);
+  const [speechRate, setSpeechRate] = useState<number>(0.95);
+  const [isVoiceSettingsOpen, setIsVoiceSettingsOpen] = useState(false);
+  const [voiceLoading, setVoiceLoading] = useState(false);
+  const [voiceFetchFailed, setVoiceFetchFailed] = useState(false);
+  const [voiceRefresh, setVoiceRefresh] = useState(0);
   const [speechStatus, setSpeechStatus] = useState<'idle' | 'playing' | 'paused' | 'error'>('idle');
   const [speechError, setSpeechError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -126,18 +133,32 @@ export default function CookingAssistant({
     return () => { anim.stop(); alarmScale.setValue(1); };
   }, [isAlarmPlaying, alarmScale]);
 
-  // --- On-device Turkish text-to-speech ---
+  // --- Device-only Turkish voices: list dynamically, prefer enhanced, fallback safely. ---
   useEffect(() => {
     if (!visible) return;
     let active = true;
-    void Speech.getAvailableVoicesAsync().then((voices) => {
-      if (!active) return;
-      const turkish = voices.filter((voice) => voice.language.toLowerCase().startsWith('tr'));
-      const enhanced = turkish.find((voice) => voice.quality === Speech.VoiceQuality.Enhanced);
-      preferredTurkishVoiceRef.current = (enhanced || turkish[0])?.identifier;
-    }).catch(() => { preferredTurkishVoiceRef.current = undefined; });
+    setVoiceLoading(true);
+    setVoiceFetchFailed(false);
+    void Speech.getAvailableVoicesAsync()
+      .then((voices) => {
+        if (!active) return;
+        const turkishVoices = getTurkishVoices(voices, Speech.VoiceQuality.Enhanced);
+        setVoiceOptions(turkishVoices);
+        setSelectedVoiceId((existing) => (
+          existing && !turkishVoices.some((voice) => voice.identifier === existing) ? null : existing
+        ));
+      })
+      .catch(() => {
+        if (!active) return;
+        setVoiceOptions([]);
+        setVoiceFetchFailed(true);
+        setSelectedVoiceId(null);
+      })
+      .finally(() => {
+        if (active) setVoiceLoading(false);
+      });
     return () => { active = false; };
-  }, [visible]);
+  }, [visible, voiceRefresh]);
 
   const stopSpeech = useCallback(() => {
     ++speechGenerationRef.current;
@@ -148,7 +169,7 @@ export default function CookingAssistant({
     });
   }, []);
 
-  const speak = useCallback((text: string) => {
+  const speak = useCallback((text: string, voiceOverride?: string | null) => {
     if (!visibleRef.current) return;
     const words = text.trim();
     if (!words) {
@@ -157,6 +178,12 @@ export default function CookingAssistant({
       return;
     }
     const generation = ++speechGenerationRef.current;
+    // null requests the recommended voice; undefined uses the user's current choice.
+    const voiceId = voiceOverride === undefined
+      ? chooseTurkishVoiceId(voiceOptions, selectedVoiceId, Speech.VoiceQuality.Enhanced)
+      : voiceOverride === null
+        ? chooseTurkishVoiceId(voiceOptions, null, Speech.VoiceQuality.Enhanced)
+        : voiceOverride;
     setSpeechStatus('idle');
     setSpeechError(null);
     // Serialize stop/speak operations so an older async stop cannot cancel new audio.
@@ -165,9 +192,9 @@ export default function CookingAssistant({
       if (!visibleRef.current || generation !== speechGenerationRef.current) return;
       Speech.speak(words, {
         language: 'tr-TR',
-        rate: 0.95,
+        rate: speechRate,
         pitch: 1,
-        voice: preferredTurkishVoiceRef.current,
+        voice: voiceId,
         onStart: () => {
           if (visibleRef.current && generation === speechGenerationRef.current) setSpeechStatus('playing');
         },
@@ -191,7 +218,7 @@ export default function CookingAssistant({
         setSpeechError('Ses başlatılamadı. Cihazın ses ayarlarını kontrol edin.');
       }
     });
-  }, []);
+  }, [voiceOptions, selectedVoiceId, speechRate]);
 
   const pauseSpeech = useCallback(() => {
     if (speechStatus !== 'playing') return;
@@ -298,6 +325,7 @@ export default function CookingAssistant({
     setIsSOSOpen(false);
     setIsHelpOpen(false);
     setIsFinishedOpen(false);
+    setIsVoiceSettingsOpen(false);
     setSosMessage(null);
     setIsAlarmPlaying(false);
   }, [visible, stopSpeech, stopTimer]);
@@ -314,6 +342,16 @@ export default function CookingAssistant({
     stopSpeech();
     onClose();
   }, [stopSpeech, onClose]);
+
+  const openVoiceSettings = useCallback(() => {
+    stopSpeech();
+    setIsVoiceSettingsOpen(true);
+  }, [stopSpeech]);
+
+  const closeVoiceSettings = useCallback(() => {
+    stopSpeech();
+    setIsVoiceSettingsOpen(false);
+  }, [stopSpeech]);
 
   const changeStep = useCallback((delta: number) => {
     stopSpeech();
@@ -356,8 +394,12 @@ export default function CookingAssistant({
             <TouchableOpacity onPress={() => setIsHelpOpen(true)} style={styles.headerIconBtn}>
               <Ionicons name="help-circle-outline" size={22} color="rgba(255,255,255,0.6)" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => speak(currentStep.content)} style={styles.headerIconBtn} disabled={!currentStep.content.trim()}>
-              <Ionicons name="volume-high-outline" size={22} color="rgba(255,255,255,0.6)" />
+            <TouchableOpacity
+              onPress={openVoiceSettings}
+              style={styles.headerIconBtn}
+              accessibilityLabel="Sesleri Karşılaştır"
+            >
+              <Ionicons name="options-outline" size={22} color="rgba(255,255,255,0.85)" />
             </TouchableOpacity>
           </View>
         </View>
@@ -481,6 +523,161 @@ export default function CookingAssistant({
         </View>
 
         {/* ══════════ MODALS ══════════ */}
+
+        {/* Local voice comparison — no recorded audio or cloud calls. */}
+        <Modal
+          visible={visible && isVoiceSettingsOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={closeVoiceSettings}
+        >
+          <View style={styles.overlay}>
+            <View style={styles.modalCard}>
+              <View style={[styles.modalHeader, styles.helpHeader]}>
+                <View style={styles.modalHeaderTitle}>
+                  <Ionicons name="options-outline" size={21} color="#60a5fa" />
+                  <Text style={styles.modalHeaderText}>Sesleri Karşılaştır</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={closeVoiceSettings}
+                  accessibilityLabel="Ses ayarlarını kapat"
+                  style={styles.voiceCloseButton}
+                >
+                  <Ionicons name="close" size={22} color="#ffffff" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
+                <Text style={styles.voiceDescription}>
+                  Telefonundaki Türkçe seslerle aynı tarif adımını dinle. Beğendiğin sesi seç;
+                  sonraki okumalarda bu ses kullanılır.
+                </Text>
+                <Text style={styles.voiceHint}>
+                  Ses karşılaştırması ücretsizdir ve cihazında yapılır. Seçimler bu pişirme ekranı boyunca geçerlidir.
+                </Text>
+
+                <Text style={styles.voiceSectionTitle}>OKUMA HIZI</Text>
+                <View style={styles.voiceRatesRow}>
+                  {VOICE_RATE_PRESETS.map((preset) => (
+                    <TouchableOpacity
+                      key={preset.id}
+                      onPress={() => {
+                        stopSpeech();
+                        setSpeechRate(preset.rate);
+                      }}
+                      style={[styles.voiceRateButton, speechRate === preset.rate && styles.voiceSelected]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: speechRate === preset.rate }}
+                    >
+                      <Text style={styles.voiceRateText}>{preset.label}</Text>
+                      <Text style={styles.voiceRateSubtext}>{preset.rate.toFixed(2)}×</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={styles.voiceHint}>Hız değişikliği bir sonraki okumada uygulanır.</Text>
+
+                <Text style={styles.voiceSectionTitle}>TÜRKÇE SESLER</Text>
+                {voiceLoading ? <Text style={styles.voiceHint}>Cihazdaki sesler yükleniyor...</Text> : null}
+                {voiceFetchFailed ? (
+                  <View style={styles.voiceNotice}>
+                    <Text style={styles.voiceHint}>Ses listesi alınamadı. Sistem sesiyle okumaya devam edebilirsin.</Text>
+                    <TouchableOpacity onPress={() => setVoiceRefresh((n) => n + 1)} accessibilityLabel="Ses listesini tekrar yükle">
+                      <Text style={styles.voiceRetryText}>Tekrar dene</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+                {!voiceLoading && !voiceFetchFailed && voiceOptions.length === 0 ? (
+                  <Text style={styles.voiceHint}>
+                    Cihazın listesinde Türkçe ses bulunamadı. Yine de varsayılan Türkçe sesle dinlemeyi deneyebilirsin.
+                  </Text>
+                ) : null}
+
+                <View style={[styles.voiceItem, selectedVoiceId === null && styles.voiceSelected]}>
+                  <TouchableOpacity
+                    onPress={() => { stopSpeech(); setSelectedVoiceId(null); }}
+                    style={styles.voiceChoice}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: selectedVoiceId === null }}
+                  >
+                    <Ionicons
+                      name={selectedVoiceId === null ? 'radio-button-on' : 'radio-button-off'}
+                      size={19}
+                      color={selectedVoiceId === null ? '#fda4af' : '#94a3b8'}
+                    />
+                    <View style={styles.voiceItemText}>
+                      <Text style={styles.voiceName}>Otomatik seçim</Text>
+                      <Text style={styles.voiceMeta}>Gelişmiş Türkçe ses varsa önce onu kullan</Text>
+                    </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.voicePreviewButton}
+                    onPress={() => speak(currentStep.content, null)}
+                    disabled={!currentStep.content.trim()}
+                    accessibilityLabel="Otomatik sesi dinle"
+                  >
+                    <Ionicons name="play" size={14} color="#ffffff" />
+                    <Text style={styles.voicePreviewText}>Dinle</Text>
+                  </TouchableOpacity>
+                </View>
+                {voiceOptions.map((voice) => (
+                  <View
+                    key={voice.identifier}
+                    style={[styles.voiceItem, selectedVoiceId === voice.identifier && styles.voiceSelected]}
+                  >
+                    <TouchableOpacity
+                      onPress={() => { stopSpeech(); setSelectedVoiceId(voice.identifier); }}
+                      style={styles.voiceChoice}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: selectedVoiceId === voice.identifier }}
+                    >
+                      <Ionicons
+                        name={selectedVoiceId === voice.identifier ? 'radio-button-on' : 'radio-button-off'}
+                        size={19}
+                        color={selectedVoiceId === voice.identifier ? '#fda4af' : '#94a3b8'}
+                      />
+                      <View style={styles.voiceItemText}>
+                        <Text style={styles.voiceName} numberOfLines={2}>{voice.name}</Text>
+                        <Text style={styles.voiceMeta}>
+                          {voice.language} · {voice.quality === Speech.VoiceQuality.Enhanced ? 'Gelişmiş' : 'Standart'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.voicePreviewButton}
+                      onPress={() => speak(currentStep.content, voice.identifier)}
+                      disabled={!currentStep.content.trim()}
+                      accessibilityLabel={voice.name + ' sesini dinle'}
+                    >
+                      <Ionicons name="play" size={14} color="#ffffff" />
+                      <Text style={styles.voicePreviewText}>Dinle</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <Text style={styles.voiceHint}>
+                  {currentStep.content.trim()
+                    ? 'Dinle, seçili sesin ve hızın mevcut tarif adımını nasıl okuduğunu gösterir.'
+                    : 'Bu tarifte okunacak adım olmadığı için ses önizlemesi yapılamıyor.'}
+                </Text>
+                <View style={styles.voiceActionsRow}>
+                  <TouchableOpacity
+                    onPress={stopSpeech}
+                    style={styles.voiceStopButton}
+                    accessibilityLabel="Ses önizlemesini durdur"
+                  >
+                    <Ionicons name="stop" size={14} color="#ffffff" />
+                    <Text style={styles.voiceStopText}>Durdur</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={closeVoiceSettings}
+                    style={styles.voiceDoneButton}
+                    accessibilityLabel="Ses seçimlerini uygula"
+                  >
+                    <Text style={styles.voiceDoneText}>Seçimi Kullan</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
 
         {/* SOS Modal */}
         <Modal
@@ -942,6 +1139,155 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.9)',
+  },
+
+  // LOCAL VOICE SELECTOR
+  voiceDescription: {
+    color: '#ffffff',
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 8,
+  },
+  voiceHint: {
+    color: '#94a3b8',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  voiceSectionTitle: {
+    color: '#fda4af',
+    fontWeight: '800',
+    fontSize: 11,
+    letterSpacing: 1,
+    marginTop: 12,
+    marginBottom: 10,
+  },
+  voiceRatesRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  voiceRateButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 12,
+  },
+  voiceRateText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  voiceRateSubtext: {
+    color: '#cbd5e1',
+    fontSize: 10,
+    paddingTop: 3,
+  },
+  voiceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+    gap: 6,
+  },
+  voiceSelected: {
+    backgroundColor: 'rgba(219,76,63,0.17)',
+    borderColor: '#db4c3f',
+  },
+  voiceChoice: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+  },
+  voiceItemText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  voiceName: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  voiceMeta: {
+    color: '#94a3b8',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  voicePreviewButton: {
+    minHeight: 44,
+    minWidth: 66,
+    borderRadius: 11,
+    backgroundColor: '#334155',
+    flexDirection: 'row',
+    gap: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voicePreviewText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  voiceNotice: {
+    borderRadius: 12,
+    padding: 10,
+    backgroundColor: '#334155',
+    marginBottom: 10,
+  },
+  voiceRetryText: {
+    color: '#93c5fd',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  voiceCloseButton: {
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  voiceActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  voiceStopButton: {
+    minHeight: 46,
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: '#334155',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  voiceStopText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  voiceDoneButton: {
+    minHeight: 46,
+    flex: 1.5,
+    borderRadius: 12,
+    backgroundColor: '#db4c3f',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voiceDoneText: {
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: 13,
   },
 
   // OVERLAY / MODAL SHARED
