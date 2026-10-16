@@ -59,6 +59,22 @@ function normalizeStep(step: Step | string): Step {
 
 type SosKey = 'burnt' | 'salty' | 'watery' | 'other';
 
+// One continuous capture: recognize interim Turkish words without stopping and
+// restarting the microphone after each phrase. iOS short commands benefit from
+// the 'confirmation' task hint. Only known fixed commands are actionable.
+const COOKING_RECOGNITION_OPTIONS = {
+  lang: 'tr-TR',
+  continuous: true,
+  interimResults: true,
+  maxAlternatives: 1,
+  iosTaskHint: 'confirmation',
+  contextualStrings: [
+    'sonraki', 'sonraki adım', 'önceki', 'ileri', 'geri', 'oku',
+    'tekrar', 'devam', 'devam et', 'sayacı durdur', 'sayacı sürdür',
+    'sayacı iptal et', 'beş dakika başlat',
+  ],
+};
+
 const SOS_RESPONSES: Record<SosKey, string> = {
   burnt: 'Önce ocağı kapat. Yanmamış üst kısmı dibi kazımadan temiz bir kaba aktar; yanık kokusu veya tadı belirginse servis etme.',
   salty: 'Tarif uygunsa tuzsuz malzeme veya sıvıyla seyrelterek tadı tekrar kontrol et. Patatesin fazla tuzu seçici biçimde emdiği doğru değildir.',
@@ -116,7 +132,7 @@ export default function CookingAssistant({
   const nativeRecognizerRef = useRef<{
     start: (config: {
       lang: string; continuous: boolean; interimResults: boolean; maxAlternatives: number;
-      contextualStrings?: string[];
+      contextualStrings?: string[]; iosTaskHint?: string;
     }) => void;
     stop: () => void;
     abort: () => void;
@@ -127,9 +143,9 @@ export default function CookingAssistant({
   const voiceRestartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nativeRecognizingRef = useRef(false);
   const commandCooldownRef = useRef(0);
-  const lastCommandValueRef = useRef('');
-  const segmentConsumedRef = useRef(false);
+  const lastCommandKeyRef = useRef('');
   const recognizerRestartDelayRef = useRef(850);
+  const consecutiveNoSpeechRef = useRef(0);
 
   // Timer
   const [timerSeconds, setTimerSeconds] = useState<number | null>(null);
@@ -523,9 +539,6 @@ export default function CookingAssistant({
   const handleNativeVoiceCommand = useCallback((transcript: string) => {
     const command = parseCookingCommand(transcript);
     if (!command) return;
-    const now = Date.now();
-    if (now - commandCooldownRef.current < 950) return;
-    commandCooldownRef.current = now;
     setLastSpokenCommand(transcript.trim());
     switch (command.type) {
       case 'next':
@@ -535,7 +548,12 @@ export default function CookingAssistant({
       case 'previous': changeStep(-1); return;
       case 'read': speak(currentStep.content); return;
       case 'pause_voice': pauseSpeech(); return;
-      case 'resume_voice': resumeSpeech(); return;
+      case 'resume_voice':
+        if (timerRunning && isTimerPaused) toggleTimerPause();
+        else if (speechStatus === 'paused') resumeSpeech();
+        else if (isLast) setIsFinishedOpen(true);
+        else changeStep(1);
+        return;
       case 'stop_voice': stopSpeech(); return;
       case 'start_timer': startTimer(command.minutes); return;
       case 'pause_timer': if (timerRunning && !isTimerPaused) toggleTimerPause(); return;
@@ -544,7 +562,7 @@ export default function CookingAssistant({
       case 'help': setIsHelpOpen(true); return;
     }
   }, [isLast, changeStep, speak, currentStep.content, pauseSpeech, resumeSpeech, stopSpeech,
-      startTimer, timerRunning, isTimerPaused, toggleTimerPause, stopTimer]);
+      speechStatus, startTimer, timerRunning, isTimerPaused, toggleTimerPause, stopTimer]);
 
   const handleCommandRef = useRef(handleNativeVoiceCommand);
   useEffect(() => { handleCommandRef.current = handleNativeVoiceCommand; }, [handleNativeVoiceCommand]);
@@ -582,75 +600,75 @@ export default function CookingAssistant({
     voiceWantedRef.current = true; // automatically listen while the cooking screen is open
     const startListening = () => {
       if (disposed || !voiceWantedRef.current || !visibleRef.current || nativeRecognizingRef.current) return;
-      if (AppState.currentState === 'background' || AppState.currentState === 'inactive') return;
+      if (AppState.currentState !== 'active') return;
       try {
-        // iOS does not deliver timely final-only results while continuously listening.
-        // Short sessions + interim results give commands immediately, then onend
-        // automatically starts another session while this screen stays visible.
         nativeRecognizingRef.current = true;
-        segmentConsumedRef.current = false;
-        api.start({
-          lang: 'tr-TR', continuous: false, interimResults: true, maxAlternatives: 1,
-          contextualStrings: ['sonraki', 'önceki', 'ileri', 'geri', 'oku', 'tekrar oku',
-            'sayacı durdur', 'sayacı sürdür', 'sayacı iptal et', 'beş dakika başlat'],
-        });
+        api.start(COOKING_RECOGNITION_OPTIONS);
       } catch {
         nativeRecognizingRef.current = false;
-        setMicError('Mikrofon otomatik açılamadı. Mikrofona dokunup tekrar deneyebilirsin.');
+        setMicError('Mikrofon başlatılamadı. iOS mikrofon ve konuşma tanıma izinlerini kontrol et.');
       }
     };
     const subscriptions = [
       api.addListener('start', () => {
         if (disposed) return;
         nativeRecognizingRef.current = true;
-        recognizerRestartDelayRef.current = 850;
         setMicListening(true);
-        setMicFeedback('Mikrofon dinliyor. Komut söyleyebilirsin.');
+        setMicFeedback('Mikrofon açık · Sonraki, Önceki veya Oku diyebilirsin.');
         setMicError('');
       }),
       api.addListener('audiostart', () => {
-        if (!disposed) setMicFeedback('Ses girişi aktif; konuşmanı bekliyorum.');
+        if (disposed) return;
+        setMicFeedback((value) => value.startsWith('Komut uygulandı:')
+          ? value : 'Konuşmanı dinliyorum…');
       }),
       api.addListener('result', (event: any) => {
         if (disposed || !voiceWantedRef.current) return;
         const transcript = extractCookingTranscript(event);
         if (!transcript) return;
-        // Display what iOS actually transcribed, even when no action matches.
-        // No transcripts are logged, uploaded, or persisted.
         setHeardPhrase(transcript);
-        if (segmentConsumedRef.current) return;
-
+        consecutiveNoSpeechRef.current = 0;
+        recognizerRestartDelayRef.current = 850;
         const command = parseCookingCommand(transcript);
         if (!command) {
-          setMicFeedback('Duyuldu ancak komut henüz eşleşmedi. Sonraki, Önceki veya Oku diyebilirsin.');
+          setMicFeedback('Duyuldu; henüz bir komutla eşleşmedi.');
           return;
         }
-
-        const normalized = transcript.toLocaleLowerCase('tr-TR').trim();
+        // Interim results commonly repeat or refine one phrase. Deduplicate
+        // by action, not by globally muting all voice commands for 950ms.
+        const actionKey = command.type === 'start_timer'
+          ? 'start_timer:' + command.minutes : command.type;
         const now = Date.now();
-        if (normalized === lastCommandValueRef.current && now - commandCooldownRef.current < 650) return;
-        lastCommandValueRef.current = normalized;
+        if (actionKey === lastCommandKeyRef.current && now - commandCooldownRef.current < 1750) return;
+        lastCommandKeyRef.current = actionKey;
         commandCooldownRef.current = now;
-        segmentConsumedRef.current = true;
         setMicFeedback('Komut uygulandı: ' + transcript);
-        // Stop the current capture to prevent one iOS partial-result stream
-        // from executing the same command repeatedly. onend restarts capture.
-        try { api.stop(); } catch { /* recognition may already be ending */ }
+        // Do not stop/restart iOS recognition after each command. Keep the
+        // audio stream active, only reinitialize when the OS ends the session.
         handleCommandRef.current(transcript);
       }),
       api.addListener('nomatch', () => {
-        if (!disposed) setMicFeedback('Konuşma duyuldu ama anlaşılamadı; tekrar söyleyebilirsin.');
+        // Native recognizers may emit nomatch after partial results.
+        // No need to overwrite useful live transcript feedback.
       }),
       api.addListener('error', (event: any) => {
         if (disposed) return;
         const code = String(event.error || 'unknown');
         if (code === 'aborted') return;
         if (code === 'no-speech') {
-          setMicFeedback('Konuşma duyulmadı; mikrofon yeniden dinlemeye başlayacak.');
+          // Silence is normal in a kitchen. Do not show repeated error
+          // banners; if iOS ends the session, onend will restart it.
+          consecutiveNoSpeechRef.current += 1;
+          recognizerRestartDelayRef.current = Math.min(
+            8500, 1400 * Math.pow(1.65, Math.min(consecutiveNoSpeechRef.current - 1, 4))
+          );
+          if (consecutiveNoSpeechRef.current >= 3) {
+            setMicFeedback('Ses algılanmadı. Mikrofon otomatik yeniden bağlanacak.');
+          }
           return;
         }
         if (code === 'network' || code === 'busy' || code === 'audio-capture') {
-          recognizerRestartDelayRef.current = 1900;
+          recognizerRestartDelayRef.current = 2400;
         }
         setMicError(code === 'not-allowed'
           ? 'Mikrofon veya konuşma tanıma izni reddedildi. Telefon ayarlarından izin ver.'
@@ -664,10 +682,9 @@ export default function CookingAssistant({
       api.addListener('end', () => {
         if (disposed) return;
         nativeRecognizingRef.current = false;
-        segmentConsumedRef.current = false;
         setMicListening(false);
         if (voiceRestartRef.current) clearTimeout(voiceRestartRef.current);
-        if (voiceWantedRef.current) {
+        if (voiceWantedRef.current && visibleRef.current) {
           voiceRestartRef.current = setTimeout(startListening, recognizerRestartDelayRef.current);
         }
       }),
@@ -721,12 +738,10 @@ export default function CookingAssistant({
       if (!grant.granted) { setMicError('Mikrofon izinleri reddedildi.'); return; }
       voiceWantedRef.current = true;
       setMicError('');
-      nativeRecognizingRef.current = true;
-      segmentConsumedRef.current = false;
-      api.start({
-        lang: 'tr-TR', continuous: false, interimResults: true, maxAlternatives: 1,
-        contextualStrings: ['sonraki', 'önceki', 'ileri', 'geri', 'oku', 'tekrar oku', 'sayacı durdur'],
-      });
+      if (!nativeRecognizingRef.current) {
+        nativeRecognizingRef.current = true;
+        api.start(COOKING_RECOGNITION_OPTIONS);
+      }
     } catch {
       nativeRecognizingRef.current = false;
       setMicError('Sesli komutları başlatamadık. Telefon ayarlarını kontrol et.');
