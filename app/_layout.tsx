@@ -1,25 +1,14 @@
-import { Stack, usePathname } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
 import { AuthProvider } from '../context/AuthContext';
 import ErrorBoundary from '../components/ErrorBoundary';
-import { logScreenView } from '../lib/analytics';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-
-function ScreenTracker() {
-  const pathname = usePathname();
-  useEffect(() => {
-    logScreenView(pathname).catch((e) => console.warn('[Analytics] logScreenView error:', e));
-  }, [pathname]);
-  return null;
-}
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
     <ErrorBoundary>
       <AuthProvider>
-        <ScreenTracker />
         <StatusBar style="dark" />
         <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
