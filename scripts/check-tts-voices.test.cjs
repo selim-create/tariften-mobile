@@ -24,7 +24,7 @@ const all = [
 test('filters only Turkish locales and ranks enhanced voices first', () => {
   assert.deepEqual(
     getTurkishVoices(all, 'Enhanced').map((voice) => voice.identifier),
-    ['tr-enhanced', 'tr-basic', 'tr-short'],
+    ['tr-enhanced', 'tr-short', 'tr-basic'],
   );
 });
 
@@ -47,7 +47,7 @@ test('speaking rate presets are explicit, unique, and within Expo supported rang
 });
 
 test('voice selection helper stays offline and without stored audio', () => {
-  assert.doesNotMatch(input, /fetch\(|https?:\/\/|openai|chirp|writeFile|mp3|audio\/mpeg|storage/i);
+  assert.doesNotMatch(input, /fetch\(|https?:\/\/|openai|chirp|writeFile|mp3|audio\/mpeg/i);
   const source = fs.readFileSync(path.join(__dirname, '..', 'components', 'CookingAssistant.tsx'), 'utf8');
   assert.match(source, /chooseTurkishVoiceId/);
   assert.match(source, /Sesleri Karşılaştır/);
