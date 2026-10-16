@@ -68,3 +68,8 @@ jobs:
           }
           console.log('Security gate passed: no critical advisories. High/moderate findings remain tracked.');
           NODE
+      - name: Reject new high advisories and audit count regressions
+        if: always()
+        run: |
+          node --test scripts/check-audit-regressions.test.cjs
+          node scripts/check-audit-regressions.cjs npm-audit-production.json
