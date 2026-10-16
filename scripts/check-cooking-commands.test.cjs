@@ -71,7 +71,7 @@ test('iOS recognition is continuous with interim actions and no forced stop on c
   assert.match(assistant, /extractCookingTranscript\(event\)/);
   assert.match(assistant, /setHeardPhrase\(pending\)/);
   assert.match(assistant, /setMicFeedback\('Komut uygulandı: ' \+ label\)/);
-  assert.match(assistant, /actionKey === lastCommandKeyRef\.current/);
+  assert.match(assistant, /lastCommandKeyRef\.current === actionKey/);
   assert.doesNotMatch(assistant, /segmentConsumedRef/);
   assert.match(assistant, /if \(code === 'no-speech'\)/);
   assert.match(assistant, /voiceRestartRef\.current = setTimeout\(startListening/);
