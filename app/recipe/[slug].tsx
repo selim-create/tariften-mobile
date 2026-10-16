@@ -480,6 +480,7 @@ export default function RecipeDetailScreen() {
         visible={cookingAssistantVisible}
         onClose={() => setCookingAssistantVisible(false)}
         recipeTitle={recipe.title}
+        recipeId={recipe.id}
         steps={recipe.steps}
         chefTip={recipe.chef_tip}
       />
