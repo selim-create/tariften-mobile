@@ -99,7 +99,7 @@ test('native UI distinguishes preflight timeouts from ambiguous POSTs and requir
   const screen = read('app/recipe/import.tsx');
   const quota = read('lib/quotas.ts');
   assert.match(screen, /withDeadline\(signal => fetchAccountQuotas\(token, signal\), 15000\)/);
-  assert.match(screen, /signal => createRecipe\\(token, buildApprovedRecipe\\(editor\\), signal\\)/);
+  assert.equal(screen.includes('createRecipe(token, buildApprovedRecipe(editor), signal)'), true);
   assert.match(screen, /45000/);
   assert.match(screen, /postStarted && isPublishResultUncertain\(cause\)/);
   assert.match(screen, /setPublishUnknown\(true\)/);
