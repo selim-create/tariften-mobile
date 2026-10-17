@@ -26,7 +26,7 @@ for (const phrase of knownPhrases) {
 function normalize(raw: string): string {
   return raw.toLocaleLowerCase('tr-TR').normalize('NFC')
     .replace(/[.,!?;:]/g, ' ')
-    .replace(/\\s+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
