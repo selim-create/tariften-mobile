@@ -74,3 +74,23 @@ test('simulator installation is a native local DEV build, never remote or produc
   }
   assert.match(script, /BUNDLE_ID.*com\.tariften\.app\.dev/);
 });
+
+test('Xcode 27 installer chooses app scheme instead of Pods-TariftenDEV', () => {
+  const shell = fs.readFileSync(path.join(root, 'scripts/ios-simulator-local-build.sh'), 'utf8');
+  assert.match(shell, /apps=all\.filter\(s=>!\/\^Pods/);
+  assert.match(shell, /\^TariftenDEV\$/);
+  assert.match(shell, /process\.stdout\.write\(preferred\|\|""\)/, 'Never default to a Pods scheme');
+  assert.match(shell, /ios-xcode27-pods-min-target\.rb/);
+  assert.match(shell, /pod install/);
+  assert.match(shell, /CODE_SIGNING_ALLOWED=NO build/);
+});
+
+test('legacy CocoaPods targets are normalized only when lower than Xcode 27 iOS minimum', () => {
+  const ruby = fs.readFileSync(path.join(root, 'scripts/ios-xcode27-pods-min-target.rb'), 'utf8');
+  assert.match(ruby, /15\.1/);
+  assert.match(ruby, /Gem::Version/);
+  assert.match(ruby, /project\.targets\.each/);
+  assert.match(ruby, /ios\/Pods\/Pods\.xcodeproj/);
+  assert.match(ruby, /project\.save if updated > 0/);
+  assert.doesNotMatch(ruby, /rm -rf|File\.delete|system\(/);
+});
