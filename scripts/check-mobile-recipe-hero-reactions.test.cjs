@@ -37,7 +37,19 @@ test('all five rating choices are equal-width vector icon cards in one native ro
   assert.match(detail, /onPress=\{\(\) => handleRate\(rating\)\}/);
   assert.match(detail, /lokmaRatingRow:[\s\S]*?flexWrap: 'nowrap'/);
   assert.match(detail, /lokmaRatingOption:[\s\S]*?flex: 1, minWidth: 0/);
-  assert.match(detail, /numberOfLines=\{2\}>\{label\}/);
+  assert.match(detail, /numberOfLines=\{1\}/);
+  assert.match(detail, /adjustsFontSizeToFit minimumFontScale=\{0\.85\}/);
+  assert.match(detail, /RATING_DISPLAY_LABELS\[rating - 1\]/);
+  assert.match(detail, /height: 80, borderRadius: 13/);
+  assert.match(detail, /justifyContent: 'space-between', gap: 5/);
+  assert.match(detail, /lokmaRatingLabel:[\s\S]*?textAlign: 'center'/);
+  assert.match(detail, /lokmaRatingLabel:[\s\S]*?height: 16/);
+  const captions = detail.match(/const RATING_DISPLAY_LABELS = \[(.*?)\] as const;/);
+  assert.ok(captions, 'Five purpose-built short captions are needed for narrow phones');
+  const labels = [...captions[1].matchAll(/'([^']+)'/g)].map(value => value[1]);
+  assert.deepEqual(labels, ['Sevmedim', 'Pek değil', 'Fena değil', 'Lezzetli', 'Bayıldım']);
+  assert.ok(labels.every(label => label.length <= 10 && !label.includes('\\n')),
+    'Captions must fit single-line five-column layout without word breaks');
   assert.doesNotMatch(detail, /styles\.lokmaRatingEmoji|\{emoji\}<\/Text>/);
   assert.match(detail, /submitRating\(token, recipe\.id, rating\)/);
   const entries = ratings.slice(ratings.indexOf('export const LOKMA_RATINGS'), ratings.indexOf('type FoodSymbol'));
