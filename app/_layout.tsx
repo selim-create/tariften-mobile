@@ -24,10 +24,9 @@ export default function RootLayout() {
         <Stack.Screen
           name="recipe/[slug]"
           options={{
-            headerShown: true,
-            headerTitle: '',
-            headerBackTitle: 'Geri',
-            headerTintColor: '#e74c3c',
+            // Full-bleed editorial hero: the recipe itself renders its own
+            // accessible safe-area back button over the image.
+            headerShown: false,
           }}
         />
         <Stack.Screen

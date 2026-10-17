@@ -236,9 +236,20 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     marginBottom: 16,
   },
-  lokmaReactionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 2 },
-  lokmaReactionButton: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff4eb', borderWidth: 1, borderColor: '#f2e4d8' },
-  lokmaReactionEmoji: { fontSize: 21 },
+  lokmaReactionRow: {
+    flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center',
+    alignItems: 'center', alignContent: 'center', gap: 8,
+    width: '100%', paddingVertical: 4, marginTop: 2,
+  },
+  lokmaReactionButton: {
+    width: 40, height: 40, borderRadius: 13,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#fff4eb', borderWidth: 1, borderColor: '#f2e4d8',
+  },
+  lokmaReactionEmoji: {
+    fontSize: 21, lineHeight: 28, width: 32, textAlign: 'center',
+    textAlignVertical: 'center', includeFontPadding: false,
+  },
   inputContainer: {
     marginBottom: 16,
     gap: 8,
