@@ -25,6 +25,8 @@ jobs:
         run: npx expo install --check
         env:
           CI: '1'
+      - name: Lint Xcode 27 local simulator installer shell syntax
+        run: bash -n scripts/ios-simulator-local-build.sh
       - name: Guard local cooking assistant speech and timer boundaries
         run: node --test scripts/check-cooking-assistant.test.cjs scripts/check-tts-voices.test.cjs scripts/check-chirp3-voice.test.cjs scripts/check-cooking-commands.test.cjs scripts/check-dev-build-variant.test.cjs
       - name: Verify semantic Lokma food emoji, ratings and comment reactions
