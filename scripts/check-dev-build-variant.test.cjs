@@ -48,6 +48,7 @@ test('ios:sim starts a fresh simulator session using the same localhost Metro UR
   const pkg = require('../package.json');
   const script = pkg.scripts['ios:sim'];
   assert.match(script, /expo start/);
+  assert.match(script, /APP_VARIANT=development/, 'Metro must use installed TariftenDEV scheme, not the production tarften:// scheme');
   assert.match(script, /--ios(?:\s|$)/, 'Expo should open the simulator, not just leave an old dev-client link open');
   assert.match(script, /--localhost/);
   assert.match(script, /--port 8081/);
