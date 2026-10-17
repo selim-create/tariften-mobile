@@ -32,7 +32,8 @@ test('device voices and Android pause difference are explicit', () => {
   assert.match(source, /getAvailableVoicesAsync\(\)/);
   assert.match(source, /VoiceQuality\.Enhanced/);
   assert.match(source, /Platform\.OS === 'ios'/);
-  assert.match(source, /Android'de devam etmek için mevcut adım baştan okunur/);
+  assert.match(source, /if \(Platform\.OS === 'ios' \|\| Platform\.OS === 'web'\)/);
+  assert.match(source, /else \{\s+speak\(currentStep\.content\);/);
 });
 
 test('clock uses absolute deadline, not decrementing a stale JS interval', () => {
