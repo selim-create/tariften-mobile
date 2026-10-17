@@ -178,7 +178,7 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
         if (already?.uri === photo.uri) image = already.id;
         else {
           setSavingImage(true);
-          const asset = await withDeadline(() => uploadManualRecipePhoto(token, photo), 60000);
+          const asset = await withDeadline(signal => uploadManualRecipePhoto(token, photo, signal), 60000);
           uploadedPhotoRef.current = { uri: photo.uri, id: asset.id };
           image = asset.id;
           setSavingImage(false);
