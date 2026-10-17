@@ -20,7 +20,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
-import { COOKING_COMMAND_PHRASES } from '../lib/cooking-commands';
 import type { CookingCommand } from '../lib/cooking-commands';
 import { CookingCommandStream } from '../lib/cooking-command-stream';
 import { extractCookingTranscript } from '../lib/native-cooking-transcript';
