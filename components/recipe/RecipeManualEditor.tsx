@@ -127,7 +127,7 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
     if (stage === 0) {
       if (!draft.title.trim()) { requireField('title', 'Önce tarifine bir isim ver.'); return; }
       if (draft.title.length > 180) { requireField('title', 'Tarif adını biraz kısalt.'); return; }
-      if (!/^[1-9]\\d*$/.test(draft.servings.trim()) || Number(draft.servings) > 36) {
+      if (!/^[1-9]\d*$/.test(draft.servings.trim()) || Number(draft.servings) > 36) {
         requireField('servings', 'Kaç kişilik olduğunu seç (1–36).'); return;
       }
       jump(1); return;
