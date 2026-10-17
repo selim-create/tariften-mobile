@@ -21,6 +21,8 @@ jobs:
         run: node --test scripts/check-mobile-recipe-import.test.cjs
       - name: Stop stalled recipe publishing and avoid duplicate writes
         run: node --test scripts/check-mobile-recipe-publish.test.cjs
+      - name: Review premium recipe checklist and import editor accessibility
+        run: node --test scripts/check-mobile-recipe-editorial.test.cjs
       - name: Typecheck Expo React Native project
         run: npx tsc --noEmit
       - name: Check recommended Expo native dependency versions
