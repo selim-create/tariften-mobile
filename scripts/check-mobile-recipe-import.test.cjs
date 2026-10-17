@@ -95,10 +95,51 @@ test('mobile uses Core directly with quota preflight, no auto-publish, double ap
   assert.match(page, /createRecipe\(token, buildApprovedRecipe\(editor\)\)/);
   assert.match(page, /Alert\.alert\('Tarifini herkese açık yayımla'/);
   assert.match(page, /Onayla ve yayımla/);
-  assert.match(page, /Porsiyonu malzeme ağırlığından tahmin etmiyoruz/);
+  assert.match(page, /malzeme miktarlarından tahmin etmiyoruz/);
   assert.match(page, /Kaynağındaki ifade/);
   assert.match(routes, /name="recipe\/import"/);
   assert.match(listing, /router\.push\('\/recipe\/import'\)/);
   assert.doesNotMatch(page, /generateAIRecipe|generateImage|AsyncStorage|SecureStore/);
   assert.doesNotMatch(api, /console\./);
+});
+
+test('AI preview takes the user into a dedicated review stage, not below a long source form', () => {
+  const page = read('app/recipe/import.tsx');
+  assert.match(page, /type Stage = 'source' \| 'review'/);
+  assert.match(page, /setStage\('review'\)/);
+  assert.match(page, /setStage\('source'\)/);
+  assert.match(page, /stage === 'source' \? <>/);
+  assert.match(page, /stage === 'review' && editor && preview/);
+  assert.match(page, /scrollRef\.current\?\.scrollTo\(\{ y: 0, animated: true \}\)/);
+  assert.match(page, /Mutfak notlarıma dön/);
+  assert.match(page, /preview && editor/);
+  assert.match(page, /Return to saved preview at no extra AI cost/);
+  assert.match(page, /Düzenlenmiş tarifime dön/);
+  assert.match(page, /Henüz yayımlanmadı/);
+  assert.match(page, /Tarifinin son hâli/);
+  assert.doesNotMatch(page, /Önizlemeyi yeniden oluştur/);
+});
+
+test('sticky review CTA points at missing servings and avoids silent publish failures', () => {
+  const page = read('app/recipe/import.tsx');
+  assert.match(page, /const checkBeforePublish = \(\): boolean/);
+  assert.match(page, /setFieldError\('servings'\)/);
+  assert.match(page, /scrollToSection\('servings'\)/);
+  assert.match(page, /servingsRef\.current\?\.focus\(\)/);
+  assert.match(page, /accessibilityRole="alert"/);
+  assert.match(page, /Yayımlamak için kaç kişilik olduğunu seç/);
+  assert.match(page, /\[2, 4, 6, 8\]\.map/);
+  assert.match(page, /Tarifimin herkese açık yayımlanacağını|Herkese açık yayımlamayı onaylıyorum/);
+  assert.match(page, /style=\{\[styles\.bottomBar/);
+  assert.match(page, /if \(!checkBeforePublish\(\)\) return;/);
+  assert.match(page, /Alert\.alert\('Tarifini herkese açık yayımla'/);
+  assert.match(page, /createRecipe\(token, buildApprovedRecipe\(editor\)\)/);
+  assert.match(page, /disabled=\{!!busy \|\| quotas\.loading \|\| \(stage === 'review' && !accepted\)\}/);
+});
+
+test('mobile editor uses quiet semantic ingredient marks rather than meaningless empty rings', () => {
+  const page = read('app/recipe/import.tsx');
+  assert.match(page, /name="leaf-outline"/);
+  assert.match(page, /styles\.ingredientMark/);
+  assert.doesNotMatch(page, /<View style=\{styles\.dot\} \/>/);
 });
