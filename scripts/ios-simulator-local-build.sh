@@ -9,7 +9,7 @@ export APP_VARIANT=development
 export LANG="${LANG:-en_US.UTF-8}"
 export LC_ALL="${LC_ALL:-en_US.UTF-8}"
 
-for tool in xcrun xcodebuild node pod; do
+for tool in xcrun xcodebuild node pod ruby; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "Eksik araç: $tool. Xcode, Node ve CocoaPods kurulumunu kontrol et." >&2
     exit 1
@@ -59,6 +59,10 @@ if [[ ! -d ios ]]; then echo 'Expo ios/ projesini üretemedi.' >&2; exit 1; fi
 echo 'CocoaPods bağımlılıkları kuruluyor...'
 (cd ios && pod install)
 
+# Xcode 27 requires iOS 15+ for every generated Pods target. Some older
+# transitive pods (e.g. SDWebImage) still set 9.0; fix generated Pods only.
+ruby "$PWD/scripts/ios-xcode27-pods-min-target.rb" "$PWD/ios/Pods/Pods.xcodeproj"
+
 WORKSPACE="$(find ios -maxdepth 1 -name '*.xcworkspace' -type d -print -quit)"
 if [[ -z "$WORKSPACE" ]]; then
   echo 'CocoaPods .xcworkspace dosyasını oluşturamadı.' >&2
@@ -68,11 +72,15 @@ fi
 SCHEME="$(xcodebuild -list -json -workspace "$WORKSPACE" | node -e '
 const fs=require("fs");const o=JSON.parse(fs.readFileSync(0,"utf8"));
 const all=o.workspace?.schemes||o.project?.schemes||[];
-const preferred=all.find(s=>/^Tariften$/i.test(s))||all.find(s=>/tariften/i.test(s));
-process.stdout.write(preferred||all[0]||"");
+// Xcode exposes Pods-TariftenDEV schemes too: they are NOT app schemes.
+const apps=all.filter(s=>!/^Pods[-_]/i.test(s) && !/^React-/i.test(s));
+const preferred=apps.find(s=>/^TariftenDEV$/i.test(s))
+  ||apps.find(s=>/^Tariften$/i.test(s))
+  ||apps.find(s=>/^Tariften/i.test(s));
+process.stdout.write(preferred||"");
 ')"
 if [[ -z "$SCHEME" ]]; then
-  echo 'Yerel Xcode scheme bulunamadı.' >&2; exit 1
+  echo 'Tariften uygulama Xcode scheme bulunamadı. Pods şemasıyla build yapılamaz.' >&2; exit 1
 fi
 
 DERIVED="$PWD/.expo/ios-local-build"
