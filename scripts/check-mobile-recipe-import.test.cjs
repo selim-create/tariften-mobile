@@ -112,6 +112,9 @@ test('AI preview takes the user into a dedicated review stage, not below a long 
   assert.match(page, /stage === 'review' && editor && preview/);
   assert.match(page, /scrollRef\.current\?\.scrollTo\(\{ y: 0, animated: true \}\)/);
   assert.match(page, /Mutfak notlarıma dön/);
+  assert.match(page, /preview && editor/);
+  assert.match(page, /Return to saved preview at no extra AI cost/);
+  assert.match(page, /Düzenlenmiş tarifime dön/);
   assert.match(page, /Henüz yayımlanmadı/);
   assert.match(page, /Tarifinin son hâli/);
   assert.doesNotMatch(page, /Önizlemeyi yeniden oluştur/);
