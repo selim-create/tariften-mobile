@@ -1291,12 +1291,14 @@ export default function CookingAssistant({
                 </TouchableOpacity>
               </View>
               <ScrollView style={styles.modalBody}>
-                <Text style={styles.helpCategory}>PİŞİRME REHBERİ</Text>
-                <Text style={styles.helpDesc}>Adımı sesli okumak için Oku düğmesine dokunun. Önceki ve Sonraki düğmeleri mevcut sesi durdurur; tarif adımlarını değiştirmez.</Text>
-                <Text style={[styles.helpCategory, { marginTop: 12 }]}>SES KONTROLÜ</Text>
-                <Text style={styles.helpDesc}>iPhone'da Duraklat ve Devam desteklenir. Android'de devam etmek için mevcut adım baştan okunur. Uygulama arka plana geçtiğinde ses durur.</Text>
-                <Text style={[styles.helpCategory, { marginTop: 12 }]}>ZAMANLAYICI</Text>
-                <Text style={styles.helpDesc}>Zamanlayıcıya dokunarak duraklatabilir veya devam ettirebilirsiniz. Arka planda geçen süre, uygulamaya döndüğünüzde hesaba katılır.</Text>
+                <Text style={styles.helpCategory}>ADIMLAR</Text>
+                <Text style={styles.helpDesc}>“Sonraki”, “Sıradaki”, “İleri” · “Önceki”, “Geri”. Her komut tarif adımını değiştirir.</Text>
+                <Text style={[styles.helpCategory, { marginTop: 12 }]}>SESLENDİRME</Text>
+                <Text style={styles.helpDesc}>“Oku”, “Konuş”, “Anlat”, “Tekrar”, “Devam”. “Kaçıncı adımdayım?” dersen mevcut adımı görürsün.</Text>
+                <Text style={[styles.helpCategory, { marginTop: 12 }]}>SAYAÇ</Text>
+                <Text style={styles.helpDesc}>“5 dakika başlat”, “Sayacı durdur”, “Sayacı sürdür”, “Sayacı iptal et”. Sayaç çalışırken “Durdur”, “Duraklat”, “İptal et” de sayacı yönetir.</Text>
+                <Text style={[styles.helpCategory, { marginTop: 12 }]}>ELLER SERBEST</Text>
+                <Text style={styles.helpDesc}>“Pasife al” veya “Mikrofonu kapat” mikrofonu kapatır. Yeniden açmak için üstteki mikrofon simgesine dokun. Komutlar yerel tanımayla işlenir; serbest sohbet için Canlı Şef gerekir.</Text>
               </ScrollView>
             </View>
           </View>
