@@ -220,8 +220,9 @@ export default function RecipeTextImportScreen() {
   const renderIngredient = (ingredient: EditableIngredient, index: number) => {
     if (!editor) return null;
     const open = index === openIngredient;
-    return <View key={'i' + index} style={styles.item}>
+    return <View key={'i' + index} style={[styles.item, open && styles.itemOpen]}>
       <TouchableOpacity onPress={() => setOpenIngredient(open ? null : index)} accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
         accessibilityLabel={(ingredient.name || 'Yeni malzeme') + ' düzenle'} style={styles.itemHeader}>
         <LokmaIngredientIcon name={ingredient.name} size={22} />
         <View style={styles.itemContent}>
@@ -230,7 +231,11 @@ export default function RecipeTextImportScreen() {
             {!ingredient.source_verified ? 'Sen ekledin · kontrol et' : ingredient.name_corrected ? 'Yazım önerisi · kontrol et' : 'Kaynakla karşılaştırıldı'}
           </Text>
         </View>
-        <Text style={styles.itemAmount}>{[ingredient.amount, ingredient.unit].filter(Boolean).join(' ') || 'Miktar belirtilmemiş'}</Text>
+        <View style={[styles.amountPill, !ingredient.amount.trim() && styles.amountPillMissing]}>
+          <Text style={[styles.itemAmount, !ingredient.amount.trim() && styles.itemAmountMissing]}>
+            {[ingredient.amount, ingredient.unit].filter(Boolean).join(' ') || 'Miktar belirtilmemiş'}
+          </Text>
+        </View>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={17} color="#a39589" />
       </TouchableOpacity>
       {open && <View style={styles.itemEdit}>
@@ -259,8 +264,10 @@ export default function RecipeTextImportScreen() {
   const renderStep = (step: EditableStep, index: number) => {
     if (!editor) return null;
     const open = openStep === index;
-    return <View key={'s' + index} style={styles.item}>
-      <TouchableOpacity style={styles.itemHeader} onPress={() => setOpenStep(open ? null : index)} accessibilityRole="button">
+    return <View key={'s' + index} style={[styles.item, open && styles.itemOpen]}>
+      <TouchableOpacity style={styles.itemHeader} onPress={() => setOpenStep(open ? null : index)}
+        accessibilityRole="button" accessibilityState={{ expanded: open }}
+        accessibilityLabel={`Yapılış adımı ${index + 1} düzenle`}>
         <View style={styles.stepNumber}><Text style={styles.stepNumberText}>{index + 1}</Text></View>
         <View style={styles.itemContent}>
           <Text style={styles.stepContent} numberOfLines={open ? undefined : 3}>{step.content || 'Yeni hazırlanış adımı'}</Text>
@@ -321,6 +328,14 @@ export default function RecipeTextImportScreen() {
           <View style={styles.reviewStep}><Ionicons name="checkmark" size={15} color="#25845e" />
             <Text style={styles.reviewStepText}>NOTLARIN DÜZENLENDİ</Text></View>
           <Text style={styles.heading}>Şimdi birlikte gözden geçirelim.</Text>
+          <View style={styles.reviewOverview}>
+            <View style={styles.reviewOverviewItem}><Ionicons name="basket-outline" size={16} color="#b36d59" />
+              <Text style={styles.reviewOverviewText}>{editor.ingredients.length} malzeme</Text>
+            </View>
+            <View style={styles.reviewOverviewItem}><Ionicons name="list-outline" size={16} color="#b36d59" />
+              <Text style={styles.reviewOverviewText}>{editor.steps.length} adım</Text>
+            </View>
+          </View>
           <Text style={styles.subtitle}>Başlık, malzemeler ve yapılış hazır. Dilediğini değiştirebilirsin.</Text>
           <TouchableOpacity accessibilityRole="button" style={styles.backToNotes} onPress={() => {
             setStage('source'); setError(''); setFieldError(null);
@@ -375,7 +390,10 @@ export default function RecipeTextImportScreen() {
           </View>}
 
           <View style={styles.sectionRow} onLayout={event => { ingredientsY.current = event.nativeEvent.layout.y; }}>
-            <Text style={styles.sectionTitle}>Malzemeler · {editor.ingredients.length}</Text>
+            <View style={styles.sectionHeading}>
+              <Text style={styles.sectionEyebrow}>MUTFAK LİSTESİ</Text>
+              <Text style={styles.sectionTitle}>Malzemeler <Text style={styles.sectionCount}>{editor.ingredients.length}</Text></Text>
+            </View>
             <TouchableOpacity onPress={() => {
               if (editor.ingredients.length >= 40) return;
               updateEditor(old => ({ ...old, ingredients: [...old.ingredients, {
@@ -387,7 +405,10 @@ export default function RecipeTextImportScreen() {
           {editor.ingredients.map(renderIngredient)}
 
           <View style={styles.sectionRow} onLayout={event => { stepsY.current = event.nativeEvent.layout.y; }}>
-            <Text style={styles.sectionTitle}>Yapılışı · {editor.steps.length}</Text>
+            <View style={styles.sectionHeading}>
+              <Text style={styles.sectionEyebrow}>HAZIRLANIŞ</Text>
+              <Text style={styles.sectionTitle}>Adım adım <Text style={styles.sectionCount}>{editor.steps.length}</Text></Text>
+            </View>
             <TouchableOpacity onPress={() => {
               if (editor.steps.length >= 40) return;
               updateEditor(old => ({ ...old, steps: [...old.steps, {
