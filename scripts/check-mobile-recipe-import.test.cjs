@@ -139,7 +139,7 @@ test('sticky review CTA points at missing servings and avoids silent publish fai
 
 test('mobile editor uses quiet semantic ingredient marks rather than meaningless empty rings', () => {
   const page = read('app/recipe/import.tsx');
-  assert.match(page, /name="leaf-outline"/);
-  assert.match(page, /styles\.ingredientMark/);
+  assert.match(page, /<LokmaIngredientIcon name=\{ingredient\.name\} size=\{22\} \/>/);
+  assert.match(page, /import LokmaIngredientIcon from/);
   assert.doesNotMatch(page, /<View style=\{styles\.dot\} \/>/);
 });
