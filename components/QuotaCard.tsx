@@ -15,10 +15,14 @@ export default function QuotaCard({ data, error, loading, kinds = ['menu_month',
     <View style={styles.card} accessibilityLabel="Kullanım haklarım">
       <View style={styles.head}>
         <Text style={styles.title}>Kullanım haklarım</Text>
-        {data && <Text style={styles.badge}>{data.tier === 'administrator' ? 'Yönetici · Sınırsız' : 'Ücretsiz üye'}</Text>}
+        {data && <Text style={styles.badge}>{data.tier === 'administrator' ? 'Yönetici · Sınırsız' : data.tier === 'internal' ? 'Dahili Hesap · Sınırsız' : 'Standart Üye'}</Text>}
       </View>
       {loading && !data && <Text style={styles.small}>Hakların kontrol ediliyor…</Text>}
       {error && !data && <Text style={styles.warning}>{error} Son kontrol sunucuda yapılır.</Text>}
+      {data && <View style={styles.tierRow} accessibilityLabel="Yakında sunulacak üyelik seçenekleri">
+        <Text style={styles.futureTier}>Premium · Yakında</Text>
+        <Text style={styles.futureTier}>Premium + · Yakında</Text>
+      </View>}
       {data && kinds.map(kind => {
         const q = data.quotas[kind];
         return (
@@ -29,7 +33,6 @@ export default function QuotaCard({ data, error, loading, kinds = ['menu_month',
           </View>
         );
       })}
-      {data && <Text style={styles.small}>Menünün tarifleri günlük bağımsız tarif kotasından düşmez.</Text>}
     </View>
   );
 }
@@ -39,6 +42,8 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 7, marginBottom: 6 },
   title: { color: '#202e25', fontSize: 17, fontWeight: '800' },
   badge: { fontSize: 11, fontWeight: '700', color: '#2b6746', backgroundColor: '#edf7ee', borderRadius: 8, overflow: 'hidden', padding: 7 },
+  tierRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  futureTier: { fontSize: 11, fontWeight: '600', color: '#b7b8bd', backgroundColor: '#f7f7f8', borderRadius: 9, padding: 7, overflow: 'hidden' },
   row: { borderTopColor: '#edf0ed', borderTopWidth: 1, paddingVertical: 10 },
   label: { fontSize: 12, color: '#78817e' },
   value: { fontSize: 18, color: '#202b28', fontWeight: '800', marginTop: 3 },

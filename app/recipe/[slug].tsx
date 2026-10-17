@@ -48,8 +48,9 @@ export default function RecipeDetailScreen() {
   const [assistantAuthVisible, setAssistantAuthVisible] = useState(false);
   const [checkedIngredients, setCheckedIngredients] = useState<Set<number>>(new Set());
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
-  const [currentServings, setCurrentServings] = useState<number>(1);
-  const [defaultServings, setDefaultServings] = useState<number>(1);
+  // Preserve unknown source servings instead of inventing a single portion.
+  const [currentServings, setCurrentServings] = useState<number | null>(null);
+  const [defaultServings, setDefaultServings] = useState<number | null>(null);
   const [similarRecipes, setSimilarRecipes] = useState<Recipe[]>([]);
 
   const requestCookingAssistant = () => {
@@ -70,7 +71,8 @@ export default function RecipeDetailScreen() {
       if (data) {
         navigation.setOptions({ title: data.title });
 
-        const parsedServings = parseInt(String(data.servings), 10) || 1;
+        const servingCount = Number(data.servings);
+        const parsedServings = Number.isInteger(servingCount) && servingCount > 0 && servingCount <= 36 ? servingCount : null;
         setDefaultServings(parsedServings);
         setCurrentServings(parsedServings);
 
@@ -169,9 +171,8 @@ export default function RecipeDetailScreen() {
   };
 
   const displayAmount = (amount: string | number): string => {
-    const num = parseFloat(String(amount));
-    if (isNaN(num) || defaultServings === 0) return String(amount);
-    const scaled = (num * currentServings) / defaultServings;
+    if (currentServings === null || defaultServings === null || !/^[0-9]+(?:[.,][0-9]+)?$/.test(String(amount).trim())) return String(amount);
+    const scaled = (Number(String(amount).replace(',', '.')) * currentServings) / defaultServings;
     return Number.isInteger(scaled) ? String(scaled) : scaled.toFixed(1);
   };
 
@@ -338,14 +339,18 @@ export default function RecipeDetailScreen() {
               <View style={styles.servingsControl}>
                 <TouchableOpacity
                   style={styles.servingsBtn}
-                  onPress={() => setCurrentServings((s) => Math.max(1, s - 1))}
+                  disabled={currentServings === null || currentServings <= 1}
+                  accessibilityLabel="Porsiyonu azalt"
+                  onPress={() => setCurrentServings((s) => s === null ? null : Math.max(1, s - 1))}
                 >
                   <Ionicons name="remove" size={16} color="#e74c3c" />
                 </TouchableOpacity>
-                <Text style={styles.servingsText}>{currentServings} Porsiyon</Text>
+                <Text style={styles.servingsText}>{currentServings === null ? 'Kişi sayısı belirtilmemiş' : `${currentServings} Porsiyon`}</Text>
                 <TouchableOpacity
                   style={styles.servingsBtn}
-                  onPress={() => setCurrentServings((s) => s + 1)}
+                  disabled={currentServings === null || currentServings >= 36}
+                  accessibilityLabel="Porsiyonu artır"
+                  onPress={() => setCurrentServings((s) => s === null ? null : Math.min(36, s + 1))}
                 >
                   <Ionicons name="add" size={16} color="#e74c3c" />
                 </TouchableOpacity>
@@ -436,7 +441,7 @@ export default function RecipeDetailScreen() {
         {/* Nutrition */}
         {(recipe.nutrition || calories > 0) && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>1 Porsiyon İçin Besin Değerleri</Text>
+            <Text style={styles.sectionTitle}>{defaultServings === null ? 'Besin Değerleri (tahmini)' : '1 Porsiyon İçin Besin Değerleri'}</Text>
             {recipe.serving_weight ? (
               <Text style={styles.servingWeightText}>yaklaşık {recipe.serving_weight} gr</Text>
             ) : null}
@@ -513,12 +518,12 @@ export default function RecipeDetailScreen() {
           <View style={assistantGateStyles.card}>
             <View style={assistantGateStyles.icon}><Ionicons name="restaurant-outline" size={27} color="#db4c3f" /></View>
             <Text style={assistantGateStyles.title}>Tariften Pişirme Rehberi</Text>
-            <Text style={assistantGateStyles.description}>Adım adım sesli pişirme rehberini ve mutfak sayaçlarını kullanmak için hesabına giriş yap veya ücretsiz kayıt ol.</Text>
+            <Text style={assistantGateStyles.description}>Adım adım sesli pişirme rehberini ve mutfak sayaçlarını kullanmak için hesabına giriş yap veya Standart Üye ol.</Text>
             <TouchableOpacity style={assistantGateStyles.primary} onPress={() => { setAssistantAuthVisible(false); router.push('/login'); }}>
               <Text style={assistantGateStyles.primaryLabel}>Giriş Yap</Text>
             </TouchableOpacity>
             <TouchableOpacity style={assistantGateStyles.secondary} onPress={() => { setAssistantAuthVisible(false); router.push('/register'); }}>
-              <Text style={assistantGateStyles.secondaryLabel}>Ücretsiz Kayıt Ol</Text>
+              <Text style={assistantGateStyles.secondaryLabel}>Standart Üye Ol</Text>
             </TouchableOpacity>
             <TouchableOpacity style={assistantGateStyles.dismiss} onPress={() => setAssistantAuthVisible(false)}>
               <Text style={assistantGateStyles.dismissLabel}>Şimdi değil</Text>
