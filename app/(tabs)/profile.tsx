@@ -202,12 +202,12 @@ export default function ProfileScreen() {
                   style={styles.emptyButton}
                   onPress={() =>
                     activeTab === 'my_recipes'
-                      ? router.push('/recipe/create')
+                      ? router.push('/recipes')
                       : router.push('/')
                   }
                 >
                   <Text style={styles.emptyButtonText}>
-                    {activeTab === 'my_recipes' ? 'Tarif Oluştur' : 'Tariflere Göz At'}
+                    {activeTab === 'my_recipes' ? 'Tarifleri Keşfet' : 'Tariflere Göz At'}
                   </Text>
                 </TouchableOpacity>
               </View>
