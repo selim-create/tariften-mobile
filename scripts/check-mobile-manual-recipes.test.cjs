@@ -93,7 +93,7 @@ test('native create and edit share one staged editor, preserve author permission
   assert.match(editor,/getRecipeById\(Number\(recipeId\)\)/);
   assert.match(editor,/fetchAccountQuotas\(token, signal\)/);
   assert.match(editor,/!editing/);
-  assert.match(editor,/uploadManualRecipePhoto\(token, photo\)/);
+  assert.equal(editor.includes('uploadManualRecipePhoto(token, photo, signal)'), true);
   assert.match(editor,/isPublishResultUncertain\(cause\)/);
   assert.match(editor,/Tariflerimde kontrol et/);
   assert.match(editor,/withDeadline\(signal => createRecipe\(token, values, signal\), 45000\)/);
@@ -109,7 +109,7 @@ test('manual photo picker uses JPEG conversion and validated authenticated WordP
   assert.match(file,/body.append\('file'/);
   assert.match(file,/Authorization: `Bearer \$\{token\}`/);
   assert.match(file,/Number\.isSafeInteger\(result\.id\)/);
-  assert.match(file, /signal\\?: AbortSignal/);
+  assert.equal(file.includes('signal?: AbortSignal'), true);
   assert.match(file, /body, signal/);
   const editor = read('components/recipe/RecipeManualEditor.tsx');
   assert.equal(editor.includes('signal => uploadManualRecipePhoto(token, photo, signal)'), true);
