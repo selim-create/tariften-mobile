@@ -422,13 +422,24 @@ export default function RecipeTextImportScreen() {
       </> : null}
       <TouchableOpacity style={[styles.mainButton, (busy || quotas.loading) && styles.buttonDisabled]}
         disabled={!!busy || quotas.loading || (stage === 'review' && !accepted)}
-        onPress={() => { if (stage === 'source') void requestPreview(); else confirmPublish(); }}
+        onPress={() => {
+          if (stage === 'review') { confirmPublish(); return; }
+          if (preview && editor) {
+            setStage('review'); // Return to saved preview at no extra AI cost.
+            setError('');
+            requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }));
+          } else {
+            void requestPreview();
+          }
+        }}
         accessibilityRole="button" accessibilityLabel={stage === 'source' ? 'Tarifimi güzelleştir' : 'Onayla ve yayımla'}>
         {busy ? <ActivityIndicator color="#fff" />
           : <Ionicons name={stage === 'source' ? 'sparkles' : 'checkmark-circle-outline'} size={19} color="#fff" />}
         <Text style={styles.mainButtonText}>{busy === 'preview' ? 'Tarifini düzenliyoruz…'
           : busy === 'publish' ? 'Tarifin yayımlanıyor…'
-            : stage === 'source' ? 'Tarifimi güzelleştir' : 'Onayla ve yayımla'}</Text>
+            : stage === 'source'
+              ? (preview && editor ? 'Düzenlenmiş tarifime dön' : 'Tarifimi güzelleştir')
+              : 'Onayla ve yayımla'}</Text>
         {!busy && <Ionicons name="arrow-forward" size={17} color="#fff" />}
       </TouchableOpacity>
     </View>
