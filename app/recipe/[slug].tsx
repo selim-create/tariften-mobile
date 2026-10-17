@@ -192,6 +192,8 @@ export default function RecipeDetailScreen() {
   const carbs = recipe.nutrition?.carbs ?? Math.round((calories * 0.45) / 4);
   const fat = recipe.nutrition?.fat ?? Math.round((calories * 0.30) / 9);
   const nutritionTotal = protein + carbs + fat;
+  const ingredientsReady = recipe.ingredients?.filter((_, index) => checkedIngredients.has(index)).length || 0;
+  const stepsReady = recipe.steps?.filter((_, index) => completedSteps.has(index)).length || 0;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -336,7 +338,11 @@ export default function RecipeDetailScreen() {
         {recipe.ingredients?.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Malzemeler</Text>
+              <View style={styles.sectionHeadingBlock}>
+                <Text style={styles.sectionEyebrow}>HAZIRLIK LİSTEN</Text>
+                <Text style={styles.sectionTitle}>Malzemeler</Text>
+                <Text style={styles.sectionCaption}>{ingredientsReady} / {recipe.ingredients.length} malzeme hazır</Text>
+              </View>
               <View style={styles.servingsControl}>
                 <TouchableOpacity
                   style={styles.servingsBtn}
@@ -360,25 +366,23 @@ export default function RecipeDetailScreen() {
             {recipe.ingredients.map((ing, idx) => (
               <TouchableOpacity
                 key={idx}
-                style={styles.ingredientRow}
+                style={[styles.ingredientRow, checkedIngredients.has(idx) && styles.ingredientRowChecked]}
                 onPress={() => toggleIngredient(idx)}
-                activeOpacity={0.7}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: checkedIngredients.has(idx) }}
+                accessibilityLabel={`${ing.name}, ${displayAmount(ing.amount)} ${ing.unit || ''}`}
+                activeOpacity={0.75}
               >
-                {checkedIngredients.has(idx) ? (
-                  <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
-                ) : (
-                  <Text style={styles.ingredientBullet}>•</Text>
-                )}
+                <View style={[styles.ingredientCheck, checkedIngredients.has(idx) && styles.ingredientCheckActive]}>
+                  {checkedIngredients.has(idx) ? <Ionicons name="checkmark" size={13} color="#ffffff" /> : null}
+                </View>
                 <LokmaIngredientIcon name={ing.name} size={27} />
-                <Text
-                  style={[
-                    styles.ingredientText,
-                    checkedIngredients.has(idx) && styles.ingredientTextChecked,
-                  ]}
-                >
-                  {displayAmount(ing.amount)} {ing.unit} {ing.name}
-                  {ing.note ? ` (${ing.note})` : ''}
-                </Text>
+                <View style={styles.ingredientCopy}>
+                  <Text style={[styles.ingredientText, checkedIngredients.has(idx) && styles.ingredientTextChecked]}>
+                    {[displayAmount(ing.amount), ing.unit, ing.name].filter(v => String(v || '').trim()).join(' ')}
+                  </Text>
+                  {ing.note ? <Text style={styles.ingredientNote}>{ing.note}</Text> : null}
+                </View>
               </TouchableOpacity>
             ))}
           </View>
@@ -388,7 +392,11 @@ export default function RecipeDetailScreen() {
         {recipe.steps?.length > 0 && (
           <View style={styles.section}>
             <View style={styles.stepsSectionHeader}>
-              <Text style={styles.sectionTitle}>Yapılışı</Text>
+              <View style={styles.sectionHeadingBlock}>
+                <Text style={styles.sectionEyebrow}>ADIM ADIM</Text>
+                <Text style={styles.sectionTitle}>Yapılışı</Text>
+                <Text style={styles.sectionCaption}>{stepsReady} / {recipe.steps.length} adım tamamlandı</Text>
+              </View>
               <TouchableOpacity
                 style={styles.startCookingButton}
                 onPress={requestCookingAssistant}
@@ -400,9 +408,12 @@ export default function RecipeDetailScreen() {
             {recipe.steps.map((step, idx) => (
               <TouchableOpacity
                 key={idx}
-                style={styles.stepRow}
+                style={[styles.stepRow, completedSteps.has(idx) && styles.stepRowDone]}
                 onPress={() => toggleStep(idx)}
-                activeOpacity={0.7}
+                activeOpacity={0.75}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: completedSteps.has(idx) }}
+                accessibilityLabel={`Adım ${idx + 1}: ${step}`}
               >
                 {completedSteps.has(idx) ? (
                   <View style={styles.stepNumberDone}>
