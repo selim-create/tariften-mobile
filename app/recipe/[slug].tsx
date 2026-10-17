@@ -25,6 +25,7 @@ import {
 import { Recipe } from '../../lib/types';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import RatingStars from '../../components/RatingStars';
+import { LOKMA_RATINGS, lokmaIngredient } from '../../lib/lokma-emoji';
 import CommentSection from '../../components/CommentSection';
 import CookingAssistant from '../../components/CookingAssistant';
 import RecipeCard from '../../components/RecipeCard';
@@ -283,6 +284,20 @@ export default function RecipeDetailScreen() {
           </View>
         )}
 
+        {user && (
+          <View style={styles.lokmaRatingRow}>
+            {LOKMA_RATINGS.map(({ rating, emoji, label }) => (
+              <TouchableOpacity key={rating} accessibilityRole="button"
+                accessibilityLabel={`${rating} yıldız, ${label}`}
+                onPress={() => handleRate(rating)}
+                style={[styles.lokmaRatingOption, userRating === rating && styles.lokmaRatingOptionSelected]}>
+                <Text style={styles.lokmaRatingEmoji}>{emoji}</Text>
+                <Text style={styles.lokmaRatingLabel} numberOfLines={1}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         {/* Meta Info */}
         <View style={styles.metaGrid}>
           {recipe.prep_time ? (
@@ -348,6 +363,9 @@ export default function RecipeDetailScreen() {
                 ) : (
                   <Text style={styles.ingredientBullet}>•</Text>
                 )}
+                <View style={styles.lokmaIngredientIcon} accessible={false}>
+                  <Text style={styles.lokmaIngredientEmoji}>{lokmaIngredient(ing.name).emoji}</Text>
+                </View>
                 <Text
                   style={[
                     styles.ingredientText,
@@ -728,6 +746,16 @@ const styles = StyleSheet.create({
     width: 20,
     textAlign: 'center',
   },
+  lokmaIngredientIcon: {
+    width: 36, height: 36, borderRadius: 12, backgroundColor: '#fff0e6',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  lokmaIngredientEmoji: { fontSize: 22 },
+  lokmaRatingRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 },
+  lokmaRatingOption: { paddingHorizontal: 8, paddingVertical: 8, borderRadius: 12, backgroundColor: '#fff5ec', borderWidth: 1, borderColor: '#f2e6da', alignItems: 'center', gap: 3, flexGrow: 1 },
+  lokmaRatingOptionSelected: { borderColor: '#db4c3f', backgroundColor: '#ffe9e0' },
+  lokmaRatingEmoji: { fontSize: 23 },
+  lokmaRatingLabel: { fontSize: 9, fontWeight: '700', color: '#66574c' },
   ingredientText: {
     fontSize: 15,
     color: '#1a1a1a',

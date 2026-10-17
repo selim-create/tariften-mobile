@@ -13,6 +13,7 @@ import { Image } from 'expo-image';
 import { useAuth } from '../context/AuthContext';
 import { addComment, deleteComment, getComments, toggleCommentLike } from '../lib/api';
 import { Comment } from '../lib/types';
+import { LOKMA_REACTIONS } from '../lib/lokma-emoji';
 
 interface CommentSectionProps {
   recipeId: number;
@@ -179,6 +180,17 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
             multiline
             maxLength={500}
           />
+          <View style={styles.lokmaReactionRow}>
+            {LOKMA_REACTIONS.map(({ id, emoji, label }) => (
+              <TouchableOpacity key={id} accessibilityRole="button"
+                accessibilityLabel={`Yoruma ${label} emojisi ekle`}
+                style={styles.lokmaReactionButton}
+                onPress={() => setNewComment(current => current.length < 490
+                  ? current + (current && !current.endsWith(' ') ? ' ' : '') + emoji : current)}>
+                <Text style={styles.lokmaReactionEmoji}>{emoji}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           <TouchableOpacity
             style={[styles.submitButton, (!newComment.trim() || submitting) && styles.submitButtonDisabled]}
             onPress={handleSubmit}
@@ -224,6 +236,9 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     marginBottom: 16,
   },
+  lokmaReactionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 2 },
+  lokmaReactionButton: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff4eb', borderWidth: 1, borderColor: '#f2e4d8' },
+  lokmaReactionEmoji: { fontSize: 21 },
   inputContainer: {
     marginBottom: 16,
     gap: 8,
