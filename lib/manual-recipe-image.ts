@@ -18,6 +18,7 @@ export async function prepareManualRecipePhoto(asset: ImagePickerAsset): Promise
 export async function uploadManualRecipePhoto(
   token: string,
   photo: { uri: string; name: string; mimeType: string },
+  signal?: AbortSignal,
 ): Promise<{ id: number; url: string }> {
   if (!token || !photo.uri || photo.mimeType !== 'image/jpeg' || !/^tariften-recipe-[0-9]+\.jpg$/.test(photo.name)) {
     throw new Error('Görsel hazırlığı doğrulanamadı.');
@@ -27,7 +28,7 @@ export async function uploadManualRecipePhoto(
   let response: Response;
   try {
     response = await fetch(UPLOAD_URL, {
-      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body,
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body, signal,
     });
   } catch {
     throw new Error('Fotoğraf gönderilemedi. Bağlantını kontrol et; tekrar yüklemeden önce görselini kontrol et.');
