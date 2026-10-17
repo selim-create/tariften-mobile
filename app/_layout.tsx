@@ -13,6 +13,14 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
+          name="recipe/create"
+          options={{ headerShown: true, headerTitle: 'Tarif Oluştur', headerBackTitle: 'Tarifler', headerTintColor: '#df5043' }}
+        />
+        <Stack.Screen
+          name="recipe/edit/[id]"
+          options={{ headerShown: true, headerTitle: 'Tarifi Düzenle', headerBackTitle: 'Geri', headerTintColor: '#df5043' }}
+        />
+        <Stack.Screen
           name="recipe/import"
           options={{
             headerShown: true,
