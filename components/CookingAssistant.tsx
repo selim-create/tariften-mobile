@@ -70,11 +70,13 @@ const COOKING_RECOGNITION_OPTIONS = {
   interimResults: true,
   maxAlternatives: 1,
   iosTaskHint: 'confirmation',
+  // Native vocabulary bias is deliberately short: common Turkish controls.
+  // The deterministic parser recognizes many more validated variations.
   contextualStrings: [
-    'sonraki', 'sonraki adım', 'sıradaki', 'önceki', 'ileri', 'geri', 'oku',
-    'konuş', 'anlat', 'tekrar', 'devam', 'devam et', 'durdur', 'duraklat',
-    'iptal et', 'kaçıncı adımdayım', 'sayacı durdur', 'sayacı sürdür',
-    'sayacı iptal et', 'beş dakika başlat',
+    'sonraki', 'sıradaki', 'önceki', 'ileri', 'geri', 'oku', 'konuş',
+    'sürdür', 'devam', 'devam ettir', 'durdur', 'duraklat',
+    'sayacı durdur', 'sayacı sürdür', 'sayacı iptal et',
+    'beş dakika başlat', 'kaçıncı adımdayım',
   ],
 };
 
@@ -559,27 +561,43 @@ export default function CookingAssistant({
       case 'read': speak(currentStep.content); return;
       case 'pause_voice': pauseSpeech(); return;
       case 'resume_voice':
+        // "Okumayı sürdür" explicitly affects narration, never a running timer.
+        if (speechStatus === 'paused') resumeSpeech();
+        else showAssistantNotice('Sesli okuma duraklatılmadı');
+        return;
+      case 'resume_context':
+        // A bare "Sürdür / Devam et / Kaldığın yerden devam et"
+        // resumes the timer first; then an interrupted narration; otherwise
+        // the existing step-navigation flow is preserved.
         if (timerRunning) {
-          if (isTimerPaused) { toggleTimerPause(); showAssistantNotice('Sayaç devam ediyor'); }
-          else showAssistantNotice('Sayaç zaten çalışıyor');
-        } else if (speechStatus === 'paused') resumeSpeech();
-        else if (isLast) setIsFinishedOpen(true);
-        else changeStep(1);
+          if (isTimerPaused) {
+            toggleTimerPause();
+            showAssistantNotice('Sayaç kaldığı yerden devam ediyor');
+          } else showAssistantNotice('Sayaç zaten çalışıyor');
+        } else if (speechStatus === 'paused') {
+          resumeSpeech();
+        } else if (isLast) {
+          setIsFinishedOpen(true);
+        } else changeStep(1);
         return;
       case 'stop_voice': stopSpeech(); return;
       case 'start_timer': startTimer(command.minutes); return;
       case 'pause_timer':
       case 'pause_context':
         if (timerRunning) {
-          if (!isTimerPaused) toggleTimerPause();
-          showAssistantNotice('Sayaç duraklatıldı');
-        } else {
+          if (!isTimerPaused) {
+            toggleTimerPause();
+            showAssistantNotice('Sayaç duraklatıldı');
+          } else showAssistantNotice('Sayaç zaten duraklatıldı');
+        } else if (command.type === 'pause_context') {
           pauseSpeech();
-        }
+        } else showAssistantNotice('Durdurulacak sayaç yok');
         return;
       case 'resume_timer':
-        if (timerRunning && isTimerPaused) toggleTimerPause();
-        else if (!timerRunning) showAssistantNotice('Çalışan sayaç yok');
+        if (timerRunning && isTimerPaused) {
+          toggleTimerPause();
+          showAssistantNotice('Sayaç kaldığı yerden devam ediyor');
+        } else showAssistantNotice(timerRunning ? 'Sayaç zaten çalışıyor' : 'Sürdürülecek sayaç yok');
         return;
       case 'cancel_context':
       case 'cancel_timer':
@@ -1295,9 +1313,9 @@ export default function CookingAssistant({
                 <Text style={styles.helpCategory}>ADIMLAR</Text>
                 <Text style={styles.helpDesc}>“Sonraki”, “Sıradaki”, “İleri” · “Önceki”, “Geri”. Her komut tarif adımını değiştirir.</Text>
                 <Text style={[styles.helpCategory, { marginTop: 12 }]}>SESLENDİRME</Text>
-                <Text style={styles.helpDesc}>“Oku”, “Konuş”, “Anlat”, “Tekrar”, “Devam”. “Kaçıncı adımdayım?” dersen mevcut adımı görürsün.</Text>
+                <Text style={styles.helpDesc}>“Oku”, “Konuş”, “Anlat”, “Tekrar”, “Baştan oku”, “Okumayı sürdür”. “Kaçıncı adımdayım?” mevcut adımı gösterir.</Text>
                 <Text style={[styles.helpCategory, { marginTop: 12 }]}>SAYAÇ</Text>
-                <Text style={styles.helpDesc}>“5 dakika başlat”, “Sayacı durdur”, “Sayacı sürdür”, “Sayacı iptal et”. Sayaç çalışırken “Durdur”, “Duraklat”, “İptal et” de sayacı yönetir.</Text>
+                <Text style={styles.helpDesc}>“5 dakika başlat”, “Sayacı durdur”, “Sayacı sürdür”, “Sayacı iptal et”. Sayaç çalışırken “Durdur”, “Duraklat”, “Sürdür”, “Devam”, “Kaldığın yerden devam et” ve “İptal et” de sayacı yönetir.</Text>
                 <Text style={[styles.helpCategory, { marginTop: 12 }]}>ELLER SERBEST</Text>
                 <Text style={styles.helpDesc}>“Pasife al” veya “Mikrofonu kapat” mikrofonu kapatır. Yeniden açmak için üstteki mikrofon simgesine dokun. Komutlar yerel tanımayla işlenir; serbest sohbet için Canlı Şef gerekir.</Text>
               </ScrollView>

@@ -16,7 +16,7 @@ test('Turkish hands-free navigation and reading commands', () => {
   assert.deepEqual(parse('Önceki adım.'), { type: 'previous' });
   assert.deepEqual(parse('Tekrar oku.'), { type: 'read' });
   assert.deepEqual(parse('Duraklat'), { type: 'pause_context' });
-  assert.deepEqual(parse('Devam et'), { type: 'resume_voice' });
+  assert.deepEqual(parse('Devam et'), { type: 'resume_context' });
   assert.deepEqual(parse('Sesi durdur'), { type: 'stop_voice' });
 });
 
@@ -80,7 +80,7 @@ test('iOS recognition is continuous with interim actions and no forced stop on c
 });
 
 test('common short natural Turkish commands are not rejected', () => {
-  assert.deepEqual(parse('devam'), { type: 'resume_voice' });
+  assert.deepEqual(parse('devam'), { type: 'resume_context' });
   assert.deepEqual(parse('Sonraki adım'), { type: 'next' });
   assert.deepEqual(parse('Bir sonraki'), { type: 'next' });
   assert.deepEqual(parse('ileri git'), { type: 'next' });
@@ -96,7 +96,7 @@ const compiledStream = ts.transpileModule(streamInput, {
 const streamMod = { exports: {} };
 Function('module', 'exports', 'require', compiledStream)(
   streamMod, streamMod.exports, (name) => {
-    if (name === './cooking-commands') return { parseCookingCommand: parse, COOKING_COMMAND_PHRASES: mod.exports.COOKING_COMMAND_PHRASES };
+    if (name === './cooking-commands') return { parseCookingCommand: parse, COOKING_COMMAND_PHRASES: mod.exports.COOKING_COMMAND_PHRASES, COOKING_MINUTE_WORDS: mod.exports.COOKING_MINUTE_WORDS };
     throw new Error('Unexpected import ' + name);
   }
 );
@@ -224,4 +224,98 @@ test('assistant requires auth and hides noisy STT diagnostic status from normal 
   assert.match(ui, /case 'cancel_context':/);
   assert.match(ui, /case 'step_status':/);
   assert.match(ui, /cloudBusy \? 'Bekle'/);
+});
+
+test('all 180+ Turkish phrase variants are deterministic, complete and conflict-free', () => {
+  const groups = mod.exports.COOKING_COMMAND_GROUPS;
+  const all = groups.flatMap(g => g.variants.map(phrase => ({ phrase, type: g.type })));
+  assert.ok(all.length >= 160, 'sufficient everyday Turkish commands should be covered');
+  const seen = new Map();
+  for (const { phrase, type } of all) {
+    assert.equal(seen.has(phrase), false,
+      'one phrase must never mean two things: ' + phrase);
+    seen.set(phrase, type);
+    assert.deepEqual(parse(phrase), { type }, phrase);
+    assert.deepEqual(parse(phrase.toLocaleUpperCase('tr-TR') + '!'), { type }, phrase + ' upper-case');
+  }
+  for (const phrase of mod.exports.COOKING_COMMAND_PHRASES) {
+    assert.ok(parse(phrase), 'recognition bias must map to executable action: ' + phrase);
+  }
+});
+
+test('bare sürdür, kaldığın yerden, devam vs resume context while explicit voice/timer stay distinct', () => {
+  for (const phrase of [
+    'sürdür', 'devam', 'devam et', 'devam ettir',
+    'kaldığın yerden devam et', 'kaldığı yerden sürdür',
+    'yeniden devam et', 'duraklatmayı bitir', 'devam edelim',
+  ]) assert.deepEqual(parse(phrase), { type: 'resume_context' }, phrase);
+  for (const phrase of [
+    'sayacı sürdür', 'sayacı devam ettir', 'sayacı başlat', 'süreyi sürdür',
+    'zamanlayıcıyı sürdür', 'geri sayımı sürdür',
+  ]) assert.deepEqual(parse(phrase), { type: 'resume_timer' }, phrase);
+  for (const phrase of [
+    'okumayı sürdür', 'seslendirmeye devam et', 'sesi devam ettir',
+  ]) assert.deepEqual(parse(phrase), { type: 'resume_voice' }, phrase);
+});
+
+test('timer expressions accept 1–60 minutes as digits or Turkish composite words', () => {
+  const examples = [
+    ['5 dakika başlat', 5],
+    ['beş dakikalık sayaç kur', 5],
+    ['10 dakika sayaç başlat', 10],
+    ['on beş dakika sayaç kur', 15],
+    ['yirmi beş dakika başlat', 25],
+    ['sayacı 30 dakikaya ayarla', 30],
+    ['zamanlayıcı 45 dakika başlat', 45],
+    ['altmış dakika başlat', 60],
+    ['60 dakika zamanlayıcı başlat', 60],
+  ];
+  for (const [phrase, minutes] of examples) {
+    assert.deepEqual(parse(phrase), { type: 'start_timer', minutes }, phrase);
+  }
+  for (const phrase of [
+    '0 dakika başlat', '61 dakika başlat', '99 dakika başlat',
+    '200 dakika başlat', 'yüz dakika başlat', '10 dakika sonra patatesleri ekle',
+    'beş dakika daha pişir', 'sayacı 200 dakikaya ayarla',
+  ]) assert.equal(parse(phrase), null, phrase);
+});
+
+test('native continuous stream emits timer resume after pausing without replaying old phrases', () => {
+  const stream = new Stream();
+  const sequence = [
+    ['on', []], ['on dakika', []],
+    ['on dakika başlat', [{ type: 'start_timer', minutes: 10 }]],
+    ['on dakika başlat durdur', [{ type: 'pause_context' }]],
+    ['on dakika başlat durdur sürdür', [{ type: 'resume_context' }]],
+    ['on dakika başlat durdur sürdür sayacı durdur', [{ type: 'pause_timer' }]],
+    ['on dakika başlat durdur sürdür sayacı durdur sayacı sürdür', [{ type: 'resume_timer' }]],
+    ['on dakika başlat durdur sürdür sayacı durdur sayacı sürdür iptal et', [{ type: 'cancel_context' }]],
+  ];
+  for (let i = 0; i < sequence.length; i++) {
+    const [phrase, expected] = sequence[i];
+    assert.deepEqual(stream.accept(phrase, 100 + i * 300).commands, expected, phrase);
+  }
+});
+
+test('native stream corrects partial resume phrases and distinguishes noise', () => {
+  const stream = new Stream();
+  assert.deepEqual(stream.accept('sayacı', 100).commands, []);
+  assert.deepEqual(stream.accept('sayacı sür', 140).commands, []);
+  assert.deepEqual(stream.accept('sayacı sürdür', 190).commands, [{ type: 'resume_timer' }]);
+  assert.deepEqual(stream.accept('sayacı sürdür sür', 250).commands, []);
+  assert.deepEqual(stream.accept('sayacı sürdür sürdür', 310).commands, [{ type: 'resume_context' }]);
+  assert.deepEqual(stream.accept('sayacı sürdür sürdür televizyon', 340).commands, []);
+  assert.deepEqual(stream.accept('sayacı sürdür sürdür televizyon önceki', 430).commands,
+    [{ type: 'previous' }]);
+});
+
+test('context-aware resume and independent timer/narration controls are wired in native dispatch', () => {
+  const ui = fs.readFileSync(path.join(__dirname, '..', 'components/CookingAssistant.tsx'), 'utf8');
+  assert.match(ui, /case 'resume_context':/);
+  assert.match(ui, /if \(timerRunning\)/);
+  assert.match(ui, /if \(isTimerPaused\)/);
+  assert.match(ui, /toggleTimerPause\(\)/);
+  assert.match(ui, /case 'resume_voice':/);
+  assert.match(ui, /case 'resume_timer':/);
+  assert.match(ui, /sayacı sürdür/i);
 });
