@@ -15,8 +15,8 @@ export type QuotaState = {
 export type AccountQuotas = { success: true; tier: 'administrator' | 'internal' | 'standard' | 'free'; quotas: Record<QuotaKind, QuotaState> };
 const BASE = "https://api.tariften.com/wp-json/tariften/v1";
 
-export async function fetchAccountQuotas(token: string): Promise<AccountQuotas> {
-  const res = await fetch(`${BASE}/account/quotas`, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
+export async function fetchAccountQuotas(token: string, signal?: AbortSignal): Promise<AccountQuotas> {
+  const res = await fetch(`${BASE}/account/quotas`, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, signal });
   const payload: unknown = await res.json();
   if (!res.ok || !payload || typeof payload !== "object" || !("success" in payload) || payload.success !== true) {
     const msg = payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string" ? payload.message : "Kullanım hakları alınamadı.";

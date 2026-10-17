@@ -1,5 +1,6 @@
 import { APIResponse, Recipe, PantryItem, Menu, BlogPost, RecipeFilters } from './types';
 import { parseIngredients, parseSteps } from './recipeUtils';
+import { RecipeCreateUnconfirmedError } from './recipe-publish';
 
 const API_URL = 'https://api.tariften.com/wp-json';
 
@@ -124,15 +125,39 @@ export async function getUserRecipes(token: string): Promise<Recipe[]> {
   return data?.data || [];
 }
 
-export async function createRecipe(token: string, recipeData: Record<string, unknown>) {
-  const res = await fetch(`${API_URL}/tariften/v1/recipes/create`, {
-    method: 'POST',
-    headers: authHeaders(token),
-    body: JSON.stringify(recipeData),
-  });
+export async function createRecipe(
+  token: string,
+  recipeData: Record<string, unknown>,
+  signal?: AbortSignal,
+) {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/tariften/v1/recipes/create`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(recipeData),
+      signal,
+    });
+  } catch {
+    // On mobile, network failure after POST does NOT guarantee the backend
+    // didn't publish. Never encourage an automatic retry.
+    throw new RecipeCreateUnconfirmedError();
+  }
 
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.message || 'Tarif oluşturulamadı');
+  let json: any;
+  try {
+    json = await res.json();
+  } catch {
+    throw new RecipeCreateUnconfirmedError();
+  }
+  if (!res.ok) {
+    // A server-side 5xx response can occur after the recipe was committed.
+    if (res.status >= 500) throw new RecipeCreateUnconfirmedError();
+    throw new Error(typeof json?.message === 'string' ? json.message : 'Tarif oluşturulamadı.');
+  }
+  if (json?.success !== true || !Number.isSafeInteger(Number(json.id)) || Number(json.id) < 1) {
+    throw new RecipeCreateUnconfirmedError();
+  }
   return json;
 }
 

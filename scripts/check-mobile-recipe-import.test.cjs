@@ -92,7 +92,7 @@ test('mobile uses Core directly with quota preflight, no auto-publish, double ap
   assert.match(page, /reached\(rights, 'recipe_ai_day'\)/);
   assert.match(page, /reached\(rights, 'recipe_day'\)/);
   assert.match(page, /buildApprovedRecipe\(editor\)/);
-  assert.match(page, /createRecipe\(token, buildApprovedRecipe\(editor\)\)/);
+  assert.match(page, /createRecipe\(token, buildApprovedRecipe\(editor\), signal\)/);
   assert.match(page, /Alert\.alert\('Tarifini herkese açık yayımla'/);
   assert.match(page, /Onayla ve yayımla/);
   assert.match(page, /malzeme miktarlarından tahmin etmiyoruz/);
@@ -133,8 +133,8 @@ test('sticky review CTA points at missing servings and avoids silent publish fai
   assert.match(page, /style=\{\[styles\.bottomBar/);
   assert.match(page, /if \(!checkBeforePublish\(\)\) return;/);
   assert.match(page, /Alert\.alert\('Tarifini herkese açık yayımla'/);
-  assert.match(page, /createRecipe\(token, buildApprovedRecipe\(editor\)\)/);
-  assert.match(page, /disabled=\{!!busy \|\| quotas\.loading \|\| \(stage === 'review' && !accepted\)\}/);
+  assert.match(page, /createRecipe\(token, buildApprovedRecipe\(editor\), signal\)/);
+  assert.match(page, /disabled=\{!!busy \|\| \(!publishUnknown && quotas\.loading\) \|\| \(stage === 'review' && !accepted && !publishUnknown\)\}/);
 });
 
 test('mobile editor uses quiet semantic ingredient marks rather than meaningless empty rings', () => {
