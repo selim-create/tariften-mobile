@@ -71,8 +71,9 @@ const COOKING_RECOGNITION_OPTIONS = {
   maxAlternatives: 1,
   iosTaskHint: 'confirmation',
   contextualStrings: [
-    'sonraki', 'sonraki adım', 'önceki', 'ileri', 'geri', 'oku',
-    'tekrar', 'devam', 'devam et', 'sayacı durdur', 'sayacı sürdür',
+    'sonraki', 'sonraki adım', 'sıradaki', 'önceki', 'ileri', 'geri', 'oku',
+    'konuş', 'anlat', 'tekrar', 'devam', 'devam et', 'durdur', 'duraklat',
+    'iptal et', 'kaçıncı adımdayım', 'sayacı durdur', 'sayacı sürdür',
     'sayacı iptal et', 'beş dakika başlat',
   ],
 };
