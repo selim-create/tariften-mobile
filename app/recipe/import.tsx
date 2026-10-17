@@ -16,6 +16,7 @@ import {
   validateRecipeSource,
 } from '../../lib/recipe-import';
 import { previewRecipeText } from '../../lib/recipe-import-api';
+import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
 
 type Busy = 'preview' | 'publish' | null;
 type Stage = 'source' | 'review';
@@ -222,9 +223,7 @@ export default function RecipeTextImportScreen() {
     return <View key={'i' + index} style={styles.item}>
       <TouchableOpacity onPress={() => setOpenIngredient(open ? null : index)} accessibilityRole="button"
         accessibilityLabel={(ingredient.name || 'Yeni malzeme') + ' düzenle'} style={styles.itemHeader}>
-        <View style={styles.ingredientMark}>
-          <Ionicons name="leaf-outline" size={15} color="#af7055" />
-        </View>
+        <LokmaIngredientIcon name={ingredient.name} size={22} />
         <View style={styles.itemContent}>
           <Text style={styles.itemTitle}>{ingredient.name || 'Yeni malzeme'}</Text>
           <Text style={[styles.itemNote, !ingredient.source_verified && styles.amber]}>
@@ -498,7 +497,6 @@ const styles = StyleSheet.create({
   servingsInvalid: { borderColor: '#dc7753', borderWidth: 2 },
   invalidInput: { borderColor: '#dc7753' },
   inlineError: { fontSize: 12, color: '#bd4d32', fontWeight: '700', lineHeight: 19 },
-  ingredientMark: { width: 26, height: 26, borderRadius: 10, backgroundColor: '#fdf3ea', alignItems: 'center', justifyContent: 'center' },
   noticeToggle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   bottomBar: { backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 10, borderTopWidth: 1, borderColor: '#f0e6dd', gap: 8 },
   footerConsentRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
