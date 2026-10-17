@@ -134,7 +134,7 @@ test('sticky review CTA points at missing servings and avoids silent publish fai
   assert.match(page, /if \(!checkBeforePublish\(\)\) return;/);
   assert.match(page, /Alert\.alert\('Tarifini herkese açık yayımla'/);
   assert.match(page, /createRecipe\(token, buildApprovedRecipe\(editor\), signal\)/);
-  assert.match(page, /disabled=\{!!busy \|\| quotas\.loading \|\| \(stage === 'review' && !accepted\)\}/);
+  assert.match(page, /disabled=\{!!busy \|\| \(!publishUnknown && quotas\.loading\) \|\| \(stage === 'review' && !accepted && !publishUnknown\)\}/);
 });
 
 test('mobile editor uses quiet semantic ingredient marks rather than meaningless empty rings', () => {
