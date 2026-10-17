@@ -16,5 +16,7 @@ export function extractCookingTranscript(event: unknown): string | null {
   else if (typeof item === 'object' && item !== null) transcript = (item as { transcript?: unknown }).transcript;
   if (typeof transcript !== 'string') return null;
   const normalized = transcript.replace(/\s+/g, ' ').trim();
-  return normalized ? normalized.slice(0, 180) : null;
+  // Continuous iOS recognition may accumulate many short commands in one
+  // native session. A 180-char prefix cap silently discards all later words.
+  return normalized ? normalized.slice(0, 8192) : null;
 }

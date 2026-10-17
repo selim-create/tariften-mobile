@@ -69,9 +69,9 @@ test('iOS recognition is continuous with interim actions and no forced stop on c
   assert.match(assistant, /api\.start\(COOKING_RECOGNITION_OPTIONS\)/);
   assert.match(assistant, /api\.addListener\('result'/);
   assert.match(assistant, /extractCookingTranscript\(event\)/);
-  assert.match(assistant, /setHeardPhrase\(transcript\)/);
-  assert.match(assistant, /setMicFeedback\('Komut uygulandı: '/);
-  assert.match(assistant, /actionKey === lastCommandKeyRef\.current/);
+  assert.match(assistant, /setHeardPhrase\(pending\)/);
+  assert.match(assistant, /setMicFeedback\('Komut uygulandı: ' \+ label\)/);
+  assert.match(assistant, /lastCommandKeyRef\.current === actionKey/);
   assert.doesNotMatch(assistant, /segmentConsumedRef/);
   assert.match(assistant, /if \(code === 'no-speech'\)/);
   assert.match(assistant, /voiceRestartRef\.current = setTimeout\(startListening/);
@@ -87,4 +87,100 @@ test('common short natural Turkish commands are not rejected', () => {
   assert.deepEqual(parse('geri git'), { type: 'previous' });
   assert.deepEqual(parse('tekrar'), { type: 'read' });
   assert.equal(parse('sıradaki malzemeyi ekle'), null);
+});
+
+const streamInput = fs.readFileSync(path.join(__dirname, '..', 'lib/cooking-command-stream.ts'), 'utf8');
+const compiledStream = ts.transpileModule(streamInput, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+}).outputText;
+const streamMod = { exports: {} };
+Function('module', 'exports', 'require', compiledStream)(
+  streamMod, streamMod.exports, (name) => {
+    if (name === './cooking-commands') return { parseCookingCommand: parse };
+    throw new Error('Unexpected import ' + name);
+  }
+);
+const Stream = streamMod.exports.CookingCommandStream;
+
+test('iOS cumulative results produce distinct repeated and different commands', () => {
+  const stream = new Stream();
+  assert.deepEqual(stream.accept('sonraki', 100).commands, [{ type: 'next' }]);
+  assert.deepEqual(stream.accept('sonraki', 150).commands, []);
+  assert.deepEqual(stream.accept('sonraki sonraki', 600).commands, [{ type: 'next' }]);
+  assert.deepEqual(stream.accept('sonraki sonraki önceki', 900).commands, [{ type: 'previous' }]);
+  assert.deepEqual(stream.accept('sonraki sonraki önceki oku', 1250).commands, [{ type: 'read' }]);
+});
+
+test('each command clears pending phrase immediately without restarting native recognition', () => {
+  const stream = new Stream();
+  assert.deepEqual(stream.accept('sayacı', 100).commands, []);
+  assert.equal(stream.accept('sayacı', 150).pending, 'sayacı');
+  const result = stream.accept('sayacı durdur', 300);
+  assert.deepEqual(result.commands, [{ type: 'pause_timer' }]);
+  assert.equal(result.pending, '');
+  assert.deepEqual(stream.accept('sayacı durdur sayacı sürdür', 500).commands, [{ type: 'resume_timer' }]);
+});
+
+test('non-command noises discard pending words and cannot block later commands', () => {
+  const stream = new Stream();
+  assert.deepEqual(stream.accept('çatal', 100).commands, []);
+  assert.equal(stream.accept('çatal', 120).pending, '');
+  const r = stream.accept('çatal sonraki', 450);
+  assert.deepEqual(r.commands, [{ type: 'next' }]);
+  assert.equal(r.pending, '');
+});
+
+test('silence clears unfinished phrases but retains consumed native transcript baseline', () => {
+  const stream = new Stream();
+  assert.equal(stream.accept('sayacı', 100).pending, 'sayacı');
+  stream.clearPending(); // called by the UI after 1100ms of inactivity
+  assert.equal(stream.accept('sayacı durdur', 1800).pending, '');
+  assert.deepEqual(stream.accept('sayacı durdur', 1810).commands, []);
+  assert.deepEqual(stream.accept('sayacı durdur sonraki', 2200).commands, [{ type: 'next' }]);
+});
+
+test('revised interim words preserve number/duration prefix until command complete', () => {
+  const stream = new Stream();
+  assert.equal(stream.accept('5 dakika ba', 100).pending, '5 dakika ba');
+  assert.deepEqual(stream.accept('5 dakika başlat', 180).commands, [{ type: 'start_timer', minutes: 5 }]);
+  assert.deepEqual(stream.accept('5 dakika başlat', 250).commands, []);
+});
+
+test('batched native interim phrases are bounded and processed in sequence', () => {
+  const stream = new Stream();
+  assert.deepEqual(stream.accept('sonraki önceki oku', 100).commands, [
+    { type: 'next' }, { type: 'previous' }, { type: 'read' }
+  ]);
+  assert.deepEqual(stream.accept('sonraki önceki oku', 150).commands, []);
+});
+
+test('diagnostic UI shows a temporary phrase, clears it on silence and explains guest voice fallback', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'components/CookingAssistant.tsx'), 'utf8');
+  assert.match(source, /voiceStreamRef\.current\.accept\(transcript\)/);
+  assert.match(source, /voiceStreamRef\.current\.clearPending\(\)/);
+  assert.match(source, /setHeardPhrase\(''\)/);
+  assert.match(source, /}, 1100\)/);
+  assert.match(source, /Misafir modunda cihaz sesi kullanılır/);
+});
+
+test('no stale command is replayed when silence is followed by an identical native snapshot', () => {
+  const stream = new Stream();
+  assert.deepEqual(stream.accept('sonraki', 100).commands, [{ type: 'next' }]);
+  stream.clearPending();
+  assert.deepEqual(stream.accept('sonraki', 2400).commands, []);
+  assert.deepEqual(stream.accept('sonraki sonraki', 2800).commands, [{ type: 'next' }]);
+});
+
+test('long native cumulative transcripts do not stop at the old 180-character cap', () => {
+  const input = fs.readFileSync(path.join(__dirname, '..', 'lib/native-cooking-transcript.ts'), 'utf8');
+  const compiled = ts.transpileModule(input, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+  }).outputText;
+  const mod = { exports: {} };
+  Function('module', 'exports', compiled)(mod, mod.exports);
+  const raw = 'malzemeleri karıştır '.repeat(20) + 'sonraki';
+  assert.ok(raw.length > 180);
+  const extracted = mod.exports.extractCookingTranscript({ results: [{ transcript: raw }] });
+  assert.ok(extracted.endsWith('sonraki'));
+  assert.ok(extracted.length > 180);
 });
