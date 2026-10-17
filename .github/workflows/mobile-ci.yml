@@ -25,6 +25,8 @@ jobs:
           CI: '1'
       - name: Guard local cooking assistant speech and timer boundaries
         run: node --test scripts/check-cooking-assistant.test.cjs scripts/check-tts-voices.test.cjs scripts/check-chirp3-voice.test.cjs scripts/check-cooking-commands.test.cjs scripts/check-dev-build-variant.test.cjs
+      - name: Verify semantic Lokma food emoji, ratings and comment reactions
+        run: node --test scripts/check-lokma-emoji.test.cjs
       - name: Guard Expo Router URI parsing compatibility
         run: node --test scripts/check-router-uri-surface.test.cjs
       - name: Verify xcode UUID compatibility and patched buffer validation
