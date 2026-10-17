@@ -12,7 +12,7 @@ export type QuotaState = {
   reset_at: string;
   available: boolean;
 };
-export type AccountQuotas = { success: true; tier: string; quotas: Record<QuotaKind, QuotaState> };
+export type AccountQuotas = { success: true; tier: 'administrator' | 'internal' | 'standard' | 'free'; quotas: Record<QuotaKind, QuotaState> };
 const BASE = "https://api.tariften.com/wp-json/tariften/v1";
 
 export async function fetchAccountQuotas(token: string): Promise<AccountQuotas> {
