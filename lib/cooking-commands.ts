@@ -141,7 +141,7 @@ const timerFirstPattern = new RegExp(
 /** All patterns are short, exact and locale-aware; no fuzzy semantic matching. */
 export function parseCookingCommand(transcript: string): CookingCommand | null {
   const cmd = transcript.toLocaleLowerCase('tr-TR').normalize('NFC').trim()
-    .replace(/[.,!?;:]/g, ' ').replace(/\s+/g, ' ');
+    .replace(/[.,!?;:]/g, ' ').replace(/\s+/g, ' ').trim();
   if (!cmd || cmd.length > 96 || cmd.split(' ').length > 9) return null;
   for (const group of COOKING_COMMAND_GROUPS) {
     if (group.variants.includes(cmd)) return { type: group.type };
