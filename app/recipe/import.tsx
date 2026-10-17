@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { createRecipe } from '../../lib/api';
+import { isPublishResultUncertain, RequestDeadlineError, withDeadline } from '../../lib/recipe-publish';
 import { fetchAccountQuotas, reached, resetDate, useQuotas } from '../../lib/quotas';
 import {
   EditableIngredient, EditableStep, GroundedImportPreview, ImportEditor,
@@ -59,6 +60,8 @@ export default function RecipeTextImportScreen() {
   const [editor, setEditor] = useState<ImportEditor | null>(null);
   const [accepted, setAccepted] = useState(true);
   const [busy, setBusy] = useState<Busy>(null);
+  const [publishUnknown, setPublishUnknown] = useState(false);
+  const [publishSlow, setPublishSlow] = useState(false);
   const [error, setError] = useState('');
   const [openIngredient, setOpenIngredient] = useState<number | null>(null);
   const [openStep, setOpenStep] = useState<number | null>(null);
@@ -66,6 +69,11 @@ export default function RecipeTextImportScreen() {
   const requestLock = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => () => { abortRef.current?.abort(); }, []);
+  useEffect(() => {
+    if (busy !== 'publish') { setPublishSlow(false); return; }
+    const timer = setTimeout(() => setPublishSlow(true), 8000);
+    return () => clearTimeout(timer);
+  }, [busy]);
 
   const updateSource = (text: string) => {
     setSource(text);
@@ -154,19 +162,27 @@ export default function RecipeTextImportScreen() {
   };
 
   const publishApproved = async () => {
-    if (!token || !editor || !preview || !accepted || requestLock.current) return;
+    if (!token || !editor || !preview || !accepted || requestLock.current || publishUnknown) return;
     if (!checkBeforePublish()) return;
     requestLock.current = true;
     setBusy('publish');
     setError('');
+    let postStarted = false;
     try {
-      const rights = await fetchAccountQuotas(token);
+      // Quotas must be checked before sending the PUBLIC write. A quota
+      // timeout cannot cause a duplicate recipe because no POST was sent.
+      const rights = await withDeadline(signal => fetchAccountQuotas(token, signal), 15000);
       if (reached(rights, 'recipe_day')) {
         setError('Bugünkü tarif paylaşma hakkın doldu. Yenilenme: ' + resetDate(rights, 'recipe_day'));
         return;
       }
-      // This is the only action writing a PUBLIC recipe; never invoked by preview.
-      const result = await createRecipe(token, buildApprovedRecipe(editor));
+      // Save once. A timeout or network failure after POST is an UNKNOWN
+      // outcome: the server might have published despite a missing response.
+      postStarted = true;
+      const result = await withDeadline(
+        signal => createRecipe(token, buildApprovedRecipe(editor), signal),
+        45000,
+      );
       const slug: unknown = result?.slug || result?.data?.slug;
       if (typeof slug === 'string' && slug.trim()) {
         router.replace('/recipe/' + encodeURIComponent(slug));
@@ -176,7 +192,14 @@ export default function RecipeTextImportScreen() {
         ]);
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Tarif yayımlanamadı.');
+      if (postStarted && isPublishResultUncertain(cause)) {
+        setPublishUnknown(true);
+        setError('Yayımlama sonucunu doğrulayamadık. Tarifin kaydedilmiş olabilir. Tekrar yayımlamadan önce Tariflerim bölümünü kontrol et.');
+      } else if (cause instanceof RequestDeadlineError) {
+        setError('Kullanım haklarını kontrol edemedik. Henüz tarif gönderilmedi; bağlantını kontrol edip tekrar deneyebilirsin.');
+      } else {
+        setError(cause instanceof Error ? cause.message : 'Tarif yayımlanamadı. Lütfen tekrar dene.');
+      }
     } finally {
       requestLock.current = false;
       void quotas.refresh();
@@ -185,7 +208,7 @@ export default function RecipeTextImportScreen() {
   };
 
   const confirmPublish = () => {
-    if (!editor || !accepted || busy) return;
+    if (!editor || !accepted || busy || publishUnknown) return;
     if (!checkBeforePublish()) return;
     Alert.alert('Tarifini herkese açık yayımla', 'Malzemeleri ve adımları kontrol ettiğinden emin misin? Yayımladığında tarifin herkes tarafından görülebilir.', [
       { text: 'Bir kez daha bakacağım', style: 'cancel' },
@@ -403,6 +426,10 @@ export default function RecipeTextImportScreen() {
 
     <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
       {error ? <Text accessibilityRole="alert" style={styles.footerError}>{error}</Text> : null}
+      {busy === 'publish' && publishSlow ? <View style={styles.footerProgress}>
+        <Ionicons name="cloud-upload-outline" size={15} color="#946a47" />
+        <Text style={styles.footerProgressText}>Sunucu yanıtını bekliyoruz. Tarifini yeniden göndermiyoruz.</Text>
+      </View> : null}
       {stage === 'review' && editor && preview ? <>
         {!editor.servings.trim() && <TouchableOpacity style={styles.footerRequired}
           accessibilityRole="button" onPress={() => {
@@ -420,9 +447,13 @@ export default function RecipeTextImportScreen() {
           <Text style={styles.footerConsentText}>Tarifimi kontrol ettim. Herkese açık yayımlamayı onaylıyorum.</Text>
         </View>
       </> : null}
-      <TouchableOpacity style={[styles.mainButton, (busy || quotas.loading) && styles.buttonDisabled]}
-        disabled={!!busy || quotas.loading || (stage === 'review' && !accepted)}
+      <TouchableOpacity style={[styles.mainButton, (busy || (!publishUnknown && quotas.loading)) && styles.buttonDisabled]}
+        disabled={!!busy || (!publishUnknown && quotas.loading) || (stage === 'review' && !accepted && !publishUnknown)}
         onPress={() => {
+          if (publishUnknown) {
+            router.push('/(tabs)/profile');
+            return;
+          }
           if (stage === 'review') { confirmPublish(); return; }
           if (preview && editor) {
             setStage('review'); // Return to saved preview at no extra AI cost.
@@ -432,11 +463,12 @@ export default function RecipeTextImportScreen() {
             void requestPreview();
           }
         }}
-        accessibilityRole="button" accessibilityLabel={stage === 'source' ? 'Tarifimi güzelleştir' : 'Onayla ve yayımla'}>
+        accessibilityRole="button" accessibilityLabel={publishUnknown ? 'Tariflerim bölümünde kontrol et' : stage === 'source' ? 'Tarifimi güzelleştir' : 'Onayla ve yayımla'}>
         {busy ? <ActivityIndicator color="#fff" />
-          : <Ionicons name={stage === 'source' ? 'sparkles' : 'checkmark-circle-outline'} size={19} color="#fff" />}
+          : <Ionicons name={publishUnknown ? 'search-outline' : stage === 'source' ? 'sparkles' : 'checkmark-circle-outline'} size={19} color="#fff" />}
         <Text style={styles.mainButtonText}>{busy === 'preview' ? 'Tarifini düzenliyoruz…'
           : busy === 'publish' ? 'Tarifin yayımlanıyor…'
+            : publishUnknown ? 'Tariflerimde kontrol et'
             : stage === 'source'
               ? (preview && editor ? 'Düzenlenmiş tarifime dön' : 'Tarifimi güzelleştir')
               : 'Onayla ve yayımla'}</Text>
@@ -447,6 +479,8 @@ export default function RecipeTextImportScreen() {
 }
 
 const styles = StyleSheet.create({
+  footerProgress: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 6 },
+  footerProgressText: { flex: 1, fontSize: 11, lineHeight: 17, color: '#8d7057' },
   reviewHero: { borderRadius: 25, borderWidth: 1, borderColor: '#eaded5', backgroundColor: '#fff', padding: 20, gap: 9 },
   reviewStep: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   reviewStepText: { fontSize: 10, color: '#25845e', fontWeight: '800', letterSpacing: 1 },
