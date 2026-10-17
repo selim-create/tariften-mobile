@@ -192,6 +192,8 @@ export default function RecipeDetailScreen() {
   const carbs = recipe.nutrition?.carbs ?? Math.round((calories * 0.45) / 4);
   const fat = recipe.nutrition?.fat ?? Math.round((calories * 0.30) / 9);
   const nutritionTotal = protein + carbs + fat;
+  const ingredientsReady = recipe.ingredients?.filter((_, index) => checkedIngredients.has(index)).length || 0;
+  const stepsReady = recipe.steps?.filter((_, index) => completedSteps.has(index)).length || 0;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -336,7 +338,11 @@ export default function RecipeDetailScreen() {
         {recipe.ingredients?.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Malzemeler</Text>
+              <View style={styles.sectionHeadingBlock}>
+                <Text style={styles.sectionEyebrow}>HAZIRLIK LİSTEN</Text>
+                <Text style={styles.sectionTitle}>Malzemeler</Text>
+                <Text style={styles.sectionCaption}>{ingredientsReady} / {recipe.ingredients.length} malzeme hazır</Text>
+              </View>
               <View style={styles.servingsControl}>
                 <TouchableOpacity
                   style={styles.servingsBtn}
@@ -360,25 +366,23 @@ export default function RecipeDetailScreen() {
             {recipe.ingredients.map((ing, idx) => (
               <TouchableOpacity
                 key={idx}
-                style={styles.ingredientRow}
+                style={[styles.ingredientRow, checkedIngredients.has(idx) && styles.ingredientRowChecked]}
                 onPress={() => toggleIngredient(idx)}
-                activeOpacity={0.7}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: checkedIngredients.has(idx) }}
+                accessibilityLabel={`${ing.name}, ${displayAmount(ing.amount)} ${ing.unit || ''}`}
+                activeOpacity={0.75}
               >
-                {checkedIngredients.has(idx) ? (
-                  <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
-                ) : (
-                  <Text style={styles.ingredientBullet}>•</Text>
-                )}
+                <View style={[styles.ingredientCheck, checkedIngredients.has(idx) && styles.ingredientCheckActive]}>
+                  {checkedIngredients.has(idx) ? <Ionicons name="checkmark" size={13} color="#ffffff" /> : null}
+                </View>
                 <LokmaIngredientIcon name={ing.name} size={27} />
-                <Text
-                  style={[
-                    styles.ingredientText,
-                    checkedIngredients.has(idx) && styles.ingredientTextChecked,
-                  ]}
-                >
-                  {displayAmount(ing.amount)} {ing.unit} {ing.name}
-                  {ing.note ? ` (${ing.note})` : ''}
-                </Text>
+                <View style={styles.ingredientCopy}>
+                  <Text style={[styles.ingredientText, checkedIngredients.has(idx) && styles.ingredientTextChecked]}>
+                    {[displayAmount(ing.amount), ing.unit, ing.name].filter(v => String(v || '').trim()).join(' ')}
+                  </Text>
+                  {ing.note ? <Text style={styles.ingredientNote}>{ing.note}</Text> : null}
+                </View>
               </TouchableOpacity>
             ))}
           </View>
@@ -388,7 +392,11 @@ export default function RecipeDetailScreen() {
         {recipe.steps?.length > 0 && (
           <View style={styles.section}>
             <View style={styles.stepsSectionHeader}>
-              <Text style={styles.sectionTitle}>Yapılışı</Text>
+              <View style={styles.sectionHeadingBlock}>
+                <Text style={styles.sectionEyebrow}>ADIM ADIM</Text>
+                <Text style={styles.sectionTitle}>Yapılışı</Text>
+                <Text style={styles.sectionCaption}>{stepsReady} / {recipe.steps.length} adım tamamlandı</Text>
+              </View>
               <TouchableOpacity
                 style={styles.startCookingButton}
                 onPress={requestCookingAssistant}
@@ -400,9 +408,12 @@ export default function RecipeDetailScreen() {
             {recipe.steps.map((step, idx) => (
               <TouchableOpacity
                 key={idx}
-                style={styles.stepRow}
+                style={[styles.stepRow, completedSteps.has(idx) && styles.stepRowDone]}
                 onPress={() => toggleStep(idx)}
-                activeOpacity={0.7}
+                activeOpacity={0.75}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: completedSteps.has(idx) }}
+                accessibilityLabel={`Adım ${idx + 1}: ${step}`}
               >
                 {completedSteps.has(idx) ? (
                   <View style={styles.stepNumberDone}>
@@ -547,14 +558,16 @@ export default function RecipeDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fffbf7',
   },
   image: {
     width: '100%',
     height: 280,
   },
   content: {
-    padding: 16,
+    paddingHorizontal: 17,
+    paddingTop: 22,
+    paddingBottom: 20,
   },
   titleRow: {
     flexDirection: 'row',
@@ -563,12 +576,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#1a1a1a',
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#18243a',
     flex: 1,
     marginRight: 12,
-    lineHeight: 30,
+    lineHeight: 34,
+    letterSpacing: -0.6,
   },
   actions: {
     flexDirection: 'row',
@@ -578,10 +592,13 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   excerpt: {
-    fontSize: 15,
-    color: '#666666',
-    lineHeight: 22,
-    marginBottom: 16,
+    fontSize: 14,
+    color: '#81756e',
+    lineHeight: 23,
+    marginBottom: 19,
+    paddingLeft: 12,
+    borderLeftWidth: 2,
+    borderLeftColor: '#e5afa0',
   },
   tagsRow: {
     flexDirection: 'row',
@@ -658,32 +675,41 @@ const styles = StyleSheet.create({
   metaItem: {
     flex: 1,
     minWidth: '22%',
-    backgroundColor: '#f9f9f9',
-    borderRadius: 10,
-    padding: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 9,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: '#efe4dd',
   },
   metaLabel: {
     fontSize: 11,
-    color: '#999999',
-    marginBottom: 2,
-    marginTop: 4,
+    color: '#8b807b',
+    marginBottom: 4,
+    marginTop: 5,
   },
   metaValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1a1a1a',
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#202b3d',
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 18,
+    backgroundColor: '#ffffff',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#efe3da',
+    padding: 15,
   },
+  sectionHeadingBlock: { flex: 1, minWidth: 0, gap: 3, paddingRight: 5 },
+  sectionEyebrow: { color: '#d35c4b', fontSize: 9, fontWeight: '900', letterSpacing: 1.3 },
+  sectionCaption: { color: '#96877b', fontSize: 11, fontWeight: '600' },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 12,
+    fontWeight: '900',
+    color: '#1d2940',
+    marginBottom: 4,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -699,23 +725,29 @@ const styles = StyleSheet.create({
   servingsControl: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    gap: 4,
+    backgroundColor: '#fff8f2',
+    borderRadius: 13,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: '#f1e0d3',
+    maxWidth: '55%',
   },
   servingsBtn: {
-    padding: 4,
+    minWidth: 30,
+    minHeight: 32,
+    borderRadius: 9,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   servingsText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    minWidth: 70,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#5c4c43',
     textAlign: 'center',
+    flexShrink: 1,
   },
   stepsSectionHeader: {
     flexDirection: 'row',
@@ -738,52 +770,46 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   ingredientRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-    gap: 8,
+    flexDirection: 'row', alignItems: 'center', marginBottom: 7, gap: 10,
+    paddingHorizontal: 10, paddingVertical: 11, minHeight: 62,
+    borderRadius: 15, borderWidth: 1, borderColor: '#f1e9e3', backgroundColor: '#fffcfa',
   },
-  ingredientBullet: {
-    fontSize: 16,
-    color: '#e74c3c',
-    marginTop: 1,
-    width: 20,
-    textAlign: 'center',
+  ingredientRowChecked: { backgroundColor: '#f3f8f4', borderColor: '#e0ebe2' },
+  ingredientCheck: {
+    width: 21, height: 21, borderRadius: 11, borderWidth: 1.5,
+    borderColor: '#d9c5b8', alignItems: 'center', justifyContent: 'center',
   },
+  ingredientCheckActive: { backgroundColor: '#5f9d78', borderColor: '#5f9d78' },
+  ingredientCopy: { flex: 1, minWidth: 0 },
+  ingredientNote: { fontSize: 11, color: '#9b8777', lineHeight: 17, marginTop: 3 },
   lokmaRatingRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 },
   lokmaRatingOption: { paddingHorizontal: 8, paddingVertical: 8, borderRadius: 12, backgroundColor: '#fff5ec', borderWidth: 1, borderColor: '#f2e6da', alignItems: 'center', gap: 3, flexGrow: 1 },
   lokmaRatingOptionSelected: { borderColor: '#db4c3f', backgroundColor: '#ffe9e0' },
   lokmaRatingEmoji: { fontSize: 23 },
   lokmaRatingLabel: { fontSize: 9, fontWeight: '700', color: '#66574c' },
   ingredientText: {
-    fontSize: 15,
-    color: '#1a1a1a',
-    flex: 1,
-    lineHeight: 22,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#344052',
+    lineHeight: 19,
   },
   ingredientTextChecked: {
     textDecorationLine: 'line-through',
     opacity: 0.5,
   },
   stepRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-    gap: 12,
+    flexDirection: 'row', alignItems: 'flex-start', marginBottom: 9,
+    padding: 13, gap: 12, borderRadius: 15, backgroundColor: '#fffcfa',
+    borderWidth: 1, borderColor: '#f1e9e3',
   },
+  stepRowDone: { backgroundColor: '#f3f8f4', borderColor: '#e0ebe2' },
   stepNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#e74c3c',
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
+    width: 29, height: 29, borderRadius: 10, backgroundColor: '#fff0ea',
+    justifyContent: 'center', alignItems: 'center', flexShrink: 0,
   },
   stepNumberText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 13,
+    color: '#d4594b',
+    fontWeight: '900', fontSize: 12,
   },
   stepNumberDone: {
     width: 28,
@@ -796,9 +822,9 @@ const styles = StyleSheet.create({
   },
   stepText: {
     flex: 1,
-    fontSize: 15,
-    color: '#1a1a1a',
-    lineHeight: 23,
+    fontSize: 13,
+    color: '#354157',
+    lineHeight: 21,
   },
   stepTextDone: {
     textDecorationLine: 'line-through',

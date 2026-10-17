@@ -220,8 +220,9 @@ export default function RecipeTextImportScreen() {
   const renderIngredient = (ingredient: EditableIngredient, index: number) => {
     if (!editor) return null;
     const open = index === openIngredient;
-    return <View key={'i' + index} style={styles.item}>
+    return <View key={'i' + index} style={[styles.item, open && styles.itemOpen]}>
       <TouchableOpacity onPress={() => setOpenIngredient(open ? null : index)} accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
         accessibilityLabel={(ingredient.name || 'Yeni malzeme') + ' düzenle'} style={styles.itemHeader}>
         <LokmaIngredientIcon name={ingredient.name} size={22} />
         <View style={styles.itemContent}>
@@ -230,7 +231,11 @@ export default function RecipeTextImportScreen() {
             {!ingredient.source_verified ? 'Sen ekledin · kontrol et' : ingredient.name_corrected ? 'Yazım önerisi · kontrol et' : 'Kaynakla karşılaştırıldı'}
           </Text>
         </View>
-        <Text style={styles.itemAmount}>{[ingredient.amount, ingredient.unit].filter(Boolean).join(' ') || 'Miktar belirtilmemiş'}</Text>
+        <View style={[styles.amountPill, !ingredient.amount.trim() && styles.amountPillMissing]}>
+          <Text style={[styles.itemAmount, !ingredient.amount.trim() && styles.itemAmountMissing]}>
+            {[ingredient.amount, ingredient.unit].filter(Boolean).join(' ') || 'Miktar belirtilmemiş'}
+          </Text>
+        </View>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={17} color="#a39589" />
       </TouchableOpacity>
       {open && <View style={styles.itemEdit}>
@@ -259,8 +264,10 @@ export default function RecipeTextImportScreen() {
   const renderStep = (step: EditableStep, index: number) => {
     if (!editor) return null;
     const open = openStep === index;
-    return <View key={'s' + index} style={styles.item}>
-      <TouchableOpacity style={styles.itemHeader} onPress={() => setOpenStep(open ? null : index)} accessibilityRole="button">
+    return <View key={'s' + index} style={[styles.item, open && styles.itemOpen]}>
+      <TouchableOpacity style={styles.itemHeader} onPress={() => setOpenStep(open ? null : index)}
+        accessibilityRole="button" accessibilityState={{ expanded: open }}
+        accessibilityLabel={`Yapılış adımı ${index + 1} düzenle`}>
         <View style={styles.stepNumber}><Text style={styles.stepNumberText}>{index + 1}</Text></View>
         <View style={styles.itemContent}>
           <Text style={styles.stepContent} numberOfLines={open ? undefined : 3}>{step.content || 'Yeni hazırlanış adımı'}</Text>
@@ -321,6 +328,14 @@ export default function RecipeTextImportScreen() {
           <View style={styles.reviewStep}><Ionicons name="checkmark" size={15} color="#25845e" />
             <Text style={styles.reviewStepText}>NOTLARIN DÜZENLENDİ</Text></View>
           <Text style={styles.heading}>Şimdi birlikte gözden geçirelim.</Text>
+          <View style={styles.reviewOverview}>
+            <View style={styles.reviewOverviewItem}><Ionicons name="basket-outline" size={16} color="#b36d59" />
+              <Text style={styles.reviewOverviewText}>{editor.ingredients.length} malzeme</Text>
+            </View>
+            <View style={styles.reviewOverviewItem}><Ionicons name="list-outline" size={16} color="#b36d59" />
+              <Text style={styles.reviewOverviewText}>{editor.steps.length} adım</Text>
+            </View>
+          </View>
           <Text style={styles.subtitle}>Başlık, malzemeler ve yapılış hazır. Dilediğini değiştirebilirsin.</Text>
           <TouchableOpacity accessibilityRole="button" style={styles.backToNotes} onPress={() => {
             setStage('source'); setError(''); setFieldError(null);
@@ -375,7 +390,10 @@ export default function RecipeTextImportScreen() {
           </View>}
 
           <View style={styles.sectionRow} onLayout={event => { ingredientsY.current = event.nativeEvent.layout.y; }}>
-            <Text style={styles.sectionTitle}>Malzemeler · {editor.ingredients.length}</Text>
+            <View style={styles.sectionHeading}>
+              <Text style={styles.sectionEyebrow}>MUTFAK LİSTESİ</Text>
+              <Text style={styles.sectionTitle}>Malzemeler <Text style={styles.sectionCount}>{editor.ingredients.length}</Text></Text>
+            </View>
             <TouchableOpacity onPress={() => {
               if (editor.ingredients.length >= 40) return;
               updateEditor(old => ({ ...old, ingredients: [...old.ingredients, {
@@ -387,7 +405,10 @@ export default function RecipeTextImportScreen() {
           {editor.ingredients.map(renderIngredient)}
 
           <View style={styles.sectionRow} onLayout={event => { stepsY.current = event.nativeEvent.layout.y; }}>
-            <Text style={styles.sectionTitle}>Yapılışı · {editor.steps.length}</Text>
+            <View style={styles.sectionHeading}>
+              <Text style={styles.sectionEyebrow}>HAZIRLANIŞ</Text>
+              <Text style={styles.sectionTitle}>Adım adım <Text style={styles.sectionCount}>{editor.steps.length}</Text></Text>
+            </View>
             <TouchableOpacity onPress={() => {
               if (editor.steps.length >= 40) return;
               updateEditor(old => ({ ...old, steps: [...old.steps, {
@@ -480,7 +501,10 @@ export default function RecipeTextImportScreen() {
 const styles = StyleSheet.create({
   footerProgress: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 6 },
   footerProgressText: { flex: 1, fontSize: 11, lineHeight: 17, color: '#8d7057' },
-  reviewHero: { borderRadius: 25, borderWidth: 1, borderColor: '#eaded5', backgroundColor: '#fff', padding: 20, gap: 9 },
+  reviewHero: { borderRadius: 24, borderWidth: 1, borderColor: '#eaded5', backgroundColor: '#fff', padding: 18, gap: 8 },
+  reviewOverview: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 4 },
+  reviewOverviewItem: { flexDirection: 'row', gap: 6, alignItems: 'center', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: '#fff6f1' },
+  reviewOverviewText: { color: '#9a6252', fontSize: 11, fontWeight: '800' },
   reviewStep: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   reviewStepText: { fontSize: 10, color: '#25845e', fontWeight: '800', letterSpacing: 1 },
   backToNotes: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 6, paddingVertical: 9 },
@@ -506,7 +530,7 @@ const styles = StyleSheet.create({
   footerError: { color: '#b54237', fontSize: 12, lineHeight: 17, fontWeight: '700' },
 
   root: { flex: 1, backgroundColor: BG },
-  scroll: { paddingHorizontal: 16, paddingVertical: 16, gap: 13, paddingBottom: 34 },
+  scroll: { paddingHorizontal: 14, paddingVertical: 14, gap: 12, paddingBottom: 32 },
   hero: { borderRadius: 26, borderWidth: 1, borderColor: '#eee0d4', backgroundColor: '#fff', padding: 20 },
   kicker: { color: BRAND, fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
   heading: { color: '#152039', fontWeight: '900', fontSize: 23, lineHeight: 30, marginTop: 8, marginBottom: 4 },
@@ -515,8 +539,8 @@ const styles = StyleSheet.create({
   stageActive: { color: '#bf5140', backgroundColor: '#fff0e9', paddingVertical: 7, paddingHorizontal: 11, borderRadius: 30, fontSize: 11, fontWeight: '800', overflow: 'hidden' },
   stageInactive: { color: '#b09c90', fontSize: 11, fontWeight: '700' },
   stageArrow: { color: '#cbb8ad' },
-  card: { borderRadius: 25, borderWidth: 1, borderColor: '#eee1d6', backgroundColor: '#fff', padding: 16, gap: 10 },
-  cardHeading: { color: '#152039', fontSize: 20, fontWeight: '900' },
+  card: { borderRadius: 23, borderWidth: 1, borderColor: '#eee1d6', backgroundColor: '#fff', padding: 14, gap: 10 },
+  cardHeading: { color: '#152039', fontSize: 19, fontWeight: '900', letterSpacing: -0.3 },
   fieldLabel: { color: '#657389', fontSize: 10, fontWeight: '800', letterSpacing: 1, marginTop: 6 },
   input: { borderColor: '#e9dcd2', borderWidth: 1, borderRadius: 13, minHeight: 48, paddingHorizontal: 14, color: '#273245', backgroundColor: '#fffcfa', fontSize: 14 },
   multiInput: { minHeight: 82, paddingVertical: 12, lineHeight: 21 },
@@ -535,21 +559,28 @@ const styles = StyleSheet.create({
   noticeTitle: { color: '#95602c', fontSize: 12, fontWeight: '800' },
   noticeText: { color: '#9b6536', fontSize: 11, lineHeight: 18 },
   servingsBox: { borderRadius: 16, borderWidth: 1, borderColor: '#f3dcc2', backgroundColor: '#fffbf4', padding: 13, gap: 6, marginVertical: 10 },
-  sectionRow: { marginTop: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle: { color: '#16223a', fontSize: 15, fontWeight: '900' },
-  add: { color: BRAND, fontWeight: '700', fontSize: 12 },
-  item: { borderColor: '#eee0d7', borderRadius: 14, borderWidth: 1, backgroundColor: '#fff', marginVertical: 2, overflow: 'hidden' },
-  itemHeader: { padding: 11, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  sectionRow: { marginTop: 20, marginBottom: 3, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sectionHeading: { flex: 1, gap: 4 },
+  sectionEyebrow: { color: '#bb6655', fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+  sectionCount: { fontSize: 12, color: '#a88a7b', fontWeight: '700' },
+  sectionTitle: { color: '#16223a', fontSize: 17, fontWeight: '900', letterSpacing: -0.3 },
+  add: { color: BRAND, fontWeight: '800', fontSize: 12, paddingVertical: 8, paddingHorizontal: 10 },
+  item: { borderColor: '#eee3db', borderRadius: 15, borderWidth: 1, backgroundColor: '#fffcfa', marginVertical: 2, overflow: 'hidden' },
+  itemOpen: { borderColor: '#deb4a6', backgroundColor: '#fffdfb' },
+  itemHeader: { paddingHorizontal: 10, paddingVertical: 13, minHeight: 61, flexDirection: 'row', alignItems: 'center', gap: 8 },
   itemContent: { flex: 1, minWidth: 0 },
-  itemTitle: { color: '#283041', fontSize: 13, fontWeight: '800' },
-  itemAmount: { color: '#937c69', fontSize: 11, maxWidth: 78, textAlign: 'right' },
-  itemNote: { color: '#6baa7c', fontSize: 10, marginTop: 3 },
+  itemTitle: { color: '#283041', fontSize: 13, fontWeight: '900' },
+  amountPill: { maxWidth: 95, paddingVertical: 6, paddingHorizontal: 6, borderRadius: 9, backgroundColor: '#f5f1eb' },
+  amountPillMissing: { backgroundColor: '#fff1df' },
+  itemAmount: { color: '#79675b', fontSize: 10, textAlign: 'right', flexShrink: 1 },
+  itemAmountMissing: { color: '#b27b42', fontWeight: '700' },
+  itemNote: { color: '#5c9e74', fontSize: 10, marginTop: 4, lineHeight: 14 },
   amber: { color: '#bf7955' },
   dot: { width: 16, height: 16, borderRadius: 10, backgroundColor: '#ffe8d5', borderWidth: 2, borderColor: '#dfa978' },
-  stepNumber: { width: 24, height: 24, borderRadius: 9, backgroundColor: '#fff0ec', alignItems: 'center', justifyContent: 'center' },
+  stepNumber: { width: 27, height: 27, borderRadius: 10, backgroundColor: '#fff0ec', alignItems: 'center', justifyContent: 'center' },
   stepNumberText: { color: BRAND, fontWeight: '800', fontSize: 11 },
-  stepContent: { color: '#31415b', fontSize: 12, lineHeight: 19 },
-  itemEdit: { paddingHorizontal: 12, paddingBottom: 13, borderTopColor: '#f6ede6', borderTopWidth: 1, gap: 6 },
+  stepContent: { color: '#31415b', fontSize: 12, lineHeight: 20 },
+  itemEdit: { paddingHorizontal: 12, paddingBottom: 14, paddingTop: 8, borderTopColor: '#f1e6dd', borderTopWidth: 1, gap: 7 },
   inputRow: { flexDirection: 'row', gap: 10 },
   inputHalf: { flex: 1, gap: 6 },
   evidence: { color: '#8e7765', fontSize: 11, lineHeight: 18, backgroundColor: '#fff8f0', padding: 10, borderRadius: 10 },
