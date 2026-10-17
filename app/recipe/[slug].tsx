@@ -37,6 +37,9 @@ import ImagePlaceholder, { isPlaceholderImage } from '../../components/ImagePlac
 import AuthorCard from '../../components/AuthorCard';
 
 const RATING_ICONS = ['sad-outline', 'remove-circle-outline', 'happy-outline', 'heart-outline', 'sparkles-outline'] as const;
+// Short visual captions keep five choices aligned on narrow screens.
+// LOKMA_RATINGS labels remain the full accessible descriptions and API values.
+const RATING_DISPLAY_LABELS = ['Sevmedim', 'Pek değil', 'Fena değil', 'Lezzetli', 'Bayıldım'] as const;
 
 export default function RecipeDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -323,7 +326,10 @@ export default function RecipeDetailScreen() {
                   <Ionicons name={RATING_ICONS[rating - 1]} size={21}
                     color={userRating === rating ? '#ffffff' : '#b55f4d'} />
                 </View>
-                <Text style={styles.lokmaRatingLabel} numberOfLines={2}>{label}</Text>
+                <Text style={styles.lokmaRatingLabel} numberOfLines={1}
+                  adjustsFontSizeToFit minimumFontScale={0.85} ellipsizeMode="tail">
+                  {RATING_DISPLAY_LABELS[rating - 1]}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -825,9 +831,9 @@ const styles = StyleSheet.create({
   },
   lokmaRatingOption: {
     flex: 1, minWidth: 0, paddingHorizontal: 3, paddingVertical: 9,
-    minHeight: 86, borderRadius: 13, backgroundColor: '#fff7f1',
+    height: 80, borderRadius: 13, backgroundColor: '#fff7f1',
     borderWidth: 1, borderColor: '#f0e4db',
-    alignItems: 'center', justifyContent: 'flex-start', gap: 7,
+    alignItems: 'center', justifyContent: 'space-between', gap: 5,
   },
   lokmaRatingOptionSelected: { borderColor: '#db4c3f', backgroundColor: '#fff0e9' },
   lokmaRatingSymbol: {
@@ -836,9 +842,9 @@ const styles = StyleSheet.create({
   },
   lokmaRatingSymbolSelected: { backgroundColor: '#db4c3f' },
   lokmaRatingLabel: {
-    fontSize: 9, lineHeight: 12, fontWeight: '800',
-    color: '#715b51', textAlign: 'center',
-    width: '100%', flexShrink: 1,
+    fontSize: 9, lineHeight: 13, fontWeight: '800',
+    color: '#715b51', textAlign: 'center', textAlignVertical: 'center',
+    includeFontPadding: false, width: '100%', height: 16, flexShrink: 1,
   },
   ingredientText: {
     fontSize: 13,
