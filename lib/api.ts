@@ -16,12 +16,14 @@ async function fetchData(endpoint: string, options?: RequestInit) {
   try {
     const res = await fetch(endpoint, options);
     if (!res.ok) {
-      console.error(`[API Error ${res.status}]: ${endpoint}`);
+      if (__DEV__) console.warn(`[Tariften API ${res.status}] GET işlemi başarısız: ${new URL(endpoint).pathname}`);
       return null;
     }
     return await res.json();
   } catch (error) {
-    console.error('Fetch Error:', error);
+    // A network outage is recoverable: callers already render an empty/offline state.
+    // console.error opens a full-screen RedBox in the development client.
+    if (__DEV__) console.warn('Tariften API bağlantısı kurulamadı:', endpoint, error instanceof Error ? error.message : 'Bilinmeyen hata');
     return null;
   }
 }
@@ -403,14 +405,14 @@ export async function getBlogPosts(params?: {
   try {
     const res = await fetch(`${API_URL}/wp/v2/posts?${urlParams.toString()}`);
     if (!res.ok) {
-      console.error(`[API Error ${res.status}]: ${API_URL}/wp/v2/posts?${urlParams.toString()}`);
+      if (__DEV__) console.warn(`[Tariften blog API ${res.status}]: /wp/v2/posts`);
       return { data: [], totalPages: 0 };
     }
     const totalPages = parseInt(res.headers.get('X-WP-TotalPages') || '1');
     const data = await res.json();
     return { data: Array.isArray(data) ? data : [], totalPages };
   } catch (error) {
-    console.error('Blog posts fetch error:', error);
+    if (__DEV__) console.warn('Tariften blog bağlantısı kurulamadı:', error instanceof Error ? error.message : 'Bilinmeyen hata');
     return { data: [], totalPages: 0 };
   }
 }

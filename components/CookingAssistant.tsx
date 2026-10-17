@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   AppState,
   Image,
@@ -70,8 +71,9 @@ const COOKING_RECOGNITION_OPTIONS = {
   maxAlternatives: 1,
   iosTaskHint: 'confirmation',
   contextualStrings: [
-    'sonraki', 'sonraki adım', 'önceki', 'ileri', 'geri', 'oku',
-    'tekrar', 'devam', 'devam et', 'sayacı durdur', 'sayacı sürdür',
+    'sonraki', 'sonraki adım', 'sıradaki', 'önceki', 'ileri', 'geri', 'oku',
+    'konuş', 'anlat', 'tekrar', 'devam', 'devam et', 'durdur', 'duraklat',
+    'iptal et', 'kaçıncı adımdayım', 'sayacı durdur', 'sayacı sürdür',
     'sayacı iptal et', 'beş dakika başlat',
   ],
 };
@@ -130,6 +132,8 @@ export default function CookingAssistant({
   const [lastSpokenCommand, setLastSpokenCommand] = useState('');
   const [micFeedback, setMicFeedback] = useState('');
   const [heardPhrase, setHeardPhrase] = useState('');
+  const [assistantNotice, setAssistantNotice] = useState('');
+  const assistantNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const voiceStreamRef = useRef(new CookingCommandStream());
   const voiceSilenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nativeRecognizerRef = useRef<{
@@ -539,6 +543,12 @@ export default function CookingAssistant({
     setCurrentIndex((index) => Math.max(0, Math.min(totalSteps - 1, index + delta)));
   }, [stopSpeech, totalSteps]);
 
+  const showAssistantNotice = useCallback((message: string) => {
+    if (assistantNoticeTimerRef.current) clearTimeout(assistantNoticeTimerRef.current);
+    setAssistantNotice(message);
+    assistantNoticeTimerRef.current = setTimeout(() => setAssistantNotice(''), 2600);
+  }, []);
+
   const handleNativeVoiceCommand = useCallback((command: CookingCommand) => {
     switch (command.type) {
       case 'next':
@@ -549,20 +559,51 @@ export default function CookingAssistant({
       case 'read': speak(currentStep.content); return;
       case 'pause_voice': pauseSpeech(); return;
       case 'resume_voice':
-        if (timerRunning && isTimerPaused) toggleTimerPause();
-        else if (speechStatus === 'paused') resumeSpeech();
+        if (timerRunning) {
+          if (isTimerPaused) { toggleTimerPause(); showAssistantNotice('Sayaç devam ediyor'); }
+          else showAssistantNotice('Sayaç zaten çalışıyor');
+        } else if (speechStatus === 'paused') resumeSpeech();
         else if (isLast) setIsFinishedOpen(true);
         else changeStep(1);
         return;
       case 'stop_voice': stopSpeech(); return;
       case 'start_timer': startTimer(command.minutes); return;
-      case 'pause_timer': if (timerRunning && !isTimerPaused) toggleTimerPause(); return;
-      case 'resume_timer': if (timerRunning && isTimerPaused) toggleTimerPause(); return;
-      case 'cancel_timer': stopTimer(); setTimerSeconds(null); return;
+      case 'pause_timer':
+      case 'pause_context':
+        if (timerRunning) {
+          if (!isTimerPaused) toggleTimerPause();
+          showAssistantNotice('Sayaç duraklatıldı');
+        } else {
+          pauseSpeech();
+        }
+        return;
+      case 'resume_timer':
+        if (timerRunning && isTimerPaused) toggleTimerPause();
+        else if (!timerRunning) showAssistantNotice('Çalışan sayaç yok');
+        return;
+      case 'cancel_context':
+      case 'cancel_timer':
+        if (timerRunning || timerSeconds !== null) {
+          stopTimer();
+          setTimerSeconds(null);
+          showAssistantNotice('Sayaç iptal edildi');
+        } else if (command.type === 'cancel_context') stopSpeech();
+        return;
+      case 'step_status':
+        showAssistantNotice('Şu anda ' + (currentIndex + 1) + '. adımdasın · Toplam ' + totalSteps + ' adım');
+        return;
+      case 'mute_mic':
+        voiceWantedRef.current = false;
+        if (voiceRestartRef.current) clearTimeout(voiceRestartRef.current);
+        try { nativeRecognizerRef.current?.stop(); } catch { /* already stopped */ }
+        setMicListening(false);
+        showAssistantNotice('Sesli komutlar kapatıldı · Mikrofon düğmesinden yeniden açabilirsin');
+        return;
       case 'help': setIsHelpOpen(true); return;
     }
   }, [isLast, changeStep, speak, currentStep.content, pauseSpeech, resumeSpeech, stopSpeech,
-      speechStatus, startTimer, timerRunning, isTimerPaused, toggleTimerPause, stopTimer]);
+      speechStatus, startTimer, timerRunning, timerSeconds, isTimerPaused, toggleTimerPause, stopTimer,
+      currentIndex, totalSteps, showAssistantNotice]);
 
   const handleCommandRef = useRef(handleNativeVoiceCommand);
   useEffect(() => { handleCommandRef.current = handleNativeVoiceCommand; }, [handleNativeVoiceCommand]);
@@ -747,6 +788,7 @@ export default function CookingAssistant({
     return () => {
       disposed = true;
       if (voiceSilenceTimerRef.current) clearTimeout(voiceSilenceTimerRef.current);
+      if (assistantNoticeTimerRef.current) clearTimeout(assistantNoticeTimerRef.current);
       voiceStreamRef.current.reset();
       voiceWantedRef.current = false;
       if (voiceRestartRef.current) clearTimeout(voiceRestartRef.current);
@@ -843,15 +885,7 @@ export default function CookingAssistant({
             <Text style={styles.speechError} accessibilityRole="alert">{speechError}</Text>
           )}
           {!!micError && <Text style={styles.micErrorText}>{micError}</Text>}
-          {micListening && <Text style={styles.micListeningText}>● SESLİ KOMUTLAR AÇIK</Text>}
-          {micAvailable && (
-            <View style={styles.micDiagnostics}>
-              <Text style={styles.micDiagnosticsText} numberOfLines={1}>
-                {heardPhrase ? 'Duyulan: ' + heardPhrase : micListening ? 'Henüz ifade algılanmadı' : 'Mikrofon yeniden bağlanıyor…'}
-              </Text>
-              {!!micFeedback && <Text style={styles.micDiagnosticsSubtext} numberOfLines={2}>{micFeedback}</Text>}
-            </View>
-          )}
+          {!!assistantNotice && <View style={styles.assistantNotice}><Text style={styles.assistantNoticeText}>{assistantNotice}</Text></View>}
           <ScrollView
             contentContainerStyle={[styles.mainContent, compactViewport && styles.mainContentCompact]}
             showsVerticalScrollIndicator={false}
@@ -943,6 +977,7 @@ export default function CookingAssistant({
           <View style={styles.progressBarBg}>
             <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
           </View>
+          {cloudBusy && <Text style={styles.voicePreparingText}>Google doğal ses hazırlanıyor…</Text>}
           <View style={styles.controls}>
             {/* Prev */}
             <TouchableOpacity
@@ -968,9 +1003,11 @@ export default function CookingAssistant({
               activeOpacity={0.85}
             >
               <LinearGradient colors={['#db4c3f', '#b03d32']} style={styles.micFAB}>
-                <Ionicons name={speechStatus === 'playing' ? 'pause' : 'volume-high'} size={28} color="#ffffff" />
-                <Text style={styles.micFABText}>
-                  {cloudBusy ? 'Hazırlanıyor' : speechStatus === 'playing' ? 'Duraklat' : speechStatus === 'paused' ? (!cloudMode && Platform.OS === 'android' ? 'Baştan Oku' : 'Devam') : 'Oku'}
+                {cloudBusy ? <ActivityIndicator color="#ffffff" size="small" /> : (
+                  <Ionicons name={speechStatus === 'playing' ? 'pause' : 'volume-high'} size={28} color="#ffffff" />
+                )}
+                <Text style={styles.micFABText} numberOfLines={1} adjustsFontSizeToFit>
+                  {cloudBusy ? 'Bekle' : speechStatus === 'playing' ? 'Duraklat' : speechStatus === 'paused' ? (!cloudMode && Platform.OS === 'android' ? 'Baştan Oku' : 'Devam') : 'Oku'}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -1255,12 +1292,14 @@ export default function CookingAssistant({
                 </TouchableOpacity>
               </View>
               <ScrollView style={styles.modalBody}>
-                <Text style={styles.helpCategory}>PİŞİRME REHBERİ</Text>
-                <Text style={styles.helpDesc}>Adımı sesli okumak için Oku düğmesine dokunun. Önceki ve Sonraki düğmeleri mevcut sesi durdurur; tarif adımlarını değiştirmez.</Text>
-                <Text style={[styles.helpCategory, { marginTop: 12 }]}>SES KONTROLÜ</Text>
-                <Text style={styles.helpDesc}>iPhone'da Duraklat ve Devam desteklenir. Android'de devam etmek için mevcut adım baştan okunur. Uygulama arka plana geçtiğinde ses durur.</Text>
-                <Text style={[styles.helpCategory, { marginTop: 12 }]}>ZAMANLAYICI</Text>
-                <Text style={styles.helpDesc}>Zamanlayıcıya dokunarak duraklatabilir veya devam ettirebilirsiniz. Arka planda geçen süre, uygulamaya döndüğünüzde hesaba katılır.</Text>
+                <Text style={styles.helpCategory}>ADIMLAR</Text>
+                <Text style={styles.helpDesc}>“Sonraki”, “Sıradaki”, “İleri” · “Önceki”, “Geri”. Her komut tarif adımını değiştirir.</Text>
+                <Text style={[styles.helpCategory, { marginTop: 12 }]}>SESLENDİRME</Text>
+                <Text style={styles.helpDesc}>“Oku”, “Konuş”, “Anlat”, “Tekrar”, “Devam”. “Kaçıncı adımdayım?” dersen mevcut adımı görürsün.</Text>
+                <Text style={[styles.helpCategory, { marginTop: 12 }]}>SAYAÇ</Text>
+                <Text style={styles.helpDesc}>“5 dakika başlat”, “Sayacı durdur”, “Sayacı sürdür”, “Sayacı iptal et”. Sayaç çalışırken “Durdur”, “Duraklat”, “İptal et” de sayacı yönetir.</Text>
+                <Text style={[styles.helpCategory, { marginTop: 12 }]}>ELLER SERBEST</Text>
+                <Text style={styles.helpDesc}>“Pasife al” veya “Mikrofonu kapat” mikrofonu kapatır. Yeniden açmak için üstteki mikrofon simgesine dokun. Komutlar yerel tanımayla işlenir; serbest sohbet için Canlı Şef gerekir.</Text>
               </ScrollView>
             </View>
           </View>
@@ -1341,6 +1380,8 @@ const styles = StyleSheet.create({
   micDiagnostics: { backgroundColor: 'rgba(24,95,60,0.10)', paddingHorizontal: 14, paddingVertical: 5 },
   micDiagnosticsText: { fontSize: 11, color: '#e7efe9', lineHeight: 15 },
   micDiagnosticsSubtext: { fontSize: 10, color: '#b6c9c2', lineHeight: 14 },
+  assistantNotice: { marginHorizontal: 16, marginTop: 5, marginBottom: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: 'rgba(219,76,63,0.16)' },
+  assistantNoticeText: { fontSize: 12, fontWeight: '700', textAlign: 'center', color: '#f5e8e5' },
   mainContentCompact: { paddingTop: 9, paddingBottom: 10 },
   readingCardCompact: { minHeight: 175, paddingVertical: 16, paddingHorizontal: 18, marginBottom: 11 },
   stepContentCompact: { fontSize: 17.5, lineHeight: 25, marginVertical: 12 },
@@ -1609,8 +1650,9 @@ const styles = StyleSheet.create({
     borderRadius: 38,
   },
   micFABText: {
-    fontSize: 10, fontWeight: '800', color: '#fff8f1', letterSpacing: 0.4,
+    fontSize: 10, fontWeight: '800', color: '#fff8f1', letterSpacing: 0.2, textAlign: 'center', maxWidth: 58,
   },
+  voicePreparingText: { color: '#cdd5df', fontSize: 11, textAlign: 'center', paddingVertical: 3 },
 
   // LOCAL VOICE SELECTOR
   voiceDescription: {

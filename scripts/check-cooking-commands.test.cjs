@@ -15,7 +15,7 @@ test('Turkish hands-free navigation and reading commands', () => {
   assert.deepEqual(parse('Sonraki!'), { type: 'next' });
   assert.deepEqual(parse('Önceki adım.'), { type: 'previous' });
   assert.deepEqual(parse('Tekrar oku.'), { type: 'read' });
-  assert.deepEqual(parse('Duraklat'), { type: 'pause_voice' });
+  assert.deepEqual(parse('Duraklat'), { type: 'pause_context' });
   assert.deepEqual(parse('Devam et'), { type: 'resume_voice' });
   assert.deepEqual(parse('Sesi durdur'), { type: 'stop_voice' });
 });
@@ -96,7 +96,7 @@ const compiledStream = ts.transpileModule(streamInput, {
 const streamMod = { exports: {} };
 Function('module', 'exports', 'require', compiledStream)(
   streamMod, streamMod.exports, (name) => {
-    if (name === './cooking-commands') return { parseCookingCommand: parse };
+    if (name === './cooking-commands') return { parseCookingCommand: parse, COOKING_COMMAND_PHRASES: mod.exports.COOKING_COMMAND_PHRASES };
     throw new Error('Unexpected import ' + name);
   }
 );
@@ -183,4 +183,45 @@ test('long native cumulative transcripts do not stop at the old 180-character ca
   const extracted = mod.exports.extractCookingTranscript({ results: [{ transcript: raw }] });
   assert.ok(extracted.endsWith('sonraki'));
   assert.ok(extracted.length > 180);
+});
+
+test('contextual timer commands, navigation variants and step status are parsed', () => {
+  assert.deepEqual(parse('sıradaki'), { type: 'next' });
+  assert.deepEqual(parse('konuş'), { type: 'read' });
+  assert.deepEqual(parse('anlat'), { type: 'read' });
+  assert.deepEqual(parse('kaçıncı adımdayım'), { type: 'step_status' });
+  assert.deepEqual(parse('neredeyiz'), { type: 'step_status' });
+  assert.deepEqual(parse('durdur'), { type: 'pause_context' });
+  assert.deepEqual(parse('duraklat'), { type: 'pause_context' });
+  assert.deepEqual(parse('sayacı durdur'), { type: 'pause_timer' });
+  assert.deepEqual(parse('sayacı iptal et'), { type: 'cancel_timer' });
+  assert.deepEqual(parse('iptal et'), { type: 'cancel_context' });
+  assert.deepEqual(parse('pasife al'), { type: 'mute_mic' });
+  assert.deepEqual(parse('10 dakika başlat'), { type: 'start_timer', minutes: 10 });
+  assert.deepEqual(parse('sayaç başlat'), { type: 'start_timer', minutes: 10 });
+  assert.equal(parse('sonraki patatesleri doğrayın'), null);
+});
+
+test('native streaming preserves prefix across timer commands and safely ignores noise', () => {
+  const stream = new Stream();
+  assert.deepEqual(stream.accept('beş', 100).commands, []);
+  assert.deepEqual(stream.accept('beş dakika', 150).commands, []);
+  assert.deepEqual(stream.accept('beş dakika başlat', 200).commands, [{ type: 'start_timer', minutes: 5 }]);
+  assert.deepEqual(stream.accept('beş dakika başlat sayacı durdur', 400).commands, [{ type: 'pause_timer' }]);
+  assert.deepEqual(stream.accept('beş dakika başlat sayacı durdur iptal et', 650).commands, [{ type: 'cancel_context' }]);
+  assert.deepEqual(stream.accept('beş dakika başlat sayacı durdur iptal et çatal', 800).commands, []);
+});
+
+test('assistant requires auth and hides noisy STT diagnostic status from normal UI', () => {
+  const detail = fs.readFileSync(path.join(__dirname, '..', 'app/recipe/[slug].tsx'), 'utf8');
+  const ui = fs.readFileSync(path.join(__dirname, '..', 'components/CookingAssistant.tsx'), 'utf8');
+  assert.match(detail, /if \(!token \|\| !user\)/);
+  assert.match(detail, /assistantAuthVisible/);
+  assert.match(detail, /!!user && !!token &&/);
+  assert.doesNotMatch(ui, /<Text[^>]*>● SESLİ KOMUTLAR AÇIK/);
+  assert.doesNotMatch(ui, /\{heardPhrase \? 'Duyulan:/);
+  assert.match(ui, /case 'pause_context':/);
+  assert.match(ui, /case 'cancel_context':/);
+  assert.match(ui, /case 'step_status':/);
+  assert.match(ui, /cloudBusy \? 'Bekle'/);
 });

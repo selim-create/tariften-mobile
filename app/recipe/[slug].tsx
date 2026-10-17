@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
+  Modal,
   ScrollView,
   Share,
   StyleSheet,
@@ -34,7 +35,7 @@ export default function RecipeDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const navigation = useNavigation();
   const router = useRouter();
-  const { user, token } = useAuth();
+  const { user, token, isLoading: authLoading } = useAuth();
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,11 +44,22 @@ export default function RecipeDetailScreen() {
   const [ratingData, setRatingData] = useState({ average: 0, count: 0 });
   const [userRating, setUserRating] = useState<number | null>(null);
   const [cookingAssistantVisible, setCookingAssistantVisible] = useState(false);
+  const [assistantAuthVisible, setAssistantAuthVisible] = useState(false);
   const [checkedIngredients, setCheckedIngredients] = useState<Set<number>>(new Set());
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [currentServings, setCurrentServings] = useState<number>(1);
   const [defaultServings, setDefaultServings] = useState<number>(1);
   const [similarRecipes, setSimilarRecipes] = useState<Recipe[]>([]);
+
+  const requestCookingAssistant = () => {
+    if (authLoading) return;
+    if (!token || !user) { setAssistantAuthVisible(true); return; }
+    setCookingAssistantVisible(true);
+  };
+
+  useEffect(() => {
+    if (!authLoading && (!token || !user)) setCookingAssistantVisible(false);
+  }, [authLoading, token, user]);
 
   const loadRecipe = useCallback(async () => {
     if (!slug) return;
@@ -357,7 +369,7 @@ export default function RecipeDetailScreen() {
               <Text style={styles.sectionTitle}>Yapılışı</Text>
               <TouchableOpacity
                 style={styles.startCookingButton}
-                onPress={() => setCookingAssistantVisible(true)}
+                onPress={requestCookingAssistant}
               >
                 <Ionicons name="play-circle" size={16} color="#ffffff" />
                 <Text style={styles.startCookingText}>Pişirmeye Başla</Text>
@@ -476,14 +488,36 @@ export default function RecipeDetailScreen() {
 
         <View style={styles.bottomPadding} />
       </View>
-      <CookingAssistant
-        visible={cookingAssistantVisible}
-        onClose={() => setCookingAssistantVisible(false)}
-        recipeTitle={recipe.title}
-        recipeId={recipe.id}
-        steps={recipe.steps}
-        chefTip={recipe.chef_tip}
-      />
+
+      <Modal visible={assistantAuthVisible} transparent animationType="fade"
+        onRequestClose={() => setAssistantAuthVisible(false)}>
+        <View style={assistantGateStyles.scrim}>
+          <View style={assistantGateStyles.card}>
+            <View style={assistantGateStyles.icon}><Ionicons name="restaurant-outline" size={27} color="#db4c3f" /></View>
+            <Text style={assistantGateStyles.title}>Tariften Pişirme Rehberi</Text>
+            <Text style={assistantGateStyles.description}>Adım adım sesli pişirme rehberini ve mutfak sayaçlarını kullanmak için hesabına giriş yap veya ücretsiz kayıt ol.</Text>
+            <TouchableOpacity style={assistantGateStyles.primary} onPress={() => { setAssistantAuthVisible(false); router.push('/login'); }}>
+              <Text style={assistantGateStyles.primaryLabel}>Giriş Yap</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={assistantGateStyles.secondary} onPress={() => { setAssistantAuthVisible(false); router.push('/register'); }}>
+              <Text style={assistantGateStyles.secondaryLabel}>Ücretsiz Kayıt Ol</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={assistantGateStyles.dismiss} onPress={() => setAssistantAuthVisible(false)}>
+              <Text style={assistantGateStyles.dismissLabel}>Şimdi değil</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      {!!user && !!token && (
+        <CookingAssistant
+          visible={cookingAssistantVisible}
+          onClose={() => setCookingAssistantVisible(false)}
+          recipeTitle={recipe.title}
+          recipeId={recipe.id}
+          steps={recipe.steps}
+          chefTip={recipe.chef_tip}
+        />
+      )}
     </ScrollView>
   );
 }
@@ -843,4 +877,18 @@ const styles = StyleSheet.create({
   bottomPadding: {
     height: 40,
   },
+});
+
+const assistantGateStyles = StyleSheet.create({
+  scrim: { flex: 1, justifyContent: 'center', paddingHorizontal: 24, backgroundColor: 'rgba(5,10,17,0.86)' },
+  card: { borderRadius: 28, padding: 28, alignItems: 'center', backgroundColor: '#182231', borderWidth: 1, borderColor: 'rgba(219,76,63,0.28)' },
+  icon: { width: 66, height: 66, borderRadius: 22, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(219,76,63,0.13)', marginBottom: 19 },
+  title: { fontSize: 22, fontWeight: '900', textAlign: 'center', color: '#fffaf4', marginBottom: 12 },
+  description: { fontSize: 14, lineHeight: 23, textAlign: 'center', color: '#c9d0dc', marginBottom: 24 },
+  primary: { width: '100%', minHeight: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 15, backgroundColor: '#db4c3f', marginBottom: 10 },
+  primaryLabel: { fontWeight: '800', fontSize: 16, color: '#ffffff' },
+  secondary: { width: '100%', minHeight: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)' },
+  secondaryLabel: { fontWeight: '800', fontSize: 15, color: '#ffffff' },
+  dismiss: { paddingVertical: 16, paddingHorizontal: 16 },
+  dismissLabel: { color: '#9ca8b8', fontSize: 13 },
 });

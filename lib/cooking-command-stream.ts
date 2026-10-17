@@ -1,17 +1,14 @@
-import { CookingCommand, parseCookingCommand } from './cooking-commands';
+import { CookingCommand, COOKING_COMMAND_PHRASES, parseCookingCommand } from './cooking-commands';
 
+// Keep native streaming prefixes in sync with the actual accepted commands.
+// Otherwise "sayacı durdur" can be discarded word-by-word before completion.
 const KNOWN_PHRASES = [
-  'sonraki', 'sonraki adım', 'bir sonraki', 'bir sonraki adım', 'sonraki adıma geç',
-  'ileri', 'ileri git', 'ileri geç', 'geç', 'önceki', 'önceki adım',
-  'bir önceki', 'geri', 'geri dön', 'geri git', 'önceki adıma dön',
-  'oku', 'adımı oku', 'tekrar', 'tekrar et', 'tekrar oku', 'adımı tekrar oku',
-  'seslendir', 'devam', 'devam et', 'okumaya devam et', 'duraklat',
-  'okumayı duraklat', 'sesi durdur', 'okumayı durdur',
-  'süreyi durdur', 'sayacı durdur', 'süreyi duraklat',
-  'süreyi sürdür', 'sayacı sürdür', 'süreyi iptal et', 'sayacı iptal et',
-  'yardım', 'komutlar',
-  'bir dakika başlat', 'beş dakika başlat', 'on dakika başlat',
-  'beş dakika sayaç kur', 'on dakika sayaç kur',
+  ...COOKING_COMMAND_PHRASES,
+  ...['bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz', 'on',
+      'on beş', 'yirmi', 'otuz', 'kırk', 'elli'].flatMap((n) => [
+        n + ' dakika başlat', n + ' dakika sayaç kur', n + ' dakika sayaç başlat',
+        n + ' dakikalık sayaç başlat',
+      ]),
 ];
 
 function normalize(raw: string): string {
