@@ -25,7 +25,8 @@ import {
 import { Recipe } from '../../lib/types';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import RatingStars from '../../components/RatingStars';
-import { LOKMA_RATINGS, lokmaIngredient } from '../../lib/lokma-emoji';
+import { LOKMA_RATINGS } from '../../lib/lokma-emoji';
+import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
 import CommentSection from '../../components/CommentSection';
 import CookingAssistant from '../../components/CookingAssistant';
 import RecipeCard from '../../components/RecipeCard';
@@ -368,9 +369,7 @@ export default function RecipeDetailScreen() {
                 ) : (
                   <Text style={styles.ingredientBullet}>•</Text>
                 )}
-                <View style={styles.lokmaIngredientIcon} accessible={false}>
-                  <Text style={styles.lokmaIngredientEmoji}>{lokmaIngredient(ing.name).emoji}</Text>
-                </View>
+                <LokmaIngredientIcon name={ing.name} size={27} />
                 <Text
                   style={[
                     styles.ingredientText,
@@ -751,11 +750,6 @@ const styles = StyleSheet.create({
     width: 20,
     textAlign: 'center',
   },
-  lokmaIngredientIcon: {
-    width: 36, height: 36, borderRadius: 12, backgroundColor: '#fff0e6',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  lokmaIngredientEmoji: { fontSize: 22 },
   lokmaRatingRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 },
   lokmaRatingOption: { paddingHorizontal: 8, paddingVertical: 8, borderRadius: 12, backgroundColor: '#fff5ec', borderWidth: 1, borderColor: '#f2e6da', alignItems: 'center', gap: 3, flexGrow: 1 },
   lokmaRatingOptionSelected: { borderColor: '#db4c3f', backgroundColor: '#ffe9e0' },
