@@ -10,7 +10,10 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -33,10 +36,16 @@ import RecipeCard from '../../components/RecipeCard';
 import ImagePlaceholder, { isPlaceholderImage } from '../../components/ImagePlaceholder';
 import AuthorCard from '../../components/AuthorCard';
 
+const RATING_ICONS = ['sad-outline', 'remove-circle-outline', 'happy-outline', 'heart-outline', 'sparkles-outline'] as const;
+
 export default function RecipeDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  const navigation = useNavigation();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/recipes');
+  };
   const { user, token, isLoading: authLoading } = useAuth();
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
@@ -70,8 +79,6 @@ export default function RecipeDetailScreen() {
       const data = await getRecipe(slug);
       setRecipe(data);
       if (data) {
-        navigation.setOptions({ title: data.title });
-
         const servingCount = Number(data.servings);
         const parsedServings = Number.isInteger(servingCount) && servingCount > 0 && servingCount <= 36 ? servingCount : null;
         setDefaultServings(parsedServings);
@@ -99,7 +106,7 @@ export default function RecipeDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [slug, token, navigation]);
+  }, [slug, token]);
 
   useEffect(() => {
     loadRecipe();
@@ -196,12 +203,28 @@ export default function RecipeDetailScreen() {
   const stepsReady = recipe.steps?.filter((_, index) => completedSteps.has(index)).length || 0;
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {isPlaceholderImage(recipe.image) ? (
-        <ImagePlaceholder title={recipe.title} variant="detail" style={styles.image} />
-      ) : (
-        <Image source={{ uri: recipe.image }} style={styles.image} contentFit="cover" transition={300} />
-      )}
+    <>
+      <StatusBar style="light" />
+      <ScrollView style={styles.container}
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="never"
+        automaticallyAdjustContentInsets={false}>
+        <View style={styles.hero}>
+          {isPlaceholderImage(recipe.image) ? (
+            <ImagePlaceholder title={recipe.title} variant="detail" style={styles.image} />
+          ) : (
+            <Image source={{ uri: recipe.image }} style={styles.image} contentFit="cover" transition={300} />
+          )}
+          <LinearGradient colors={['rgba(18,23,33,0.56)', 'rgba(18,23,33,0.10)', 'transparent']}
+            locations={[0, 0.55, 1]}
+            style={styles.heroGradient} pointerEvents="none" />
+          <TouchableOpacity style={[styles.heroBack, { top: Math.max(insets.top + 8, 20) }]}
+            onPress={handleBack} accessibilityRole="button" accessibilityLabel="Tariflere geri dön"
+            activeOpacity={0.8}>
+            <Ionicons name="chevron-back" size={20} color="#17243a" />
+            <Text style={styles.heroBackText}>Geri</Text>
+          </TouchableOpacity>
+        </View>
 
       <View style={styles.content}>
         {/* Title & Actions */}
@@ -290,13 +313,17 @@ export default function RecipeDetailScreen() {
 
         {user && (
           <View style={styles.lokmaRatingRow}>
-            {LOKMA_RATINGS.map(({ rating, emoji, label }) => (
+            {LOKMA_RATINGS.map(({ rating, label }) => (
               <TouchableOpacity key={rating} accessibilityRole="button"
                 accessibilityLabel={`${rating} yıldız, ${label}`}
+                accessibilityState={{ selected: userRating === rating }}
                 onPress={() => handleRate(rating)}
                 style={[styles.lokmaRatingOption, userRating === rating && styles.lokmaRatingOptionSelected]}>
-                <Text style={styles.lokmaRatingEmoji}>{emoji}</Text>
-                <Text style={styles.lokmaRatingLabel} numberOfLines={1}>{label}</Text>
+                <View style={[styles.lokmaRatingSymbol, userRating === rating && styles.lokmaRatingSymbolSelected]}>
+                  <Ionicons name={RATING_ICONS[rating - 1]} size={21}
+                    color={userRating === rating ? '#ffffff' : '#b55f4d'} />
+                </View>
+                <Text style={styles.lokmaRatingLabel} numberOfLines={2}>{label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -551,7 +578,8 @@ export default function RecipeDetailScreen() {
           chefTip={recipe.chef_tip}
         />
       )}
-    </ScrollView>
+      </ScrollView>
+    </>
   );
 }
 
@@ -560,10 +588,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fffbf7',
   },
-  image: {
-    width: '100%',
-    height: 280,
+  hero: { width: '100%', position: 'relative' },
+  image: { width: '100%', height: 320 },
+  heroGradient: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 150,
   },
+  heroBack: {
+    position: 'absolute', left: 16,
+    height: 42, minWidth: 79, paddingHorizontal: 13,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3,
+    borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.94)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.84)',
+  },
+  heroBackText: { color: '#17243a', fontSize: 13, fontWeight: '800' },
   content: {
     paddingHorizontal: 17,
     paddingTop: 22,
@@ -782,11 +819,27 @@ const styles = StyleSheet.create({
   ingredientCheckActive: { backgroundColor: '#5f9d78', borderColor: '#5f9d78' },
   ingredientCopy: { flex: 1, minWidth: 0 },
   ingredientNote: { fontSize: 11, color: '#9b8777', lineHeight: 17, marginTop: 3 },
-  lokmaRatingRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 },
-  lokmaRatingOption: { paddingHorizontal: 8, paddingVertical: 8, borderRadius: 12, backgroundColor: '#fff5ec', borderWidth: 1, borderColor: '#f2e6da', alignItems: 'center', gap: 3, flexGrow: 1 },
-  lokmaRatingOptionSelected: { borderColor: '#db4c3f', backgroundColor: '#ffe9e0' },
-  lokmaRatingEmoji: { fontSize: 23 },
-  lokmaRatingLabel: { fontSize: 9, fontWeight: '700', color: '#66574c' },
+  lokmaRatingRow: {
+    flexDirection: 'row', flexWrap: 'nowrap', width: '100%',
+    gap: 5, marginBottom: 16, alignItems: 'stretch',
+  },
+  lokmaRatingOption: {
+    flex: 1, minWidth: 0, paddingHorizontal: 3, paddingVertical: 9,
+    minHeight: 86, borderRadius: 13, backgroundColor: '#fff7f1',
+    borderWidth: 1, borderColor: '#f0e4db',
+    alignItems: 'center', justifyContent: 'flex-start', gap: 7,
+  },
+  lokmaRatingOptionSelected: { borderColor: '#db4c3f', backgroundColor: '#fff0e9' },
+  lokmaRatingSymbol: {
+    width: 31, height: 31, borderRadius: 11,
+    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
+  },
+  lokmaRatingSymbolSelected: { backgroundColor: '#db4c3f' },
+  lokmaRatingLabel: {
+    fontSize: 9, lineHeight: 12, fontWeight: '800',
+    color: '#715b51', textAlign: 'center',
+    width: '100%', flexShrink: 1,
+  },
   ingredientText: {
     fontSize: 13,
     fontWeight: '700',
