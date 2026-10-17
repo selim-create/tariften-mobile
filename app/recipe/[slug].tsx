@@ -171,7 +171,6 @@ export default function RecipeDetailScreen() {
   };
 
   const displayAmount = (amount: string | number): string => {
-    const num = parseFloat(String(amount));
     if (currentServings === null || defaultServings === null || !/^[0-9]+(?:[.,][0-9]+)?$/.test(String(amount).trim())) return String(amount);
     const scaled = (Number(String(amount).replace(',', '.')) * currentServings) / defaultServings;
     return Number.isInteger(scaled) ? String(scaled) : scaled.toFixed(1);
@@ -519,7 +518,7 @@ export default function RecipeDetailScreen() {
           <View style={assistantGateStyles.card}>
             <View style={assistantGateStyles.icon}><Ionicons name="restaurant-outline" size={27} color="#db4c3f" /></View>
             <Text style={assistantGateStyles.title}>Tariften Pişirme Rehberi</Text>
-            <Text style={assistantGateStyles.description}>Adım adım sesli pişirme rehberini ve mutfak sayaçlarını kullanmak için hesabına giriş yap veya ücretsiz kayıt ol.</Text>
+            <Text style={assistantGateStyles.description}>Adım adım sesli pişirme rehberini ve mutfak sayaçlarını kullanmak için hesabına giriş yap veya Standart Üye ol.</Text>
             <TouchableOpacity style={assistantGateStyles.primary} onPress={() => { setAssistantAuthVisible(false); router.push('/login'); }}>
               <Text style={assistantGateStyles.primaryLabel}>Giriş Yap</Text>
             </TouchableOpacity>
