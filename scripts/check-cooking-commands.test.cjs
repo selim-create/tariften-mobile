@@ -96,7 +96,7 @@ const compiledStream = ts.transpileModule(streamInput, {
 const streamMod = { exports: {} };
 Function('module', 'exports', 'require', compiledStream)(
   streamMod, streamMod.exports, (name) => {
-    if (name === './cooking-commands') return { parseCookingCommand: parse, COOKING_COMMAND_PHRASES: mod.exports.COOKING_COMMAND_PHRASES };
+    if (name === './cooking-commands') return { parseCookingCommand: parse, COOKING_COMMAND_PHRASES: mod.exports.COOKING_COMMAND_PHRASES, COOKING_MINUTE_WORDS: mod.exports.COOKING_MINUTE_WORDS };
     throw new Error('Unexpected import ' + name);
   }
 );
