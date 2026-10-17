@@ -1,32 +1,39 @@
-import { CookingCommand, COOKING_COMMAND_PHRASES, parseCookingCommand } from './cooking-commands';
+import { CookingCommand, COOKING_COMMAND_PHRASES, COOKING_MINUTE_WORDS, parseCookingCommand } from './cooking-commands';
 
-// Keep native streaming prefixes in sync with the actual accepted commands.
-// Otherwise "sayacı durdur" can be discarded word-by-word before completion.
-const KNOWN_PHRASES = [
-  ...COOKING_COMMAND_PHRASES,
-  ...['bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz', 'on',
-      'on beş', 'yirmi', 'otuz', 'kırk', 'elli'].flatMap((n) => [
-        n + ' dakika başlat', n + ' dakika sayaç kur', n + ' dakika sayaç başlat',
-        n + ' dakikalık sayaç başlat',
-      ]),
+// The recognizer emits partial words before final results. Generate valid
+// prefixes from the very same phrase catalog used by the deterministic parser.
+// Include all 1–60 minute values (digits and words), not just "beş/on".
+const minuteValues = [
+  ...Array.from({ length: 60 }, (_, i) => String(i + 1)),
+  ...Object.keys(COOKING_MINUTE_WORDS),
 ];
+const knownPhrases = [
+  ...COOKING_COMMAND_PHRASES,
+  ...minuteValues.flatMap((n) => [
+    n + ' dakika başlat', n + ' dakika kur', n + ' dakika ayarla',
+    n + ' dakika tut', n + ' dakika sayaç başlat', n + ' dakika sayaç kur',
+    n + ' dakikalık sayaç başlat', n + ' dakikalık sayaç kur',
+    n + ' dakika zamanlayıcı başlat', n + ' dakika süre başlat',
+    'sayaç ' + n + ' dakika başlat', 'sayacı ' + n + ' dakikaya ayarla',
+    'zamanlayıcı ' + n + ' dakika başlat',
+  ]),
+];
+const validPrefixes = new Set<string>();
+for (const phrase of knownPhrases) {
+  for (let i = 1; i <= phrase.length; i++) validPrefixes.add(phrase.slice(0, i));
+}
 
 function normalize(raw: string): string {
-  return raw.toLocaleLowerCase('tr-TR')
+  return raw.toLocaleLowerCase('tr-TR').normalize('NFC')
     .replace(/[.,!?;:]/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/\\s+/g, ' ')
     .trim();
 }
 
 function potentiallyValid(fragment: string): boolean {
-  if (!fragment || fragment.length > 56 || fragment.split(' ').length > 6) return false;
-  if (KNOWN_PHRASES.some((phrase) => phrase.startsWith(fragment))) return true;
-  const number = Number(fragment.split(' ')[0]);
-  if (Number.isInteger(number) && number >= 1 && number <= 60) {
-    return [number + ' dakika başlat', number + ' dakika sayaç kur', number + ' dakika süre başlat']
-      .some((phrase) => phrase.startsWith(fragment));
-  }
-  return false;
+  return fragment.length <= 96
+    && fragment.split(' ').length <= 9
+    && validPrefixes.has(fragment);
 }
 
 export type CookingStreamResult = {
