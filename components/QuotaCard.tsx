@@ -19,8 +19,7 @@ export default function QuotaCard({ data, error, loading, kinds = ['menu_month',
       </View>
       {loading && !data && <Text style={styles.small}>Hakların kontrol ediliyor…</Text>}
       {error && !data && <Text style={styles.warning}>{error} Son kontrol sunucuda yapılır.</Text>}
-      {data && <View style={styles.tierRow} accessibilityLabel="Üyelik seçenekleri">
-        <Text style={styles.currentTier}> {data.tier === 'administrator' ? 'Yönetici · Sınırsız' : data.tier === 'internal' ? 'Dahili Hesap · Sınırsız' : 'Standart Üye'}</Text>
+      {data && <View style={styles.tierRow} accessibilityLabel="Yakında sunulacak üyelik seçenekleri">
         <Text style={styles.futureTier}>Premium · Yakında</Text>
         <Text style={styles.futureTier}>Premium + · Yakında</Text>
       </View>}
@@ -44,7 +43,6 @@ const styles = StyleSheet.create({
   title: { color: '#202e25', fontSize: 17, fontWeight: '800' },
   badge: { fontSize: 11, fontWeight: '700', color: '#2b6746', backgroundColor: '#edf7ee', borderRadius: 8, overflow: 'hidden', padding: 7 },
   tierRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
-  currentTier: { fontSize: 11, fontWeight: '700', color: '#a65045', backgroundColor: '#fff4ef', borderRadius: 9, padding: 7, overflow: 'hidden' },
   futureTier: { fontSize: 11, fontWeight: '600', color: '#b7b8bd', backgroundColor: '#f7f7f8', borderRadius: 9, padding: 7, overflow: 'hidden' },
   row: { borderTopColor: '#edf0ed', borderTopWidth: 1, paddingVertical: 10 },
   label: { fontSize: 12, color: '#78817e' },
