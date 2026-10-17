@@ -109,5 +109,9 @@ test('manual photo picker uses JPEG conversion and validated authenticated WordP
   assert.match(file,/body.append\('file'/);
   assert.match(file,/Authorization: `Bearer \$\{token\}`/);
   assert.match(file,/Number\.isSafeInteger\(result\.id\)/);
+  assert.match(file, /signal\\?: AbortSignal/);
+  assert.match(file, /body, signal/);
+  const editor = read('components/recipe/RecipeManualEditor.tsx');
+  assert.equal(editor.includes('signal => uploadManualRecipePhoto(token, photo, signal)'), true);
   assert.doesNotMatch(file,/\/wp\/v2\/media|generateImage|ai\/generate/);
 });
