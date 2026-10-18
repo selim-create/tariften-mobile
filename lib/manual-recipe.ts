@@ -1,4 +1,5 @@
 import type { Recipe } from './types';
+import { validateRecipeAmount, validateRecipeUnit } from './recipe-measurements';
 import { parseIngredients, parseSteps } from './recipeUtils';
 
 export type ManualIngredient = { name: string; amount: string; unit: string };
@@ -53,6 +54,10 @@ export function validateManualDraft(draft: RecipeManualDraft): { field: ManualFi
     return { field: 'ingredients', message: 'Malzeme satırlarında isim boş bırakılamaz.' };
   }
   if (draft.ingredients.length > 40) return { field: 'ingredients', message: 'En fazla 40 malzeme ekleyebilirsin.' };
+  for (const row of draft.ingredients) {
+    const issue = validateRecipeAmount(row.amount) || validateRecipeUnit(row.unit);
+    if (issue) return { field: 'ingredients', message: issue };
+  }
   if (!draft.steps.length || draft.steps.some(step => !step.trim())) {
     return { field: 'steps', message: 'Yapılış adımlarını doldurmalısın.' };
   }
