@@ -28,6 +28,25 @@ test('speech operations are serialized and session callbacks are guarded', () =>
   assert.match(source, /\+\+speechGenerationRef\.current/);
 });
 
+test('local TTS and natural cloud audio cannot overlap on rapid play or replay', () => {
+  const stopHelper = source.slice(
+    source.indexOf('const stopDeviceSpeechForCloud = useCallback('),
+    source.indexOf('const speakCloud = useCallback('),
+  );
+  assert.match(stopHelper, /\+\+speechGenerationRef\.current/);
+  assert.match(stopHelper, /speechQueueRef\.current = speechQueueRef\.current\.catch/);
+  assert.match(stopHelper, /await Speech\.stop\(\)/);
+
+  const cloud = source.slice(source.indexOf('const speakCloud = useCallback('), source.indexOf('const stopSpeech = useCallback('));
+  assert.equal((cloud.match(/await stopDeviceSpeechForCloud\(\)/g) || []).length, 2,
+    'new cloud requests and same-step replay must both drain pending device speech');
+  assert.match(cloud, /playbackGeneration !== cloudGenerationRef\.current/);
+  assert.match(cloud, /cloudPlayerRef\.current !== player/);
+  assert.match(cloud, /requestGeneration !== cloudGenerationRef\.current/);
+  assert.match(source, /if \(cloudPlayerRef\.current \|\| cloudControllerRef\.current\) clearCloud\(\)/);
+  assert.match(source, /if \(!text\.trim\(\)\)/);
+});
+
 test('device voices and Android pause difference are explicit', () => {
   assert.match(source, /getAvailableVoicesAsync\(\)/);
   assert.match(source, /VoiceQuality\.Enhanced/);
