@@ -143,3 +143,44 @@ test('mobile editor uses quiet semantic ingredient marks rather than meaningless
   assert.match(page, /import LokmaIngredientIcon from/);
   assert.doesNotMatch(page, /<View style=\{styles\.dot\} \/>/);
 });
+
+
+test('native AI import accepts suggested servings, calories, cuisine and meal while keeping raw source strict', () => {
+  const fixture = previewFixture();
+  fixture.recipe.suggestions = {
+    servings: 4, calories_per_serving: 360,
+    cuisine: 'Türk Mutfağı', meal_type: 'Akşam Yemeği',
+    nutrition_note: 'Yaklaşık kcal/kişi',
+  };
+  const draft = importLib.editorFromPreview(importLib.parseImportPreview(fixture));
+  assert.equal(draft.servings, '4');
+  assert.equal(draft.calories, '360');
+  assert.equal(draft.cuisine, 'Türk Mutfağı');
+  draft.calories = '420';
+  draft.mealType = 'Öğle Yemeği';
+  const saved = importLib.buildApprovedRecipe(draft);
+  assert.equal(saved.calories, 420);
+  assert.deepEqual(saved.cuisine, ['Türk Mutfağı']);
+  assert.deepEqual(saved.meal_type, ['Öğle Yemeği']);
+  fixture.recipe.suggestions.calories_per_serving = 9999;
+  assert.throws(() => importLib.parseImportPreview(fixture), /beklenmeyen/);
+  const empty = importLib.editorFromPreview(importLib.parseImportPreview(previewFixture()));
+  assert.equal(empty.calories, '');
+  assert.equal(empty.servings, '');
+});
+test('native quick creation remains first-class while routine quotas appear only in Profile', () => {
+  const mobile = read('app/(tabs)/recipes.tsx');
+  const global = read('components/navigation/GlobalCreateAction.tsx');
+  const imported = read('app/recipe/import.tsx');
+  const profile = read('app/(tabs)/profile.tsx');
+  assert.match(global, /Hızlı tarif oluştur/);
+  assert.match(global, /Dolabımdakilerle tarif/);
+  assert.match(mobile, /placeholder="Örn. Kabak, domates, bulgur/);
+  assert.match(mobile, /handleGenerateAI\(prompt\)/);
+  assert.doesNotMatch(mobile, /<QuotaCard/);
+  assert.doesNotMatch(imported, /<View style=\{styles\.quotaRow\}>/);
+  assert.match(imported, /usageNotice/);
+  assert.match(imported, /editor\.calories/);
+  assert.match(imported, /editor\.mealType/);
+  assert.match(profile, /QuotaCard/);
+});
