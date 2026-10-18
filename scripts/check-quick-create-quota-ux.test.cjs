@@ -40,7 +40,7 @@ test('mobile quick AI guards offline quotas, double taps and uncertain saves',()
  const end=list.indexOf('  useEffect(() => {\n    return () => {\n      if (aiMsgIntervalRef.current)',start);
  assert.ok(start>=0 && end>start);
  const flow=list.slice(start,end);
- assert.match(flow,/if \(quickCreateInFlightRef\.current\) return/);
+ assert.match(flow,/if \(quickCreateInFlightRef\.current \|\| quickPublishInFlightRef\.current/);
  assert.match(flow,/quickCreateInFlightRef\.current = true/);
  assert.match(flow,/await fetchAccountQuotas\(token\)/);
  assert.match(flow,/catch \{\s*Alert\.alert\('Şu anda oluşturulamıyor'/);
@@ -48,5 +48,5 @@ test('mobile quick AI guards offline quotas, double taps and uncertain saves',()
  assert.match(flow,/finally \{[\s\S]*quickCreateInFlightRef\.current = false;/);
  assert.doesNotMatch(flow,/fetchAccountQuotas\(token\)\.catch\(\(\) => null\)/);
  assert.match(flow,/error instanceof RecipeCreateUnconfirmedError/);
- assert.match(flow,/Yeniden oluşturmadan önce Profil > Tariflerim/);
+ assert.match(flow,/Tekrar göndermeden önce Profil > Tariflerim/);
 });
