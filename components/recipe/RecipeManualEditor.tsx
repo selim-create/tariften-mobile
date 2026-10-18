@@ -361,8 +361,8 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
         </TouchableOpacity>
         <Text style={styles.hint}>Fotoğrafın kaydetme sırasında güvenli biçimde yüklenir. Yapay zekâyla görsel üretilmez.</Text>
 
-        <View style={styles.twoColumns}>
-          {CATEGORIES.map(key => <View key={key} style={styles.col}>
+        <View style={styles.categoryGrid}>
+          {CATEGORIES.map(key => <View key={key} style={styles.categoryGridItem}>
             <RecipePicker label={CATEGORY_LABELS[key]} value={draft[key][0] || ''}
               options={[...new Set([...draft[key], ...options[key]])]}
               onChange={value => setField(key, value ? [value] : [])} />
@@ -500,6 +500,8 @@ const styles = StyleSheet.create({
   chipText:{fontSize:12,fontWeight:'700',color:'#7b645a'},
   selectedText:{color:RED},
   twoColumns:{flexDirection:'row',gap:10},
+  categoryGrid:{flexDirection:'row',flexWrap:'wrap',gap:10},
+  categoryGridItem:{width:'48%',minWidth:0},
   col:{flex:1,minWidth:0},
   photoHeader:{gap:5,marginTop:6},
   photoCard:{borderRadius:18,overflow:'hidden',backgroundColor:'#fff8f3',borderWidth:1,borderColor:'#efddd0',height:190},
