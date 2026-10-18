@@ -161,16 +161,28 @@ export async function createRecipe(
   return json;
 }
 
-export async function updateRecipe(token: string, recipeData: Record<string, unknown>) {
-  const res = await fetch(`${API_URL}/tariften/v1/recipes/update`, {
-    method: 'POST',
-    headers: authHeaders(token),
-    body: JSON.stringify(recipeData),
-  });
-
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.message || 'Tarif güncellenemedi');
-  return json;
+export async function updateRecipe(
+  token: string,
+  recipeData: Record<string, unknown>,
+  signal?: AbortSignal,
+) {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/tariften/v1/recipes/update`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(recipeData),
+      signal,
+    });
+  } catch {
+    // The server could have committed the update before the connection dropped.
+    throw new RecipeCreateUnconfirmedError();
+  }
+  const json: unknown = await res.json().catch(() => null);
+  const data = json && typeof json === 'object' ? json as Record<string, unknown> : {};
+  if (res.status >= 500 || (res.ok && data.success !== true)) throw new RecipeCreateUnconfirmedError();
+  if (!res.ok) throw new Error(typeof data.message === 'string' ? data.message : 'Tarif güncellenemedi.');
+  return data;
 }
 
 // --- AUTH ---

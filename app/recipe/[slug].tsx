@@ -258,6 +258,15 @@ export default function RecipeDetailScreen() {
           </View>
         </View>
 
+        {user && Number(recipe.author?.id) === Number(user.id) ? (
+          <TouchableOpacity style={styles.authorEditButton} accessibilityRole="button"
+            accessibilityLabel="Kendi tarifimi düzenle"
+            onPress={() => router.push(`/recipe/edit/${recipe.id}`)}>
+            <Ionicons name="create-outline" size={17} color="#b95b49" />
+            <Text style={styles.authorEditText}>Bu tarif sana ait · Düzenle</Text>
+            <Ionicons name="chevron-forward" size={16} color="#b95b49" />
+          </TouchableOpacity>
+        ) : null}
         {recipe.excerpt ? <Text style={styles.excerpt}>{recipe.excerpt}</Text> : null}
 
         {/* Tags (above rating) */}
@@ -590,6 +599,13 @@ export default function RecipeDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  authorEditButton: {
+    marginBottom: 15, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 11,
+    borderWidth: 1, borderColor: '#efddcd', backgroundColor: '#fff7f2',
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  authorEditText: { flex: 1, color: '#a65c4a', fontSize: 12, fontWeight: '800' },
+
   container: {
     flex: 1,
     backgroundColor: '#fffbf7',
