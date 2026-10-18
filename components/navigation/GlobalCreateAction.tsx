@@ -5,10 +5,24 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 
-type Destination = '/recipe/create' | '/recipe/import' | '/menu/create';
+type Destination = '/recipe/create' | '/recipe/import' | '/menu/create' | '/(tabs)/recipes' | '/(tabs)/pantry';
 type Icon = React.ComponentProps<typeof Ionicons>['name'];
 
 const ACTIONS: { route: Destination; title: string; description: string; icon: Icon; tint: string }[] = [
+  {
+    route: '/(tabs)/recipes',
+    title: 'Hızlı tarif oluştur',
+    description: 'Tarif adı veya malzemelerle hemen başla.',
+    icon: 'sparkles-outline',
+    tint: '#d75445',
+  },
+  {
+    route: '/(tabs)/pantry',
+    title: 'Dolabımdakilerle tarif',
+    description: 'Elindeki malzemelerden yeni bir tarif hazırla.',
+    icon: 'basket-outline',
+    tint: '#398367',
+  },
   {
     route: '/recipe/create',
     title: 'Tarifini kendin yaz',
@@ -53,7 +67,13 @@ export default function GlobalCreateAction({ tabBarHeight }: { tabBarHeight: num
     if (navigationTimer.current) clearTimeout(navigationTimer.current);
     // Let the native modal finish dismissing before pushing a new stack screen.
     navigationTimer.current = setTimeout(() => {
-      router.push(user && token ? route : '/login');
+      if (!user || !token) {
+        router.push('/login');
+      } else if (route === '/(tabs)/recipes') {
+        router.push({ pathname: '/(tabs)/recipes', params: { quick: '1' } });
+      } else {
+        router.push(route);
+      }
       navigationTimer.current = null;
     }, 300);
   };
@@ -119,9 +139,7 @@ export default function GlobalCreateAction({ tabBarHeight }: { tabBarHeight: num
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.footnote}>
-              {user && token ? 'Tariflerin yalnızca sen onayladığında yayımlanır.' : 'Devam etmek için hesabına giriş yapabilirsin.'}
-            </Text>
+            {!user || !token ? <Text style={styles.footnote}>Devam etmek için hesabına giriş yapabilirsin.</Text> : null}
           </View>
         </View>
       </Modal>
