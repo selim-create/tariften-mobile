@@ -42,13 +42,13 @@ function SmallField({ value, onChangeText, placeholder, multiline = false, keybo
   />;
 }
 
-export default function RecipeTextImportScreen() {
+export default function RecipeTextImportScreen({ initialMethod = 'text' }: { initialMethod?: 'social' | 'text' } = {}) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
   const quotas = useQuotas(token);
   const [source, setSource] = useState('');
-  const [importMethod, setImportMethod] = useState<'social' | 'text'>('social');
+  const [importMethod, setImportMethod] = useState<'social' | 'text'>(initialMethod);
   const [socialUrl, setSocialUrl] = useState('');
   const [stage, setStage] = useState<Stage>('source');
   const scrollRef = useRef<ScrollView>(null);
@@ -349,8 +349,8 @@ export default function RecipeTextImportScreen() {
       {stage === 'source' ? <>
         <View style={styles.hero}>
           <Text style={styles.kicker}>TARİFTEN MUTFAK STÜDYOSU</Text>
-          <Text style={styles.heading}>Sen anlat, biz düzenleyelim.</Text>
-          <Text style={styles.subtitle}>Notlarını kendi kelimelerinle yaz. Tarifinin son sözü sende.</Text>
+          <Text style={styles.heading}>{importMethod === 'social' ? 'Sosyal medyadan tarif ekle.' : 'Sen anlat, biz düzenleyelim.'}</Text>
+          <Text style={styles.subtitle}>{importMethod === 'social' ? 'Paylaşım bağlantısını ekle. Ulaşılabilen kaynak bilgileriyle Tariften tarifine dönüştürelim.' : 'Notlarını kendi kelimelerinle yaz. Tarifinin son sözü sende.'}</Text>
           <View style={styles.stageRow}>
             <Text style={styles.stageActive}>1 · Notların</Text>
             <Ionicons name="arrow-forward" size={15} color="#ad9c8f" />
@@ -358,8 +358,8 @@ export default function RecipeTextImportScreen() {
           </View>
         </View>
         <View style={styles.card}>
-          <Text style={styles.cardHeading}>Senin mutfak notların</Text>
-          <Text style={styles.subtitle}>Elinin alıştığı ölçüler, aileden kalan küçük sırlar...</Text>
+          <Text style={styles.cardHeading}>{importMethod === 'social' ? 'Sosyal medya paylaşımı' : 'Senin mutfak notların'}</Text>
+          <Text style={styles.subtitle}>{importMethod === 'social' ? 'Reels, TikTok, Shorts ve gönderi bağlantısı.' : 'Elinin alıştığı ölçüler, aileden kalan küçük sırlar...'}</Text>
           <View style={styles.socialTabs} accessibilityRole="tablist">
             <TouchableOpacity accessibilityRole="tab" accessibilityState={{ selected: importMethod === 'social' }}
               disabled={!!busy} onPress={() => { setImportMethod('social'); setError(''); }}
