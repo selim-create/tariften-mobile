@@ -81,6 +81,7 @@ export default function RecipesScreen() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiLoadingMessage, setAiLoadingMessage] = useState(AI_LOADING_MESSAGES[0]);
   const aiMsgIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const duplicateDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const quickCreateInFlightRef = useRef(false);
   const quickPublishInFlightRef = useRef(false);
   const [reviewDraft, setReviewDraft] = useState<QuickRecipeDraft | null>(null);
@@ -280,7 +281,11 @@ export default function RecipesScreen() {
         && aiResponse.existing_recipe_slug.trim() ? aiResponse.existing_recipe_slug.trim() : null);
       setReviewUncertain(false);
       if (duplicateId) {
-        setReviewVisible(true);
+        // The loading modal must close before opening another native Modal,
+        // otherwise iOS can lose or flash the second presentation.
+        setAiModalVisible(false);
+        if (duplicateDelayRef.current) clearTimeout(duplicateDelayRef.current);
+        duplicateDelayRef.current = setTimeout(() => setReviewVisible(true), 320);
       } else {
         await publishGeneratedRecipe(draft, token);
       }
@@ -320,6 +325,7 @@ export default function RecipesScreen() {
       if (aiMsgIntervalRef.current) {
         clearInterval(aiMsgIntervalRef.current);
       }
+      if (duplicateDelayRef.current) clearTimeout(duplicateDelayRef.current);
     };
   }, []);
 
@@ -517,7 +523,7 @@ export default function RecipesScreen() {
         <View style={styles.aiModalOverlay}>
           <View style={styles.aiModalCard}>
             <ActivityIndicator color="#e74c3c" size="large" />
-            <Text style={styles.aiModalTitle}>Tarif Hazırlanıyor...</Text>
+            <Text style={styles.aiModalTitle}>{reviewSaving ? 'Tarif Yayımlanıyor...' : 'Tarif Hazırlanıyor...'}</Text>
             <Text style={styles.aiModalMessage}>{aiLoadingMessage}</Text>
           </View>
         </View>
