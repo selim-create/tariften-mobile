@@ -229,6 +229,31 @@ export async function createRecipe(
   return json;
 }
 
+export type RecipeEditReviewStatus = {
+  status: 'none' | 'pending' | 'approved' | 'rejected';
+  updated_at: string;
+  note: string;
+};
+
+export async function getRecipeEditReviewStatus(
+  token: string, recipeId: number, signal?: AbortSignal,
+): Promise<RecipeEditReviewStatus> {
+  const res = await fetch(`${API_URL}/tariften/v1/recipes/edit-review/${recipeId}`, {
+    method: 'GET', headers: authHeaders(token), cache: 'no-store', signal,
+  });
+  const raw: unknown = await res.json().catch(() => null);
+  const data = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  if (!res.ok) throw new Error('Tarif düzenleme durumu yüklenemedi.');
+  const status = data.status;
+  if (status !== 'none' && status !== 'pending' && status !== 'approved' && status !== 'rejected') {
+    throw new Error('Geçersiz tarif düzenleme durumu.');
+  }
+  return {
+    status, updated_at: typeof data.updated_at === 'string' ? data.updated_at : '',
+    note: typeof data.note === 'string' ? data.note : '',
+  };
+}
+
 export async function updateRecipe(
   token: string,
   recipeData: Record<string, unknown>,
