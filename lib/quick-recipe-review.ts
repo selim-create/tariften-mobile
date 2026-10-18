@@ -108,9 +108,9 @@ export function validateQuickRecipe(draft: QuickRecipeDraft): string | null {
     || draft.ingredients.some(row => !row.name.trim())) {
     return 'Malzeme isimlerini tamamla (1–40 malzeme).';
   }
-  for (const row of draft.ingredients) {
+  for (const [index, row] of draft.ingredients.entries()) {
     const issue = validateRecipeAmount(row.amount) || validateRecipeUnit(row.unit);
-    if (issue) return issue;
+    if (issue) return `${index + 1}. malzeme: ${issue}`;
   }
   if (!draft.steps.length || draft.steps.length > 40 || draft.steps.some(step => !step.trim())) {
     return 'Hazırlanış adımlarını tamamla (1–40 adım).';
