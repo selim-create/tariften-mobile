@@ -23,6 +23,8 @@ jobs:
         run: node --test scripts/check-mobile-recipe-publish.test.cjs
       - name: Guard native manual recipe creation, editing and image upload
         run: node --test scripts/check-mobile-manual-recipes.test.cjs
+      - name: Guard global create sheet and restored recipe discovery feed
+        run: node --test scripts/check-mobile-global-create-sheet.test.cjs
       - name: Review premium recipe checklist and import editor accessibility
         run: node --test scripts/check-mobile-recipe-editorial.test.cjs
       - name: Guard full-bleed recipe hero and compact rating and reaction controls

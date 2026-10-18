@@ -289,31 +289,6 @@ export default function RecipesScreen() {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={{ marginHorizontal: 16, marginTop: 9, marginBottom: 4, borderRadius: 16, borderWidth: 1, borderColor: '#e5c7bc', backgroundColor: '#fff8f4', paddingHorizontal: 16, paddingVertical: 13, flexDirection: 'row', alignItems: 'center', gap: 12 }}
-        accessibilityRole="button" accessibilityLabel="Tarifi kendim yazmak istiyorum"
-        onPress={() => token ? router.push('/recipe/create') : router.push('/login')}>
-        <Ionicons name="create-outline" size={24} color="#df5043" />
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: '#1a2740', fontSize: 14, fontWeight: '900' }}>Tarifini kendin yaz</Text>
-          <Text style={{ color: '#907e72', fontSize: 11, marginTop: 3 }}>Malzemeler, adımlar ve fotoğraf tamamen senin elinde.</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color="#d24e43" />
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={{ marginHorizontal: 16, marginTop: 8, marginBottom: 10, borderRadius: 16, borderWidth: 1, borderColor: '#f1d9c9', backgroundColor: '#fffbf7', paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}
-        accessibilityRole="button"
-        accessibilityLabel="Kendi tarifini metinden aktar"
-        onPress={() => token ? router.push('/recipe/import') : router.push('/login')}
-      >
-        <Ionicons name="book-outline" size={23} color="#db4c3f" />
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: '#1a2740', fontSize: 14, fontWeight: '800' }}>Kendi tarifini ekle</Text>
-          <Text style={{ color: '#907e72', fontSize: 11, marginTop: 3 }}>Mutfak notlarını anlat, birlikte düzenleyelim.</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color="#d24e43" />
-      </TouchableOpacity>
 
       {activeChips.length > 0 ? (
         <View style={styles.activeFiltersRow}>

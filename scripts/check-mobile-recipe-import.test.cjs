@@ -82,7 +82,7 @@ test('mobile uses Core directly with quota preflight, no auto-publish, double ap
   const page = read('app/recipe/import.tsx');
   const api = read('lib/recipe-import-api.ts');
   const routes = read('app/_layout.tsx');
-  const listing = read('app/(tabs)/recipes.tsx');
+  const createSheet = read('components/navigation/GlobalCreateAction.tsx');
   assert.match(api, /\/ai\/recipe-import\/preview/);
   assert.match(api, /parseImportPreview\(json\)/);
   assert.match(api, /110000/);
@@ -98,7 +98,7 @@ test('mobile uses Core directly with quota preflight, no auto-publish, double ap
   assert.match(page, /malzeme miktarlarından tahmin etmiyoruz/);
   assert.match(page, /Kaynağındaki ifade/);
   assert.match(routes, /name="recipe\/import"/);
-  assert.match(listing, /router\.push\('\/recipe\/import'\)/);
+  assert.match(createSheet, /route: '\/recipe\/import'/);
   assert.doesNotMatch(page, /generateAIRecipe|generateImage|AsyncStorage|SecureStore/);
   assert.doesNotMatch(api, /console\./);
 });
