@@ -6,10 +6,10 @@ const path = require('node:path');
 const ts = require('typescript');
 const read = p => fs.readFileSync(path.join(__dirname,'..',p),'utf8');
 const helper = read('lib/quick-recipe-review.ts');
-const js = ts.transpileModule(helper,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+const js = ts.transpileModule(helper,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
 const local = {exports:{}};
 const measureSource = read('lib/recipe-measurements.ts');
-const measureJs = ts.transpileModule(measureSource,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+const measureJs = ts.transpileModule(measureSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
 const measures = {exports:{}};
 new Function('module','exports',measureJs)(measures,measures.exports);
 new Function('module','exports','require',js)(local,local.exports,id => {
@@ -113,19 +113,7 @@ test('AI can publish grounded composite egg amounts without inventing whole eggs
   ...draft,
   ingredients: [{ ...draft.ingredients[0], amount: 'domatas' }, ...draft.ingredients.slice(1)],
  };
- const seen = [];
- const originalAmountCheck = measures.exports.validateRecipeAmount;
- measures.exports.validateRecipeAmount = value => {
-   const result = originalAmountCheck(value);
-   seen.push({ value, result });
-   return result;
- };
- const problem = validateQuickRecipe(invalid);
- measures.exports.validateRecipeAmount = originalAmountCheck;
- assert.ok(problem, 'Invalid amount not rejected: ' + JSON.stringify({
-   amount: invalid.ingredients[0].amount, seen, result: problem,
-   functionCode: validateQuickRecipe.toString().slice(-1200),
- }));
+ assert.ok(validateQuickRecipe(invalid), 'AI publication must reject arbitrary amount words');
 });
 test('Numeric recipe deep links and published duplicate choice retain safe navigation',()=> {
  const api=read('lib/api.ts');
