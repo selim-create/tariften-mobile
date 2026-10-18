@@ -39,7 +39,7 @@ test('sheet uses a native dimmed bottom modal with accessible close and navigati
 test('global create sheet exposes only real manual, import and menu create destinations', () => {
   const component = read('components/navigation/GlobalCreateAction.tsx');
   const destinations = [...component.matchAll(/route: '(\/[^']+)'/g)].map(x => x[1]);
-  assert.deepEqual(destinations, ['/recipe/create', '/recipe/import', '/menu/create']);
+  assert.deepEqual(destinations, ['/(tabs)/recipes?quick=1', '/(tabs)/pantry', '/recipe/create', '/recipe/import', '/menu/create']);
   for(const [route, file] of [
     ['/recipe/create', 'app/recipe/create.tsx'],
     ['/recipe/import', 'app/recipe/import.tsx'],
