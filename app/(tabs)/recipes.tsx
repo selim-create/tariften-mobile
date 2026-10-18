@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { createRecipe, generateAIRecipe, getRecipes, getTerms } from '../../lib/api';
+import { RecipeCreateUnconfirmedError } from '../../lib/recipe-publish';
 import { Recipe, RecipeFilters } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
 import SearchBar from '../../components/SearchBar';
@@ -78,6 +79,7 @@ export default function RecipesScreen() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiLoadingMessage, setAiLoadingMessage] = useState(AI_LOADING_MESSAGES[0]);
   const aiMsgIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const quickCreateInFlightRef = useRef(false);
 
   const loadRecipes = useCallback(
     async (pageNum: number = 1, currentFilters: RecipeFilters = filters, append = false) => {
@@ -170,76 +172,82 @@ export default function RecipesScreen() {
   }, []);
 
   const handleGenerateAI = useCallback(async (overridePrompt?: string) => {
+    // Lock synchronously, before the first network await or React re-render.
+    if (quickCreateInFlightRef.current) return;
     if (!token) {
       router.push('/login');
       return;
     }
-    const searchQuery = overridePrompt?.trim() || filters.query || query;
-    if (!searchQuery.trim()) {
-      Alert.alert('Hata', 'Tarif oluşturmak için önce bir arama yapın.');
+    const searchQuery = (overridePrompt?.trim() || filters.query || query).trim();
+    if (!searchQuery) {
+      Alert.alert('Bir tarif yaz', 'Tarif adı veya elindeki malzemeleri yazabilirsin.');
       return;
     }
-    // The backend remains authoritative. A fresh read avoids accidentally
-    // charging an AI request when the user has no save rights left.
-    const fresh = await fetchAccountQuotas(token).catch(() => null);
-    if (reached(fresh, 'recipe_ai_day') || reached(fresh, 'recipe_day')) {
-      const key = reached(fresh, 'recipe_ai_day') ? 'recipe_ai_day' : 'recipe_day';
-      Alert.alert('Kullanım hakkın doldu', 'Yeni hak: ' + resetDate(fresh, key));
-      return;
-    }
-    setAiModalVisible(true);
+
+    quickCreateInFlightRef.current = true;
     setAiLoading(true);
-    let msgIdx = 0;
-    aiMsgIntervalRef.current = setInterval(() => {
-      msgIdx = (msgIdx + 1) % AI_LOADING_MESSAGES.length;
-      setAiLoadingMessage(AI_LOADING_MESSAGES[msgIdx]);
-    }, 2000);
     try {
+      // An unavailable quota service is NOT permission to incur paid AI cost.
+      let fresh;
+      try {
+        fresh = await fetchAccountQuotas(token);
+      } catch {
+        Alert.alert('Şu anda oluşturulamıyor', 'Kullanım hakların kontrol edilemiyor. Lütfen tekrar dene.');
+        return;
+      }
+      if (reached(fresh, 'recipe_ai_day') || reached(fresh, 'recipe_day')) {
+        const key = reached(fresh, 'recipe_ai_day') ? 'recipe_ai_day' : 'recipe_day';
+        Alert.alert('Kullanım hakkın doldu', 'Yeni hak: ' + resetDate(fresh, key));
+        return;
+      }
+
+      setAiModalVisible(true);
+      setAiLoadingMessage(AI_LOADING_MESSAGES[0]);
+      let msgIdx = 0;
+      aiMsgIntervalRef.current = setInterval(() => {
+        msgIdx = (msgIdx + 1) % AI_LOADING_MESSAGES.length;
+        setAiLoadingMessage(AI_LOADING_MESSAGES[msgIdx]);
+      }, 2000);
+
       const aiResponse = await generateAIRecipe(token, searchQuery);
       setUsageNotice("AI tarif oluşturma denemen kullanıldı. Kalan hakların Profil'de.");
+      void quotas.refresh();
 
       if (aiResponse.success && aiResponse.recipe) {
-        void quotas.refresh();
-        // 2-step flow: generate then save (mirrors web implementation)
+        // The backend validates the save and may report an unknown outcome.
+        // Never automatically repeat a publish after a transport failure.
         const saveResponse = await createRecipe(token, aiResponse.recipe);
         void quotas.refresh();
-
-        if (aiMsgIntervalRef.current) {
-          clearInterval(aiMsgIntervalRef.current);
-          aiMsgIntervalRef.current = null;
-        }
-        setAiModalVisible(false);
-
         const slug = saveResponse?.slug || saveResponse?.data?.slug || saveResponse?.id;
+        setQuickPromptText('');
         if (slug) {
           router.push(`/recipe/${slug}`);
         } else {
-          Alert.alert('Bilgi', 'Tarif oluşturuldu fakat detay sayfasına yönlendirilemedi.');
+          Alert.alert('Bilgi', 'Tarif kaydedildi fakat detay sayfasına yönlendirilemedi.');
         }
       } else {
-        // Fallback: API returned slug directly (older format)
-        if (aiMsgIntervalRef.current) {
-          clearInterval(aiMsgIntervalRef.current);
-          aiMsgIntervalRef.current = null;
-        }
-        setAiModalVisible(false);
-
         const slug = aiResponse?.slug || aiResponse?.data?.slug;
         if (slug) {
+          setQuickPromptText('');
           router.push(`/recipe/${slug}`);
         } else {
           Alert.alert('Hata', 'Tarif oluşturulamadı. Lütfen tekrar deneyin.');
         }
       }
     } catch (error: unknown) {
+      if (error instanceof RecipeCreateUnconfirmedError) {
+        Alert.alert('Tarifini kontrol et', 'Tarif kaydedilmiş olabilir. Yeniden oluşturmadan önce Profil > Tariflerim bölümünü kontrol et.');
+      } else {
+        Alert.alert('Hata', error instanceof Error ? error.message : 'AI tarif oluşturulamadı.');
+      }
+    } finally {
       if (aiMsgIntervalRef.current) {
         clearInterval(aiMsgIntervalRef.current);
         aiMsgIntervalRef.current = null;
       }
       setAiModalVisible(false);
-      Alert.alert('Hata', error instanceof Error ? error.message : 'AI tarif oluşturulamadı.');
-    } finally {
       setAiLoading(false);
+      quickCreateInFlightRef.current = false;
     }
   }, [token, filters.query, query, router, quotas.refresh]);
 
@@ -355,8 +363,7 @@ export default function RecipesScreen() {
               {(filters.query || query) ? (
                 <View>
                   <TouchableOpacity
-                    style={[styles.aiCard, (reached(quotas.data, 'recipe_day') || reached(quotas.data, 'recipe_ai_day')) && { opacity: 0.45 }]}
-                    disabled={reached(quotas.data, 'recipe_day') || reached(quotas.data, 'recipe_ai_day')}
+                    style={styles.aiCard}
                     onPress={() => { void handleGenerateAI(); }}>
                   <View style={styles.aiCardHeader}>
                     <Ionicons name="sparkles" size={20} color="#ffffff" />
