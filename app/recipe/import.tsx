@@ -64,6 +64,12 @@ export default function RecipeTextImportScreen() {
   const [publishUnknown, setPublishUnknown] = useState(false);
   const [publishSlow, setPublishSlow] = useState(false);
   const [error, setError] = useState('');
+  const [usageNotice, setUsageNotice] = useState('');
+  useEffect(() => {
+    if (!usageNotice) return;
+    const t = setTimeout(() => setUsageNotice(''), 3500);
+    return () => clearTimeout(t);
+  }, [usageNotice]);
   const [openIngredient, setOpenIngredient] = useState<number | null>(null);
   const [openStep, setOpenStep] = useState<number | null>(null);
   const [seoOpen, setSeoOpen] = useState(false);
@@ -143,6 +149,7 @@ export default function RecipeTextImportScreen() {
       const controller = new AbortController();
       abortRef.current = controller;
       const data = await previewRecipeText(token, source, controller.signal);
+      setUsageNotice("AI düzenleme denemesi kullanıldı. Kalan haklarını Profil'de görebilirsin.");
       setPreview(data);
       setEditor(editorFromPreview(data));
       setStage('review'); // Explicit next stage: never leave AI output below the source field.
@@ -317,11 +324,7 @@ export default function RecipeTextImportScreen() {
             placeholderTextColor="#a59b95" multiline textAlignVertical="top" editable={!busy}
             style={styles.sourceInput} maxLength={20000} />
           <Text style={styles.small}>Notların yalnızca sen istersen yapay zekâyla düzenlenir. {source.length} karakter</Text>
-          <View style={styles.quotaRow}>
-            <Text style={styles.quotaLabel}>Bugünkü düzenleme hakkın</Text>
-            <Text style={styles.quotaValue}>{quotaText(remainingAI)}</Text>
-          </View>
-          <Text style={styles.small}>Görsel oluşturulmaz. Önizleme denemesi AI hakkından düşebilir.</Text>
+          <Text style={styles.small}>Yalnızca sen başlattığında düzenlenir. Görsel oluşturulmaz.</Text>
         </View>
       </> : editor && preview ? <>
         <View style={styles.reviewHero}>
@@ -356,7 +359,7 @@ export default function RecipeTextImportScreen() {
           <View style={[styles.servingsBox, fieldError === 'servings' && styles.servingsInvalid]}
             onLayout={event => { servingsY.current = event.nativeEvent.layout.y; }}>
             <Text style={styles.servingsHeading}>Kaç kişilik?</Text>
-            <Text style={styles.servingsDescription}>Bu bilgiyi sen belirlersin; malzeme miktarlarından tahmin etmiyoruz.</Text>
+            <Text style={styles.servingsDescription}>AI kişi sayısı önermiş olabilir; tarife göre değiştirebilirsin.</Text>
             <View style={styles.servingsChoices}>
               {[2, 4, 6, 8].map(count => <TouchableOpacity key={count}
                 onPress={() => updateEditor(old => ({ ...old, servings: String(count) }))}
@@ -376,6 +379,19 @@ export default function RecipeTextImportScreen() {
             </Text> : null}
           </View>
 
+          <View style={styles.metaBox}>
+            <Text style={styles.metaHeading}>AI önerileri · Dilersen değiştir</Text>
+            <EditorLabel>TAHMİNİ KALORİ · KİŞİ BAŞINA</EditorLabel>
+            <SmallField keyboardType="number-pad" placeholder="Yeterli veri yok"
+              value={editor.calories} onChangeText={text => updateEditor(old => ({ ...old, calories: text }))} />
+            <Text style={styles.small}>Yaklaşık kcal. Miktarlar eksikse hesaplanmaz; beslenme analizi değildir.</Text>
+            <EditorLabel>MUTFAK</EditorLabel>
+            <SmallField placeholder="Örn. Türk Mutfağı" value={editor.cuisine}
+              onChangeText={text => updateEditor(old => ({ ...old, cuisine: text }))} />
+            <EditorLabel>ÖĞÜN TİPİ</EditorLabel>
+            <SmallField placeholder="Örn. Akşam Yemeği" value={editor.mealType}
+              onChangeText={text => updateEditor(old => ({ ...old, mealType: text }))} />
+          </View>
           <EditorLabel>EDİTORYAL SPOT</EditorLabel>
           <SmallField value={editor.excerpt} multiline onChangeText={text => updateEditor(old => ({ ...old, excerpt: text }))} />
 
@@ -435,10 +451,7 @@ export default function RecipeTextImportScreen() {
           <View style={styles.publishCard}>
             <Text style={styles.sectionTitle}>Yayımlamaya hazır mısın?</Text>
             <Text style={styles.small}>Tarifin yalnızca sen onaylarsan herkese açık yayımlanır.</Text>
-            <View style={styles.quotaRow}>
-              <Text style={styles.quotaLabel}>Bugünkü tarif paylaşma hakkın</Text>
-              <Text style={styles.quotaValue}>{quotaText(remainingPublish)}</Text>
-            </View>
+
           </View>
         </View>
       </> : null}
@@ -558,6 +571,8 @@ const styles = StyleSheet.create({
   notice: { borderRadius: 14, borderWidth: 1, borderColor: '#f5dca5', backgroundColor: '#fffaf0', padding: 13, gap: 7 },
   noticeTitle: { color: '#95602c', fontSize: 12, fontWeight: '800' },
   noticeText: { color: '#9b6536', fontSize: 11, lineHeight: 18 },
+  metaBox: { borderRadius: 16, borderWidth: 1, borderColor: '#f1dcc8', backgroundColor: '#fff9f1', padding: 13, gap: 8, marginVertical: 10 },
+  metaHeading: { color: '#ad604b', fontWeight: '900', fontSize: 13 },
   servingsBox: { borderRadius: 16, borderWidth: 1, borderColor: '#f3dcc2', backgroundColor: '#fffbf4', padding: 13, gap: 6, marginVertical: 10 },
   sectionRow: { marginTop: 20, marginBottom: 3, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionHeading: { flex: 1, gap: 4 },
