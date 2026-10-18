@@ -14,6 +14,8 @@ type Props = {
   draft: QuickRecipeDraft;
   onChange: (updater: (value: QuickRecipeDraft) => QuickRecipeDraft) => void;
   existingRecipeId: number | null;
+  cuisineOptions: string[];
+  mealOptions: string[];
   saving: boolean;
   uncertain: boolean;
   error: string;
@@ -37,7 +39,7 @@ function FormField({ label, value, onChange, numeric, multiline, placeholder }: 
 }
 
 export default function QuickRecipeReview({
-  visible, draft, onChange, existingRecipeId, saving, uncertain, error,
+  visible, draft, onChange, existingRecipeId, cuisineOptions, mealOptions, saving, uncertain, error,
   onClose, onNew, onPublish,
 }: Props) {
   const patch = (fields: Partial<QuickRecipeDraft>) => onChange(current => ({ ...current, ...fields }));
@@ -71,10 +73,10 @@ export default function QuickRecipeReview({
             <Text style={styles.hint}>Kalori AI tahminidir; beslenme analizi değildir. Bilinmiyorsa boş kalabilir.</Text>
             <View style={styles.twoCol}>
               <View style={styles.col}><RecipePicker label="Mutfak" value={draft.cuisine[0] || ''}
-                options={[...new Set([...draft.cuisine, 'Türk Mutfağı', 'İtalyan Mutfağı', 'Akdeniz Mutfağı'])]}
+                options={[...new Set([...draft.cuisine, ...cuisineOptions])]}
                 onChange={v => patch({ cuisine: v ? [v] : [] })} /></View>
               <View style={styles.col}><RecipePicker label="Öğün türü" value={draft.meal_type[0] || ''}
-                options={[...new Set([...draft.meal_type, 'Kahvaltı', 'Öğle Yemeği', 'Akşam Yemeği', 'Ara Öğün', 'Tatlı'])]}
+                options={[...new Set([...draft.meal_type, ...mealOptions])]}
                 onChange={v => patch({ meal_type: v ? [v] : [] })} /></View>
             </View>
             <View style={styles.twoCol}>
