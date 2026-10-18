@@ -1,6 +1,6 @@
 /**
- * Quick AI recipes are candidates, not published posts.
- * Pure/offline parsing and explicit user-approved payload preparation;
+ * Quick AI recipes automatically publish only after Core-reviewed quality checks.
+ * Pure/offline parsing and deterministic publication payload preparation;
  * no extra AI calls, no inferred portions, no unverified nutrition facts.
  */
 import { validateRecipeAmount, validateRecipeUnit } from './recipe-measurements';
@@ -22,7 +22,7 @@ export type QuickRecipeDraft = {
   ingredients: QuickIngredient[];
   steps: string[];
   seo: { title: string; description: string; focus_keywords: string };
-  quality_check?: { warnings: string[] };
+  quality_check?: { status: string; issues: string[]; warnings: string[] };
 };
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -84,12 +84,20 @@ export function quickRecipeFromAI(candidate: unknown): QuickRecipeDraft {
         : text(rawKeywords),
     },
     ...(quality ? { quality_check: {
+      status: text(quality.status),
+      issues: terms(quality.issues),
       warnings: terms(quality.warnings),
     } } : {}),
   };
 }
 
 export function validateQuickRecipe(draft: QuickRecipeDraft): string | null {
+  // One authoritative AI editorial audit runs on Core before any image request.
+  // Do not publish if the review flag is missing, unsuccessful or has issues.
+  if (!draft.quality_check || draft.quality_check.status !== 'reviewed'
+    || draft.quality_check.issues.length > 0) {
+    return 'AI tarifi editoryal kalite kontrolünü geçemedi. Yayımlama durduruldu.';
+  }
   if (!draft.title.trim() || draft.title.trim().length > 180) {
     return 'Tarifin adını kontrol et (en fazla 180 karakter).';
   }

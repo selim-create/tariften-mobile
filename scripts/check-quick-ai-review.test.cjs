@@ -21,7 +21,7 @@ const good=()=>({
  title:'Domatesli pilav', excerpt:'Evde kolay pilav.',
  servings:4,calories:270,prep_time:10,cook_time:20,chef_tip:'Altını kapatıp dinlendir.',
  image:'https://example.com/pilav.jpg', cuisine:['turk-mutfagi'], meal_type:['aksam-yemegi'],
- difficulty:['kolay'],diet:[],quality_check:{warnings:['nutrition_unverified']},
+ difficulty:['kolay'],diet:[],quality_check:{status:'reviewed',issues:[],warnings:['nutrition_unverified']},
  ingredients:[{name:'Domates',amount:'2',unit:'adet'},{name:'Pirinç',amount:'1',unit:'su bardağı'}],
  steps:['Domatesleri yıka.','Pirinci kavur.'],
  seo:{title:'Evde Domatesli Pilav',description:'Domatesli pilav.',focus_keywords:['pilav','domates']}
@@ -66,7 +66,7 @@ test('AI draft retains real source fields, suggested serving and per-person esti
  assert.equal(payload.calories,270);
  assert.equal(payload.image,candidate.image);
  assert.deepEqual(payload.steps,candidate.steps);
- assert.deepEqual(payload.quality_check,{warnings:['nutrition_unverified']});
+ assert.deepEqual(payload.quality_check,{status:'reviewed',issues:[],warnings:['nutrition_unverified']});
  assert.deepEqual(payload.seo,{title:'Evde Domatesli Pilav',description:'Domatesli pilav.',focus_keywords:'pilav, domates'});
  assert.ok(!Object.hasOwn(payload,'existing_recipe_id'));
  assert.ok(!Object.hasOwn(payload,'source_text'));
@@ -127,4 +127,19 @@ test('Numeric recipe deep links and published duplicate choice retain safe navig
  const decision=read('components/recipe/SimilarRecipeChoice.tsx');
  assert.match(decision,/Mevcut tarifi görüntüle/);
  assert.match(decision,/Yine de yeni tarif oluştur/);
+});
+
+test('AI never publishes a recipe without a completed Core editorial review',()=>{
+ const original=good();
+ for(const quality of [undefined, null, {}, {status:'requires_review',issues:['weak_editorial_excerpt'],warnings:[]},
+   {status:'reviewed',issues:['invalid_amount'],warnings:['nutrition_unverified']}]) {
+   const candidate = {...original,quality_check:quality};
+   const draft=quickRecipeFromAI(candidate);
+   assert.match(validateQuickRecipe(draft),/editoryal kalite kontrolü/);
+   assert.throws(()=>approvedQuickRecipe(draft));
+ }
+ const valid=quickRecipeFromAI(original);
+ assert.equal(validateQuickRecipe(valid),null);
+ assert.deepEqual(approvedQuickRecipe(valid).quality_check,
+   {status:'reviewed',issues:[],warnings:['nutrition_unverified']});
 });
