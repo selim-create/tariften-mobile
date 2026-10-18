@@ -64,12 +64,18 @@ export default function RecipeTextImportScreen() {
   const [publishUnknown, setPublishUnknown] = useState(false);
   const [publishSlow, setPublishSlow] = useState(false);
   const [error, setError] = useState('');
+  const [usageNotice, setUsageNotice] = useState('');
   const [openIngredient, setOpenIngredient] = useState<number | null>(null);
   const [openStep, setOpenStep] = useState<number | null>(null);
   const [seoOpen, setSeoOpen] = useState(false);
   const requestLock = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => () => { abortRef.current?.abort(); }, []);
+  useEffect(() => {
+    if (!usageNotice) return;
+    const timer = setTimeout(() => setUsageNotice(''), 4400);
+    return () => clearTimeout(timer);
+  }, [usageNotice]);
   useEffect(() => {
     if (busy !== 'publish') { setPublishSlow(false); return; }
     const timer = setTimeout(() => setPublishSlow(true), 8000);
@@ -145,6 +151,7 @@ export default function RecipeTextImportScreen() {
       const data = await previewRecipeText(token, source, controller.signal);
       setPreview(data);
       setEditor(editorFromPreview(data));
+      setUsageNotice('1 AI düzenleme denemesi kullanıldı.');
       setStage('review'); // Explicit next stage: never leave AI output below the source field.
       setAccepted(true);
       setReviewNotesOpen(false);
@@ -289,10 +296,6 @@ export default function RecipeTextImportScreen() {
   };
 
   const notes = preview ? importReviewNotes(preview.warnings, preview.needs_confirmation) : [];
-  const remainingAI = quotas.data?.quotas.recipe_ai_day;
-  const remainingPublish = quotas.data?.quotas.recipe_day;
-  const quotaText = (value: typeof remainingAI) =>
-    !value ? 'Kontrol ediliyor' : value.limit === null ? 'Sınırsız' : String(value.remaining) + ' / ' + String(value.limit);
 
   return <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled"
@@ -317,11 +320,8 @@ export default function RecipeTextImportScreen() {
             placeholderTextColor="#a59b95" multiline textAlignVertical="top" editable={!busy}
             style={styles.sourceInput} maxLength={20000} />
           <Text style={styles.small}>Notların yalnızca sen istersen yapay zekâyla düzenlenir. {source.length} karakter</Text>
-          <View style={styles.quotaRow}>
-            <Text style={styles.quotaLabel}>Bugünkü düzenleme hakkın</Text>
-            <Text style={styles.quotaValue}>{quotaText(remainingAI)}</Text>
-          </View>
-          <Text style={styles.small}>Görsel oluşturulmaz. Önizleme denemesi AI hakkından düşebilir.</Text>
+
+          <Text style={styles.small}>Görsel oluşturulmaz; düzenleme yalnızca sen başlatınca yapılır.</Text>
         </View>
       </> : editor && preview ? <>
         <View style={styles.reviewHero}>
@@ -356,7 +356,7 @@ export default function RecipeTextImportScreen() {
           <View style={[styles.servingsBox, fieldError === 'servings' && styles.servingsInvalid]}
             onLayout={event => { servingsY.current = event.nativeEvent.layout.y; }}>
             <Text style={styles.servingsHeading}>Kaç kişilik?</Text>
-            <Text style={styles.servingsDescription}>Bu bilgiyi sen belirlersin; malzeme miktarlarından tahmin etmiyoruz.</Text>
+            <Text style={styles.servingsDescription}>Yapay zekânın yaklaşık önerisini kontrol et, dilersen kişi sayısını değiştir.</Text>
             <View style={styles.servingsChoices}>
               {[2, 4, 6, 8].map(count => <TouchableOpacity key={count}
                 onPress={() => updateEditor(old => ({ ...old, servings: String(count) }))}
@@ -376,6 +376,19 @@ export default function RecipeTextImportScreen() {
             </Text> : null}
           </View>
 
+          <View style={styles.estimateBox}>
+            <EditorLabel>TAHMİNİ KALORİ · KCAL/KİŞİ</EditorLabel>
+            <SmallField value={editor.calories} keyboardType="number-pad"
+              placeholder="Bilgi yetersizse boş bırak" onChangeText={value =>
+                updateEditor(old => ({ ...old, calories: value }))} />
+            <Text style={styles.estimateHint}>Kalori yaklaşık değerdir, kullanılan miktarlara ve porsiyona göre değişir.</Text>
+            <EditorLabel>MUTFAK · AI ÖNERİSİ</EditorLabel>
+            <SmallField value={editor.cuisine} placeholder="Örn. Türk Mutfağı"
+              onChangeText={value => updateEditor(old => ({ ...old, cuisine: value }))} />
+            <EditorLabel>ÖĞÜN TİPİ · AI ÖNERİSİ</EditorLabel>
+            <SmallField value={editor.mealType} placeholder="Örn. Akşam Yemeği"
+              onChangeText={value => updateEditor(old => ({ ...old, mealType: value }))} />
+          </View>
           <EditorLabel>EDİTORYAL SPOT</EditorLabel>
           <SmallField value={editor.excerpt} multiline onChangeText={text => updateEditor(old => ({ ...old, excerpt: text }))} />
 
@@ -435,10 +448,7 @@ export default function RecipeTextImportScreen() {
           <View style={styles.publishCard}>
             <Text style={styles.sectionTitle}>Yayımlamaya hazır mısın?</Text>
             <Text style={styles.small}>Tarifin yalnızca sen onaylarsan herkese açık yayımlanır.</Text>
-            <View style={styles.quotaRow}>
-              <Text style={styles.quotaLabel}>Bugünkü tarif paylaşma hakkın</Text>
-              <Text style={styles.quotaValue}>{quotaText(remainingPublish)}</Text>
-            </View>
+
           </View>
         </View>
       </> : null}
@@ -446,6 +456,7 @@ export default function RecipeTextImportScreen() {
 
     <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
       {error ? <Text accessibilityRole="alert" style={styles.footerError}>{error}</Text> : null}
+      {usageNotice ? <Text accessibilityRole="alert" style={styles.usageNotice}>{usageNotice}</Text> : null}
       {busy === 'publish' && publishSlow ? <View style={styles.footerProgress}>
         <Ionicons name="cloud-upload-outline" size={15} color="#946a47" />
         <Text style={styles.footerProgressText}>Sunucu yanıtını bekliyoruz. Tarifini yeniden göndermiyoruz.</Text>
@@ -499,6 +510,11 @@ export default function RecipeTextImportScreen() {
 }
 
 const styles = StyleSheet.create({
+  estimateBox: { borderColor: '#eadfd6', borderWidth: 1, backgroundColor: '#fffdfa',
+    borderRadius: 16, padding: 13, gap: 7, marginVertical: 10 },
+  estimateHint: { color: '#9d8473', fontSize: 11, lineHeight: 17 },
+  usageNotice: { alignSelf: 'center', fontSize: 11, fontWeight: '700', color: '#a66d47',
+    backgroundColor: '#fff3e5', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6 },
   footerProgress: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 6 },
   footerProgressText: { flex: 1, fontSize: 11, lineHeight: 17, color: '#8d7057' },
   reviewHero: { borderRadius: 24, borderWidth: 1, borderColor: '#eaded5', backgroundColor: '#fff', padding: 18, gap: 8 },
