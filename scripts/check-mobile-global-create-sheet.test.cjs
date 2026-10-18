@@ -39,15 +39,17 @@ test('sheet uses a native dimmed bottom modal with accessible close and navigati
 test('global create sheet exposes only real manual, import and menu create destinations', () => {
   const component = read('components/navigation/GlobalCreateAction.tsx');
   const destinations = [...component.matchAll(/route: '(\/[^']+)'/g)].map(x => x[1]);
-  assert.deepEqual(destinations, ['/(tabs)/recipes?quick=1', '/(tabs)/pantry', '/recipe/create', '/recipe/import', '/menu/create']);
+  assert.deepEqual(destinations, ['/(tabs)/recipes?quick=1', '/(tabs)/pantry', '/recipe/create', '/recipe/social', '/recipe/import', '/menu/create']);
   for(const [route, file] of [
     ['/recipe/create', 'app/recipe/create.tsx'],
+    ['/recipe/social', 'app/recipe/social.tsx'],
     ['/recipe/import', 'app/recipe/import.tsx'],
     ['/menu/create', 'app/menu/create.tsx']
   ]) {
     assert.ok(fs.existsSync(path.join(root, file)), route + ' should have a real screen');
   }
-  assert.doesNotMatch(component, /instagram|tiktok|social\.import|camera\/import|AI fotoğraf/i);
+  assert.match(component, /Sosyal medyadan tarif ekle/);
+  assert.doesNotMatch(component, /camera\/import|AI fotoğraf/i);
 });
 
 test('Recipes screen returns directly to discovery list without full-width promo cards', () => {
