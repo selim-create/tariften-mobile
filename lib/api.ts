@@ -90,7 +90,7 @@ export async function getRecipes(filters: RecipeFilters | string = {}): Promise<
 }
 
 export async function getRecipe(slug: string): Promise<Recipe | null> {
-  const data = await fetchData(`${API_URL}/tariften/v1/recipes/search?slug=${encodeURIComponent(slug)}`);
+  const data = await fetchData(`${API_URL}/tariften/v1/recipes/search?${/^[1-9]\\d*$/.test(slug) ? `id=${encodeURIComponent(slug)}` : `slug=${encodeURIComponent(slug)}`}`);
 
   if (!data || !data.data || data.data.length === 0) return null;
 
