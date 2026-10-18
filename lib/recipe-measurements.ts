@@ -3,7 +3,8 @@ export const RECIPE_UNITS = [
   'adet', 'g', 'kg', 'ml', 'l', 'su bardağı', 'çay bardağı',
   'yemek kaşığı', 'tatlı kaşığı', 'çay kaşığı', 'fincan',
   'paket', 'dilim', 'diş', 'baş', 'dal', 'demet', 'tutam',
-  'avuç', 'kase', 'çimdik',
+  'avuç', 'kase', 'çimdik', 'gram', 'kilo', 'litre', 'gr', 'bardak',
+  'çorba kaşığı', 'kaşık', 'tane', 'yaprak', 'sap', 'salkım', 'yumru', 'kutu', 'şişe',
 ] as const;
 
 export function validateRecipeAmount(input: string): string | null {
