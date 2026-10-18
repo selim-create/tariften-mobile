@@ -57,9 +57,9 @@ export function validateManualDraft(draft: RecipeManualDraft): { field: ManualFi
     return { field: 'ingredients', message: 'Malzeme satırlarında isim boş bırakılamaz.' };
   }
   if (draft.ingredients.length > 40) return { field: 'ingredients', message: 'En fazla 40 malzeme ekleyebilirsin.' };
-  for (const row of draft.ingredients) {
+  for (const [index, row] of draft.ingredients.entries()) {
     const issue = validateRecipeAmount(row.amount) || validateRecipeUnit(row.unit);
-    if (issue) return { field: 'ingredients', message: issue };
+    if (issue) return { field: 'ingredients', message: `${index + 1}. malzeme: ${issue}` };
   }
   if (!draft.steps.length || draft.steps.some(step => !step.trim())) {
     return { field: 'steps', message: 'Yapılış adımlarını doldurmalısın.' };
