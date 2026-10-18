@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import QuotaCard from '../../components/QuotaCard';
 import { useQuotas } from '../../lib/quotas';
-import { deleteAccount, getInteractions, getUserRecipes } from '../../lib/api';
+import { deleteAccount, getInteractions } from '../../lib/api';
 import { Recipe } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
