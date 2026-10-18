@@ -18,7 +18,7 @@ import { approvedManualPayload, draftFromRecipe, emptyRecipeDraft, EMPTY_INGREDI
 import { prepareManualRecipePhoto, uploadManualRecipePhoto } from '../../lib/manual-recipe-image';
 import LokmaIngredientIcon from '../LokmaIngredientIcon';
 import RecipePicker from './RecipePicker';
-import { RECIPE_UNITS } from '../../lib/recipe-measurements';
+import { RECIPE_UNITS, canTypeRecipeAmount } from '../../lib/recipe-measurements';
 
 const RED = '#df5043', INK = '#1a283e';
 type CategoryKey = 'cuisine' | 'meal_type' | 'difficulty' | 'diet';
@@ -84,6 +84,8 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
     if (!editing || authLoading || !token || !user) return;
     let mounted = true;
     setLoading(true);
+    setDraft(emptyRecipeDraft());
+    setReviewStatus(null);
     (async () => {
       const existing = await getRecipeById(Number(recipeId));
       if (!mounted) return;
@@ -94,12 +96,15 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
         setError('Yalnızca kendi tarifini düzenleyebilirsin.');
         return;
       }
-      setDraft(draftFromRecipe(existing));
+      // A public recipe is never permission to edit: Core authenticates owner.
+      // Do not expose fields or permit a save if this lookup fails.
       try {
         const state = await getRecipeEditReviewStatus(token, Number(recipeId));
-        if (mounted) setReviewStatus(state);
+        if (!mounted) return;
+        setReviewStatus(state);
+        setDraft(draftFromRecipe(existing));
       } catch {
-        // Core protects every update; unavailable status must not change permissions.
+        if (mounted) setError('Düzenleme yetkin doğrulanamadı. Tarifini profilinden yeniden açabilirsin.');
       }
     })().catch(err => {
       if (mounted) setError(err instanceof Error ? err.message : 'Tarif yüklenemedi.');
@@ -388,10 +393,9 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
           {input('Malzeme adı', item.name, text => ingredientEdit(index, 'name', text), { placeholder: 'Örn. Domates' })}
           <View style={styles.twoColumns}>
             <View style={styles.col}>{input('Miktar (isteğe bağlı)', item.amount, text => {
-                if (/[a-zA-ZğüşıöçĞÜŞİÖÇ]/.test(text) &&
-                  !['yarım','çeyrek'].some(value => value.startsWith(text.toLocaleLowerCase('tr-TR')))) {
+                if (!canTypeRecipeAmount(text)) {
                   setInvalidField('ingredients');
-                  setError((index + 1) + '. malzeme: Miktara sayı, kesir, yarım veya çeyrek yaz.');
+                  setError((index + 1) + '. malzeme: Miktara sayı, yarım, bir veya kesir yaz.');
                   return;
                 }
                 ingredientEdit(index, 'amount', text);
