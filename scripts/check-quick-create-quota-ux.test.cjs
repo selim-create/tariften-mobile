@@ -1,0 +1,36 @@
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
+test('global + sheet prioritizes quick text AI and pantry; no bureaucratic note',()=>{
+ const menu=read('components/navigation/GlobalCreateAction.tsx');
+ assert.match(menu,/route: '\/\(tabs\)\/recipes\?quick=1'/);
+ assert.match(menu,/route: '\/\(tabs\)\/pantry'/);
+ assert.ok(menu.indexOf('Hızlı tarif oluştur')<menu.indexOf('Tarifini kendin yaz'));
+ assert.doesNotMatch(menu,/Tariflerin yalnızca sen onayladığında yayımlanır|styles\.footnote.*\/\//);
+});
+test('quick route opens AI prompt before any paid call, uses the same quota guard',()=>{
+ const list=read('app/(tabs)/recipes.tsx');
+ assert.match(list,/params\.quick === '1'/);
+ assert.match(list,/setQuickPromptVisible\(true\)/);
+ assert.match(list,/const prompt = quickPromptText\.trim\(\)/);
+ assert.match(list,/handleGenerateAI\(prompt\)/);
+ assert.match(list,/fetchAccountQuotas\(token\)/);
+ assert.doesNotMatch(list,/<QuotaCard/);
+});
+test('membership rights live in profile only, import metadata is editable',()=>{
+ const profile=read('components/QuotaCard.tsx');
+ assert.match(profile,/Sınırsız/);
+ const importView=read('app/recipe/import.tsx');
+ const lib=read('lib/recipe-import.ts');
+ assert.doesNotMatch(importView,/<View style=\{styles\.quotaRow\}>/);
+ assert.match(importView,/value=\{editor\.calories\}/);
+ assert.match(importView,/value=\{editor\.cuisine\}/);
+ assert.match(importView,/value=\{editor\.mealType\}/);
+ assert.match(lib,/calories_per_serving/);
+ assert.match(importView,/setUsageNotice/);
+ assert.doesNotMatch(read('app/menu/create.tsx'),/<QuotaCard/);
+ assert.doesNotMatch(read('components/recipe/RecipeManualEditor.tsx'),/Bugünkü tarif hakkın:/);
+});
