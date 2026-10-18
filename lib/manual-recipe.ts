@@ -46,8 +46,11 @@ export function validateManualDraft(draft: RecipeManualDraft): { field: ManualFi
     return { field: 'servings', message: 'Tarifin kaç kişilik olduğunu seçmelisin (1–36).' };
   }
   for (const key of ['prep_time', 'cook_time', 'calories'] as const) {
-    if (draft[key].trim() && (!/^\d+$/.test(draft[key].trim()) || Number(draft[key]) > 9999)) {
-      return { field: key, message: 'Süre ve kalori alanlarında negatif olmayan bir sayı kullan.' };
+    const max = key === 'calories' ? 3000 : 720;
+    if (draft[key].trim() && (!/^\d+$/.test(draft[key].trim()) || Number(draft[key]) > max)) {
+      return { field: key, message: key === 'calories'
+        ? 'Kişi başına kalori 0–3000 arasında olmalı.'
+        : 'Süre 0–720 dakika arasında olmalı.' };
     }
   }
   if (!draft.ingredients.length || draft.ingredients.some(item => !item.name.trim())) {
