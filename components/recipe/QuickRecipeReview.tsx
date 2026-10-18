@@ -41,7 +41,7 @@ export default function QuickRecipeReview({
   const patch = (fields: Partial<QuickRecipeDraft>) => onChange(current => ({ ...current, ...fields }));
   const validation = validateQuickRecipe(draft);
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" onRequestClose={() => { if (!saving) onClose(); }}>
       <SafeAreaView style={styles.page}>
         <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.header}>
@@ -121,7 +121,7 @@ export default function QuickRecipeReview({
               Tarif kaydedilmiş olabilir. Yeniden göndermeden önce Profil &gt; Tariflerim bölümünü kontrol et.
             </Text>}
             <View style={styles.footerActions}>
-              <TouchableOpacity accessibilityRole="button" onPress={onNew} disabled={saving} style={styles.secondary}>
+              <TouchableOpacity accessibilityRole="button" onPress={onNew} disabled={saving || uncertain} style={styles.secondary}>
                 <Text style={styles.secondaryText}>Yeni tarif yaz</Text>
               </TouchableOpacity>
               <TouchableOpacity accessibilityRole="button" onPress={onPublish} disabled={saving || uncertain || !!validation}
