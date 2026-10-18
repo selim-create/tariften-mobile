@@ -15,7 +15,7 @@ import {
   buildApprovedRecipe, editorFromPreview, importReviewNotes, publishValidation,
   validateRecipeSource,
 } from '../../lib/recipe-import';
-import { previewRecipeText } from '../../lib/recipe-import-api';
+import { previewRecipeSocial, previewRecipeText } from '../../lib/recipe-import-api';
 import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
 
 type Busy = 'preview' | 'publish' | null;
@@ -48,6 +48,8 @@ export default function RecipeTextImportScreen() {
   const { token } = useAuth();
   const quotas = useQuotas(token);
   const [source, setSource] = useState('');
+  const [importMethod, setImportMethod] = useState<'social' | 'text'>('social');
+  const [socialUrl, setSocialUrl] = useState('');
   const [stage, setStage] = useState<Stage>('source');
   const scrollRef = useRef<ScrollView>(null);
   const servingsRef = useRef<TextInput>(null);
@@ -164,6 +166,47 @@ export default function RecipeTextImportScreen() {
     } finally {
       abortRef.current = null;
       void quotas.refresh(); // Failed provider attempts may still count.
+      setBusy(null);
+      requestLock.current = false;
+    }
+  };
+
+  const requestSocialPreview = async () => {
+    if (!token) { router.push('/login'); return; }
+    if (requestLock.current) return;
+    const link = socialUrl.trim();
+    if (!/^https:\/\/[^\s]+$/i.test(link) || link.length > 2048) {
+      setError('Geçerli bir HTTPS paylaşım bağlantısı gir.');
+      return;
+    }
+    requestLock.current = true;
+    setBusy('preview');
+    setError('');
+    try {
+      const rights = await fetchAccountQuotas(token);
+      if (reached(rights, 'recipe_ai_day')) {
+        setError('Bugünkü yapay zekâ hakkın doldu. Yenilenme: ' + resetDate(rights, 'recipe_ai_day'));
+        return;
+      }
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const data = await previewRecipeSocial(token, link, controller.signal);
+      setSource(data.source_text);
+      setPreview(data);
+      setEditor(editorFromPreview(data));
+      setStage('review');
+      setAccepted(true);
+      setReviewNotesOpen(false);
+      setFieldError(null);
+      setOpenIngredient(null);
+      setOpenStep(null);
+      setUsageNotice('Tarif düzenleme hakkından bir deneme kullanıldı.');
+      requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Bağlantı incelenemedi.');
+    } finally {
+      abortRef.current = null;
+      void quotas.refresh();
       setBusy(null);
       requestLock.current = false;
     }
@@ -317,6 +360,21 @@ export default function RecipeTextImportScreen() {
         <View style={styles.card}>
           <Text style={styles.cardHeading}>Senin mutfak notların</Text>
           <Text style={styles.subtitle}>Elinin alıştığı ölçüler, aileden kalan küçük sırlar...</Text>
+          <View style={styles.socialTabs} accessibilityRole="tablist">
+            <TouchableOpacity accessibilityRole="tab" accessibilityState={{ selected: importMethod === 'social' }}
+              disabled={!!busy} onPress={() => { setImportMethod('social'); setError(''); }}
+              style={[styles.socialTab, importMethod === 'social' && styles.socialTabActive]}>
+              <Ionicons name="link-outline" size={15} color={BRAND} />
+              <Text style={styles.socialTabText}>Bağlantıyla</Text>
+            </TouchableOpacity>
+            <TouchableOpacity accessibilityRole="tab" accessibilityState={{ selected: importMethod === 'text' }}
+              disabled={!!busy} onPress={() => { setImportMethod('text'); setError(''); }}
+              style={[styles.socialTab, importMethod === 'text' && styles.socialTabActive]}>
+              <Ionicons name="document-text-outline" size={15} color={BRAND} />
+              <Text style={styles.socialTabText}>Tarif metni</Text>
+            </TouchableOpacity>
+          </View>
+          {importMethod === 'text' ? <>
           <EditorLabel>TARİFİNİ ANLAT</EditorLabel>
           <TextInput value={source} onChangeText={updateSource}
             placeholder="Örneğin: Önce soğanı rendele, üzerine domatesi ekle..."
@@ -324,6 +382,24 @@ export default function RecipeTextImportScreen() {
             style={styles.sourceInput} maxLength={20000} />
           <Text style={styles.small}>Notların yalnızca sen istersen yapay zekâyla düzenlenir. {source.length} karakter</Text>
           <Text style={styles.small}>Yalnızca sen başlattığında düzenlenir. Görsel oluşturulmaz.</Text>
+          </> : <>
+            <EditorLabel>PAYLAŞIM BAĞLANTISI</EditorLabel>
+            <TextInput value={socialUrl}
+              onChangeText={url => { setSocialUrl(url); setPreview(null); setEditor(null); setError(''); }}
+              placeholder="https://www.youtube.com/shorts/…"
+              placeholderTextColor="#a59b95" autoCapitalize="none" autoCorrect={false}
+              keyboardType="url" editable={!busy} maxLength={2048} style={styles.input} />
+            <Text style={styles.socialHelp}>
+              Reels, TikTok, Shorts veya bir yemek gönderisinin bağlantısını ekle. Bu beta sürümünde erişilebilen paylaşım açıklaması kullanılır; videonun sesi veya görüntüsü henüz analiz edilmez.
+            </Text>
+            {preview?.provenance.origin_type === 'social_creator_description' ? (
+              <View style={styles.socialSourceBox}>
+                <Text style={styles.socialSourceTitle}>Kaynak açıklaması</Text>
+                <Text style={styles.socialSourceText} numberOfLines={6}>{preview.source_text}</Text>
+              </View>
+            ) : null}
+          </>}
+
         </View>
       </> : editor && preview ? <>
         <View style={styles.reviewHero}>
@@ -492,17 +568,18 @@ export default function RecipeTextImportScreen() {
             setError('');
             requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }));
           } else {
-            void requestPreview();
+            if (importMethod === 'social') { void requestSocialPreview(); }
+            else { void requestPreview(); }
           }
         }}
-        accessibilityRole="button" accessibilityLabel={publishUnknown ? 'Tariflerim bölümünde kontrol et' : stage === 'source' ? 'Tarifimi güzelleştir' : 'Onayla ve yayımla'}>
+        accessibilityRole="button" accessibilityLabel={publishUnknown ? 'Tariflerim bölümünde kontrol et' : stage === 'source' ? (importMethod === 'social' ? 'Bağlantıdan tarif oluştur' : 'Tarifimi güzelleştir') : 'Onayla ve yayımla'}>
         {busy ? <ActivityIndicator color="#fff" />
           : <Ionicons name={publishUnknown ? 'search-outline' : stage === 'source' ? 'sparkles' : 'checkmark-circle-outline'} size={19} color="#fff" />}
         <Text style={styles.mainButtonText}>{busy === 'preview' ? 'Tarifini düzenliyoruz…'
           : busy === 'publish' ? 'Tarifin yayımlanıyor…'
             : publishUnknown ? 'Tariflerimde kontrol et'
             : stage === 'source'
-              ? (preview && editor ? 'Düzenlenmiş tarifime dön' : 'Tarifimi güzelleştir')
+              ? (preview && editor ? 'Düzenlenmiş tarifime dön' : importMethod === 'social' ? 'Bağlantıdan tarif oluştur' : 'Tarifimi güzelleştir')
               : 'Onayla ve yayımla'}</Text>
         {!busy && <Ionicons name="arrow-forward" size={17} color="#fff" />}
       </TouchableOpacity>
@@ -556,6 +633,14 @@ const styles = StyleSheet.create({
   fieldLabel: { color: '#657389', fontSize: 10, fontWeight: '800', letterSpacing: 1, marginTop: 6 },
   input: { borderColor: '#e9dcd2', borderWidth: 1, borderRadius: 13, minHeight: 48, paddingHorizontal: 14, color: '#273245', backgroundColor: '#fffcfa', fontSize: 14 },
   multiInput: { minHeight: 82, paddingVertical: 12, lineHeight: 21 },
+  socialTabs: { flexDirection: 'row', padding: 5, gap: 7, backgroundColor: '#fff5f0', borderRadius: 14 },
+  socialTab: { flex: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 5, borderRadius: 11, minHeight: 43, paddingHorizontal: 8 },
+  socialTabActive: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#f1dfd3' },
+  socialTabText: { fontSize: 12, fontWeight: '800', color: '#a85d4a' },
+  socialHelp: { fontSize: 12, lineHeight: 20, color: '#8f8277' },
+  socialSourceBox: { borderWidth: 1, borderColor: '#e9dcd2', padding: 12, borderRadius: 12, backgroundColor: '#fffdfa', gap: 5 },
+  socialSourceTitle: { fontSize: 11, fontWeight: '800', color: '#42745e' },
+  socialSourceText: { fontSize: 11, color: '#6c7380', lineHeight: 19 },
   sourceInput: { color: '#253246', fontSize: 14, lineHeight: 24, borderColor: '#e9dcd2', backgroundColor: '#fffcfa', borderWidth: 1, borderRadius: 15, minHeight: 210, maxHeight: 360, padding: 15 },
   quotaRow: { borderColor: '#ebece9', borderWidth: 1, borderRadius: 12, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 12 },
   quotaLabel: { color: '#5b687a', fontSize: 11, fontWeight: '700' },

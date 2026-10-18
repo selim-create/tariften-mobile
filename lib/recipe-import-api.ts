@@ -68,3 +68,66 @@ export async function previewRecipeText(
     signal?.removeEventListener('abort', onAbort);
   }
 }
+
+/**
+ * Creator-description import only. This calls the single existing Core paid
+ * import when the source has enough text; video/audio are not processed here.
+ */
+export async function previewRecipeSocial(
+  token: string,
+  sourceUrl: string,
+  signal?: AbortSignal,
+): Promise<GroundedImportPreview> {
+  if (!token) throw new Error('Tarif oluşturmak için giriş yapmalısın.');
+  const link = sourceUrl.trim();
+  if (!/^https:\/\/[^\s]+$/i.test(link) || link.length > 2048) {
+    throw new Error('Geçerli bir HTTPS paylaşım bağlantısı gir.');
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 110000);
+  const onAbort = () => controller.abort();
+  signal?.addEventListener('abort', onAbort, { once: true });
+  try {
+    const response = await fetch('https://api.tariften.com/wp-json/tariften/v1/ai/recipe-social/preview', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'Cache-Control': 'no-store',
+      },
+      body: JSON.stringify({ source_url: link }),
+      signal: controller.signal,
+    });
+    const payload: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+      const error = asError(payload);
+      if (response.status === 404 && error.code === 'rest_no_route') {
+        throw new Error('Sosyal tarif aktarımı henüz sunucuda hazır değil.');
+      }
+      if (error.code === 'social_source_unavailable' || error.code === 'recipe_import_unavailable') {
+        throw new Error('Sosyal tarif aktarımı beta özelliği henüz etkinleştirilmedi.');
+      }
+      if (response.status === 504 || error.code === 'recipe_import_timeout') {
+        throw new Error('Tarifin hazırlanması zaman aşımına uğradı. Kullanım hakkından deneme düşmüş olabilir.');
+      }
+      throw new Error(error.message || 'Bu bağlantıdan tarif çıkarılamadı.');
+    }
+    const preview = parseImportPreview(payload);
+    if (preview.provenance.origin_type !== 'social_creator_description') {
+      throw new Error('Sosyal tarif kaynağı doğrulanamadı.');
+    }
+    return preview;
+  } catch (cause) {
+    if (controller.signal.aborted || signal?.aborted) {
+      throw new Error('Kaynak incelemesi zaman aşımına uğradı ya da iptal edildi. Kullanım hakkından deneme düşmüş olabilir.');
+    }
+    if (cause instanceof TypeError) {
+      throw new Error('Tariften sunucusuna bağlanılamadı. İnternet bağlantını kontrol et.');
+    }
+    throw cause;
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', onAbort);
+  }
+}
