@@ -49,7 +49,11 @@ export type GroundedImportPreview = {
   warnings: string[];
   needs_confirmation: string[];
   provenance: {
-    origin_type: "manual_text";
+    origin_type: "manual_text" | "social_creator_description";
+    source_platform?: "youtube" | "tiktok" | "instagram" | "facebook" | "pinterest";
+    source_url?: string;
+    video_analyzed?: false;
+    audio_transcribed?: false;
     ingredient_evidence: string;
     step_evidence: string;
     editorial_fields: string[];
@@ -126,8 +130,19 @@ export function parseImportPreview(value: unknown): GroundedImportPreview {
     || r.ingredients.length > 40 || r.steps.length > 40 || !isRecord(r.seo)
     || !isString(r.seo.title) || !isString(r.seo.description)
     || !isStringArray(r.seo.focus_keywords)
-    || value.provenance.origin_type !== "manual_text") {
+    || (value.provenance.origin_type !== "manual_text" && value.provenance.origin_type !== "social_creator_description")) {
     throw new Error("Tarif alanları eksik veya beklenmeyen türde.");
+  }
+  if (value.provenance.origin_type === "social_creator_description") {
+    const platform = value.provenance.source_platform;
+    const link = value.provenance.source_url;
+    if (typeof platform !== "string"
+      || !["youtube", "tiktok", "instagram", "facebook", "pinterest"].includes(platform)
+      || typeof link !== "string" || !/^https:\/\/[^\s]+$/i.test(link)
+      || value.provenance.video_analyzed !== false
+      || value.provenance.audio_transcribed !== false) {
+      throw new Error("Sosyal kaynak doğrulaması eksik.");
+    }
   }
   for (const ingredient of r.ingredients as ImportIngredient[]) {
     const sourceName = ingredient.source_name || ingredient.name;
