@@ -78,15 +78,15 @@ test('native create and edit share one staged editor, preserve author permission
   const create = read('app/recipe/create.tsx');
   const edit = read('app/recipe/edit/[id].tsx');
   const layout = read('app/_layout.tsx');
-  const recipes = read('app/(tabs)/recipes.tsx');
+  const createSheet = read('components/navigation/GlobalCreateAction.tsx');
   const details = read('app/recipe/[slug].tsx');
   assert.match(create,/RecipeManualEditor/);
   assert.match(edit,/RecipeManualEditor recipeId/);
   assert.match(edit,/Düzenlenecek tarifin bağlantısı geçersiz/);
   assert.match(layout,/name="recipe\/create"/);
   assert.match(layout,/name="recipe\/edit\/\[id\]"/);
-  assert.match(recipes,/router.push\('\/recipe\/create'\)/);
-  assert.match(recipes,/router.push\('\/recipe\/import'\)/);
+  assert.match(createSheet,/route: '\/recipe\/create'/);
+  assert.match(createSheet,/route: '\/recipe\/import'/);
   assert.match(details,/router.push\(`\/recipe\/edit\/\$\{recipe.id\}`\)/);
   assert.match(editor,/Number\(existing.author\?\.id\) !== Number\(user.id\)/);
   assert.match(editor,/approvedManualPayload\(draft, image\)/);
