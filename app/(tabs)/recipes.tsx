@@ -5,6 +5,7 @@ import {
   Modal,
   RefreshControl,
   ScrollView,
+  TextInput,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -20,7 +21,6 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import ResponsiveGrid from '../../components/ResponsiveGrid';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import QuotaCard from '../../components/QuotaCard';
 import { fetchAccountQuotas, reached, resetDate, useQuotas } from '../../lib/quotas';
 
 const AI_LOADING_MESSAGES = [
@@ -39,6 +39,7 @@ export default function RecipesScreen() {
     difficulty?: string;
     mealType?: string;
     collection?: string;
+    quick?: string;
   }>();
   const router = useRouter();
   const { token } = useAuth();
@@ -60,6 +61,8 @@ export default function RecipesScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [query, setQuery] = useState(params.query || '');
   const [aiModalVisible, setAiModalVisible] = useState(false);
+  const [quickVisible, setQuickVisible] = useState(false);
+  const [quickText, setQuickText] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiLoadingMessage, setAiLoadingMessage] = useState(AI_LOADING_MESSAGES[0]);
   const aiMsgIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -118,6 +121,10 @@ export default function RecipesScreen() {
   }, []);
 
   useEffect(() => {
+    if (params.quick === '1') setQuickVisible(true);
+  }, [params.quick]);
+
+  useEffect(() => {
     const newFilters: RecipeFilters = {};
     if (params.query) newFilters.query = params.query;
     if (params.cuisine) newFilters.cuisine = [params.cuisine];
@@ -154,12 +161,12 @@ export default function RecipesScreen() {
     setFilters(newFilters);
   }, []);
 
-  const handleGenerateAI = useCallback(async () => {
+  const handleGenerateAI = useCallback(async (inputOverride?: string) => {
     if (!token) {
       router.push('/login');
       return;
     }
-    const searchQuery = filters.query || query;
+    const searchQuery = inputOverride?.trim() || filters.query || query;
     if (!searchQuery.trim()) {
       Alert.alert('Hata', 'Tarif oluşturmak için önce bir arama yapın.');
       return;
@@ -290,6 +297,19 @@ export default function RecipesScreen() {
       </View>
 
 
+      <View style={styles.quickActionsRow}>
+        <TouchableOpacity accessibilityRole="button" onPress={() => setQuickVisible(true)}
+          style={styles.quickAction}>
+          <Ionicons name="sparkles-outline" color="#db4c3f" size={16} />
+          <Text style={styles.quickActionText}>Hızlı tarif oluştur</Text>
+        </TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/(tabs)/pantry')}
+          style={styles.quickAction}>
+          <Ionicons name="basket-outline" color="#398367" size={16} />
+          <Text style={styles.quickActionText}>Dolabımı kullan</Text>
+        </TouchableOpacity>
+      </View>
+
       {activeChips.length > 0 ? (
         <View style={styles.activeFiltersRow}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.activeFiltersContent}>
@@ -338,11 +358,10 @@ export default function RecipesScreen() {
               <Text style={styles.emptySubtext}>Farklı filtreler deneyin.</Text>
               {(filters.query || query) ? (
                 <View>
-                  <QuotaCard data={quotas.data} error={quotas.error} loading={quotas.loading} kinds={['recipe_day', 'recipe_ai_day']} />
                   <TouchableOpacity
                     style={[styles.aiCard, (reached(quotas.data, 'recipe_day') || reached(quotas.data, 'recipe_ai_day')) && { opacity: 0.45 }]}
                     disabled={reached(quotas.data, 'recipe_day') || reached(quotas.data, 'recipe_ai_day')}
-                    onPress={handleGenerateAI}>
+                    onPress={() => void handleGenerateAI()}>
                   <View style={styles.aiCardHeader}>
                     <Ionicons name="sparkles" size={20} color="#ffffff" />
                     <Text style={styles.aiCardTitle}>AI ile Tarif Oluştur</Text>
@@ -369,6 +388,37 @@ export default function RecipesScreen() {
         terms={terms ?? undefined}
       />
 
+      <Modal visible={quickVisible} transparent animationType="slide"
+        onRequestClose={() => setQuickVisible(false)}>
+        <View style={styles.quickOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} accessibilityRole="button"
+            accessibilityLabel="Hızlı tarif penceresini kapat" onPress={() => setQuickVisible(false)} />
+          <View style={styles.quickSheet}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Kapat"
+              style={styles.quickClose} onPress={() => setQuickVisible(false)}>
+              <Ionicons name="close" size={23} color="#85786f" />
+            </TouchableOpacity>
+            <Text style={styles.quickEyebrow}>TARİFTEN · HIZLI MUTFAK</Text>
+            <Text style={styles.quickTitle}>Bugün ne pişirelim?</Text>
+            <Text style={styles.quickHint}>Yemek adı yaz veya elindeki malzemeleri listele.</Text>
+            <TextInput autoFocus multiline value={quickText} onChangeText={setQuickText}
+              accessibilityLabel="Tarif adı veya malzeme listesi"
+              placeholder="Örn. Kabak, domates, bulgur..." placeholderTextColor="#aaa098"
+              style={styles.quickInput} />
+            <TouchableOpacity accessibilityRole="button" disabled={!quickText.trim() || aiLoading}
+              style={[styles.quickGenerate, (!quickText.trim() || aiLoading) && { opacity: 0.5 }]}
+              onPress={() => { const prompt = quickText.trim(); setQuickVisible(false); void handleGenerateAI(prompt); }}>
+              <Ionicons name="sparkles" size={17} color="#fff" />
+              <Text style={styles.quickGenerateText}>AI ile tarif oluştur</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickPantry} accessibilityRole="button"
+              onPress={() => { setQuickVisible(false); router.push('/(tabs)/pantry'); }}>
+              <Ionicons name="basket-outline" size={17} color="#398367" />
+              <Text style={styles.quickPantryText}>Dolabımdaki malzemeleri kullan</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       {/* AI Loading Modal */}
       <Modal visible={aiModalVisible} transparent animationType="fade">
         <View style={styles.aiModalOverlay}>
@@ -384,6 +434,24 @@ export default function RecipesScreen() {
 }
 
 const styles = StyleSheet.create({
+  quickActionsRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, paddingHorizontal: 16, paddingVertical: 8 },
+  quickAction: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 7 },
+  quickActionText: { fontSize: 11, fontWeight: '800', color: '#906e60' },
+  quickOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(21,31,39,0.5)' },
+  quickSheet: { borderTopLeftRadius: 30, borderTopRightRadius: 30, backgroundColor: '#fffbf7',
+    paddingHorizontal: 22, paddingTop: 28, paddingBottom: 42, gap: 12 },
+  quickClose: { position: 'absolute', right: 17, top: 14, zIndex: 1, padding: 10 },
+  quickEyebrow: { fontSize: 10, fontWeight: '900', color: '#c95c4c', letterSpacing: 1.5 },
+  quickTitle: { fontSize: 27, fontWeight: '900', color: '#23313b' },
+  quickHint: { color: '#8a8078', fontSize: 13, lineHeight: 20 },
+  quickInput: { borderWidth: 1, borderColor: '#eeddd1', borderRadius: 17, minHeight: 95,
+    backgroundColor: '#fff', color: '#273847', paddingHorizontal: 14, paddingVertical: 12,
+    fontSize: 14, textAlignVertical: 'top' },
+  quickGenerate: { backgroundColor: '#db4c3f', minHeight: 50, borderRadius: 14,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  quickGenerateText: { color: '#fff', fontSize: 14, fontWeight: '900' },
+  quickPantry: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 42, gap: 8 },
+  quickPantryText: { color: '#398367', fontSize: 12, fontWeight: '800' },
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
