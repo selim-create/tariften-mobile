@@ -357,7 +357,7 @@ export default function RecipesScreen() {
                   <TouchableOpacity
                     style={[styles.aiCard, (reached(quotas.data, 'recipe_day') || reached(quotas.data, 'recipe_ai_day')) && { opacity: 0.45 }]}
                     disabled={reached(quotas.data, 'recipe_day') || reached(quotas.data, 'recipe_ai_day')}
-                    onPress={handleGenerateAI}>
+                    onPress={() => { void handleGenerateAI(); }}>
                   <View style={styles.aiCardHeader}>
                     <Ionicons name="sparkles" size={20} color="#ffffff" />
                     <Text style={styles.aiCardTitle}>AI ile Tarif Oluştur</Text>
