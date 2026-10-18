@@ -109,8 +109,11 @@ test('AI can publish grounded composite egg amounts without inventing whole eggs
  const draft=quickRecipeFromAI(candidate);
  assert.equal(validateQuickRecipe(draft),null);
  assert.equal(approvedQuickRecipe(draft).ingredients[0].amount,'1 bütün + 2 sarı');
- candidate.ingredients[0].amount='domatas';
- assert.ok(validateQuickRecipe(quickRecipeFromAI(candidate)));
+ const invalid = {
+  ...draft,
+  ingredients: [{ ...draft.ingredients[0], amount: 'domatas' }, ...draft.ingredients.slice(1)],
+ };
+ assert.ok(validateQuickRecipe(invalid),'AI publication must reject arbitrary amount words');
 });
 test('Numeric recipe deep links and published duplicate choice retain safe navigation',()=> {
  const api=read('lib/api.ts');
