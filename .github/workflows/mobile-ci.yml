@@ -37,6 +37,8 @@ jobs:
         run: node --test scripts/check-mobile-recipe-hero-reactions.test.cjs
       - name: Guard editable AI recipe preview and user-approved publish
         run: node --test scripts/check-quick-ai-review.test.cjs
+      - name: Guard shared recipe editor UX, curated units and numeric ranges
+        run: node --test scripts/check-recipe-editor-parity-ux.test.cjs
       - name: Typecheck Expo React Native project
         run: npx tsc --noEmit
       - name: Check recommended Expo native dependency versions
