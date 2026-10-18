@@ -113,10 +113,18 @@ test('AI can publish grounded composite egg amounts without inventing whole eggs
   ...draft,
   ingredients: [{ ...draft.ingredients[0], amount: 'domatas' }, ...draft.ingredients.slice(1)],
  };
- assert.ok(validateQuickRecipe(invalid), 'Invalid amount was not rejected: ' + JSON.stringify({
-  amount: invalid.ingredients[0].amount,
-  measurement: measures.exports.validateRecipeAmount(invalid.ingredients[0].amount),
-  validated: validateQuickRecipe(invalid),
+ const seen = [];
+ const originalAmountCheck = measures.exports.validateRecipeAmount;
+ measures.exports.validateRecipeAmount = value => {
+   const result = originalAmountCheck(value);
+   seen.push({ value, result });
+   return result;
+ };
+ const problem = validateQuickRecipe(invalid);
+ measures.exports.validateRecipeAmount = originalAmountCheck;
+ assert.ok(problem, 'Invalid amount not rejected: ' + JSON.stringify({
+   amount: invalid.ingredients[0].amount, seen, result: problem,
+   functionCode: validateQuickRecipe.toString().slice(-1200),
  }));
 });
 test('Numeric recipe deep links and published duplicate choice retain safe navigation',()=> {
