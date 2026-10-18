@@ -9,7 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
-import { createRecipe, getRecipeById, getTerms, updateRecipe } from '../../lib/api';
+import { createRecipe, getRecipeById, getTerms, updateRecipe, getRecipeEditReviewStatus,
+  type RecipeEditReviewStatus } from '../../lib/api';
 import { fetchAccountQuotas, reached, resetDate, useQuotas } from '../../lib/quotas';
 import { RequestDeadlineError, isPublishResultUncertain, withDeadline } from '../../lib/recipe-publish';
 import { approvedManualPayload, draftFromRecipe, emptyRecipeDraft, EMPTY_INGREDIENT,
@@ -69,6 +70,7 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
   const [uncertain, setUncertain] = useState(false);
   const [error, setError] = useState('');
   const [invalidField, setInvalidField] = useState<ManualField | null>(null);
+  const [reviewStatus, setReviewStatus] = useState<RecipeEditReviewStatus | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -91,6 +93,12 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
         return;
       }
       setDraft(draftFromRecipe(existing));
+      try {
+        const state = await getRecipeEditReviewStatus(token, Number(recipeId));
+        if (mounted) setReviewStatus(state);
+      } catch {
+        // Core protects every update; unavailable status must not change permissions.
+      }
     })().catch(err => {
       if (mounted) setError(err instanceof Error ? err.message : 'Tarif yüklenemedi.');
     }).finally(() => { if (mounted) setLoading(false); });
@@ -158,7 +166,8 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
   };
 
   const save = async () => {
-    if (!token || !user || busyRef.current || finishedRef.current || uncertain) return;
+    if (!token || !user || busyRef.current || finishedRef.current || uncertain ||
+      (editing && reviewStatus?.status === 'pending')) return;
     const issue = validateManualDraft(draft);
     if (issue) { requireField(issue.field, issue.message); return; }
     busyRef.current = true; setBusy(true); setError('');
@@ -192,6 +201,15 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
       const slug = result?.slug;
       finishedRef.current = true;
       void quotas.refresh();
+      if (editing && (result?.pending_review === true || result?.status === 'pending_review')) {
+        setReviewStatus({ status: 'pending', updated_at: new Date().toISOString(), note: '' });
+        Alert.alert(
+          'Değişikliklerin incelemeye gönderildi',
+          'Yönetici onayına kadar tarifinin yayındaki hâli değişmeyecek.',
+          [{ text: 'Tariflerime dön', onPress: () => router.replace('/(tabs)/profile') }],
+        );
+        return;
+      }
       if (typeof slug === 'string' && slug.trim()) router.replace('/recipe/' + encodeURIComponent(slug));
       else Alert.alert('Tarifin kaydedildi', 'Tarifini profilindeki Tariflerim bölümünde bulabilirsin.', [
         { text: 'Profilime git', onPress: () => router.replace('/(tabs)/profile') },
@@ -213,11 +231,15 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
   const confirmSave = () => {
     const issue = validateManualDraft(draft);
     if (issue) { requireField(issue.field, issue.message); return; }
-    Alert.alert(editing ? 'Değişiklikler kaydedilsin mi?' : 'Tarifin yayımlansın mı?',
-      editing ? 'Tarifinin mevcut sayfası yeni bilgilerle güncellenecek.'
+    if (editing && reviewStatus?.status === 'pending') {
+      Alert.alert('İncelemede', 'Önceki düzenleme isteğin hâlâ yönetici onayında.');
+      return;
+    }
+    Alert.alert(editing ? 'Değişikliklerini gönder?' : 'Tarifin yayımlansın mı?',
+      editing ? 'Üye düzenlemeleri yönetici onayından sonra yayına alınır. Tarifinin eski hâli bu sırada korunur.'
         : 'Tarifin herkese açık olarak yayımlanacak. Son sözü sen söylersin.',
       [{ text: 'Vazgeç', style: 'cancel' },
-        { text: editing ? 'Kaydet' : 'Onayla ve yayımla', onPress: () => { void save(); } }]);
+        { text: editing ? 'Değişiklikleri gönder' : 'Onayla ve yayımla', onPress: () => { void save(); } }]);
   };
 
   const ingredientEdit = (index: number, field: 'name'|'amount'|'unit', value: string) => {
@@ -254,6 +276,28 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
         <Text style={styles.kicker}>TARİFTEN MUTFAK STÜDYOSU</Text>
         <Text style={styles.heading}>{editing ? 'Tarifini düzenle.' : 'Kendi tarifini oluştur.'}</Text>
         <Text style={styles.subtitle}>{subtitle}</Text>
+        {editing && reviewStatus?.status === 'pending' ? (
+          <View style={styles.reviewPending} accessibilityRole="alert">
+            <Ionicons name="time-outline" size={20} color="#ad6c38" />
+            <View style={styles.col}>
+              <Text style={styles.reviewPendingTitle}>Değişikliklerin onay bekliyor</Text>
+              <Text style={styles.reviewPendingCopy}>Tarifinin yayındaki hâli korunuyor. Yönetici kararından sonra yeniden düzenleyebilirsin.</Text>
+            </View>
+          </View>
+        ) : null}
+        {editing && reviewStatus?.status === 'rejected' ? (
+          <View style={styles.reviewPending} accessibilityRole="alert">
+            <Ionicons name="alert-circle-outline" size={20} color="#af4f42" />
+            <View style={styles.col}>
+              <Text style={styles.reviewPendingTitle}>Son düzenleme isteğin onaylanmadı</Text>
+              {reviewStatus.note ? <Text style={styles.reviewPendingCopy}>Yönetici notu: {reviewStatus.note}</Text> : null}
+              <Text style={styles.reviewPendingCopy}>Tarifini yeniden düzenleyip gönderebilirsin.</Text>
+            </View>
+          </View>
+        ) : null}
+        {editing && reviewStatus?.status === 'approved' ? (
+          <Text style={styles.reviewApproved}>Son düzenlemen yönetici tarafından onaylandı.</Text>
+        ) : null}
         <View style={styles.stages}>
           {stages.map((text, index) => <View key={text} style={[styles.stepPill, index === stage && styles.stepActive]}>
             <Text style={[styles.stepText, index === stage && styles.stepActiveText]}>{index + 1} · {text}</Text>
@@ -397,11 +441,13 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
           {stage > 0 ? <TouchableOpacity style={styles.secondary} disabled={busy} onPress={() => jump(stage-1)}>
             <Ionicons name="arrow-back" size={18} color={INK} /><Text style={styles.secondaryText}>Geri</Text>
           </TouchableOpacity> : null}
-          <TouchableOpacity style={[styles.action, busy && styles.disabled]} disabled={busy}
+          <TouchableOpacity
+            style={[styles.action, (busy || (editing && reviewStatus?.status === 'pending' && stage === 2)) && styles.disabled]}
+            disabled={busy || (editing && reviewStatus?.status === 'pending' && stage === 2)}
             onPress={stage === 2 ? confirmSave : goNext}>
             {busy ? <ActivityIndicator color="#ffffff" /> : <Ionicons name={stage === 2 ? 'checkmark-circle-outline' : 'arrow-forward'} size={18} color="#ffffff" />}
             <Text style={styles.actionText}>{busy ? savingImage ? 'Fotoğraf yükleniyor…' : 'Tarifin kaydediliyor…'
-              : stage === 2 ? editing ? 'Değişiklikleri kaydet' : 'Onayla ve yayımla' : 'Devam et'}</Text>
+              : stage === 2 ? editing ? (reviewStatus?.status === 'pending' ? 'Yönetici onayı bekleniyor' : 'Onaya gönder') : 'Onayla ve yayımla' : 'Devam et'}</Text>
           </TouchableOpacity>
         </View>
       </>}
@@ -469,6 +515,10 @@ const styles = StyleSheet.create({
   reviewCopy:{flex:1,color:'#364255',lineHeight:19,fontSize:12},
   reviewBack:{paddingVertical:10},
   publishNote:{fontSize:12,lineHeight:18,color:'#7e766e',backgroundColor:'#fff8ed',padding:12,borderRadius:12},
+  reviewPending:{backgroundColor:'#fff7e9',borderWidth:1,borderColor:'#ecd7b9',borderRadius:14,padding:12,flexDirection:'row',alignItems:'flex-start',gap:10,marginTop:10},
+  reviewPendingTitle:{fontSize:12,color:'#85552e',fontWeight:'900'},
+  reviewPendingCopy:{fontSize:11,color:'#946d50',lineHeight:17,marginTop:3},
+  reviewApproved:{fontSize:11,color:'#318467',fontWeight:'800',marginTop:7},
   footer:{paddingHorizontal:15,paddingTop:10,backgroundColor:'#fff',borderTopWidth:1,borderColor:'#f1e3d9',gap:8},
   footerButtons:{flexDirection:'row',gap:9},
   action:{backgroundColor:RED,flex:1,minHeight:49,borderRadius:13,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:8,paddingHorizontal:13},

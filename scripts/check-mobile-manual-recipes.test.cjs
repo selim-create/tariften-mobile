@@ -99,7 +99,8 @@ test('native create and edit share one staged editor, preserve author permission
   assert.match(editor,/withDeadline\(signal => createRecipe\(token, values, signal\), 45000\)/);
   assert.match(editor,/withDeadline\(signal => updateRecipe\(token, \{ \.\.\.values, id: recipeId \}, signal\), 45000\)/);
   assert.match(editor,/router.replace\('\/recipe\/' \+ encodeURIComponent\(slug\)\)/);
-  assert.match(editor,/Alert.alert\(editing \? 'Değişiklikler kaydedilsin mi\?' : 'Tarifin yayımlansın mı\?'/);
+  assert.match(editor,/Alert.alert\(editing \? 'Değişikliklerini gönder\?' : 'Tarifin yayımlansın mı\?'/);
+  assert.match(editor, /Yönetici onayına kadar tarifinin yayındaki hâli değişmeyecek/);
 });
 
 test('manual photo picker uses JPEG conversion and validated authenticated WordPress Core upload, not legacy wp/v2/media', () => {
