@@ -296,12 +296,11 @@ export default function RecipeTextImportScreen() {
   };
 
   const notes = preview ? importReviewNotes(preview.warnings, preview.needs_confirmation) : [];
-  const remainingAI = quotas.data?.quotas.recipe_ai_day;
-  const remainingPublish = quotas.data?.quotas.recipe_day;
-  const quotaText = (value: typeof remainingAI) =>
-    !value ? 'Kontrol ediliyor' : value.limit === null ? 'Sınırsız' : String(value.remaining) + ' / ' + String(value.limit);
-
   return <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    {usageNotice ? <View style={styles.usageToast} accessibilityRole="alert">
+      <Ionicons name="checkmark-circle" size={16} color="#ffffff" />
+      <Text style={styles.usageText}>{usageNotice}</Text>
+    </View> : null}
     <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       {stage === 'source' ? <>
@@ -571,6 +570,8 @@ const styles = StyleSheet.create({
   notice: { borderRadius: 14, borderWidth: 1, borderColor: '#f5dca5', backgroundColor: '#fffaf0', padding: 13, gap: 7 },
   noticeTitle: { color: '#95602c', fontSize: 12, fontWeight: '800' },
   noticeText: { color: '#9b6536', fontSize: 11, lineHeight: 18 },
+  usageToast: { position: 'absolute', top: 8, left: 18, right: 18, backgroundColor: '#284b3c', borderRadius: 14, padding: 13, zIndex: 20, flexDirection: 'row', gap: 8, alignItems: 'center' },
+  usageText: { color: '#fff', fontSize: 11, fontWeight: '800', flex: 1 },
   metaBox: { borderRadius: 16, borderWidth: 1, borderColor: '#f1dcc8', backgroundColor: '#fff9f1', padding: 13, gap: 8, marginVertical: 10 },
   metaHeading: { color: '#ad604b', fontWeight: '900', fontSize: 13 },
   servingsBox: { borderRadius: 16, borderWidth: 1, borderColor: '#f3dcc2', backgroundColor: '#fffbf4', padding: 13, gap: 6, marginVertical: 10 },
