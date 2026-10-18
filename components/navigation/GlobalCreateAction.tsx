@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 
-type Destination = '/recipe/create' | '/recipe/import' | '/menu/create' | '/(tabs)/recipes?quick=1' | '/(tabs)/pantry';
+type Destination = '/recipe/create' | '/recipe/social' | '/recipe/import' | '/menu/create' | '/(tabs)/recipes?quick=1' | '/(tabs)/pantry';
 type Icon = React.ComponentProps<typeof Ionicons>['name'];
 
 const ACTIONS: { route: Destination; title: string; description: string; icon: Icon; tint: string }[] = [
@@ -31,8 +31,15 @@ const ACTIONS: { route: Destination; title: string; description: string; icon: I
     tint: '#d75445',
   },
   {
+    route: '/recipe/social',
+    title: 'Sosyal medyadan tarif ekle',
+    description: 'Reels, TikTok ve Shorts bağlantısından tarif.',
+    icon: 'videocam-outline',
+    tint: '#d75445',
+  },
+  {
     route: '/recipe/import',
-    title: 'Mutfak notlarından aktar',
+    title: 'Tarif metninden aktar',
     description: 'Aklındaki tarifi anlat, birlikte düzenleyelim.',
     icon: 'book-outline',
     tint: '#d7784e',
@@ -112,7 +119,7 @@ export default function GlobalCreateAction({ tabBarHeight }: { tabBarHeight: num
                 <Ionicons name="close" size={23} color="#7e817c" />
               </TouchableOpacity>
             </View>
-            <View style={styles.options}>
+            <ScrollView style={styles.optionScroll} contentContainerStyle={styles.options} showsVerticalScrollIndicator={false}>
               {ACTIONS.map(action => (
                 <TouchableOpacity
                   key={action.route}
@@ -132,7 +139,7 @@ export default function GlobalCreateAction({ tabBarHeight }: { tabBarHeight: num
                   <Ionicons name="chevron-forward" size={19} color="#bb8b7a" />
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -151,7 +158,7 @@ const styles = StyleSheet.create({
   modal: { flex: 1, justifyContent: 'flex-end' },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(20, 29, 34, 0.49)' },
   sheet: {
-    width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 13,
+    maxHeight: '90%', width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 13,
     backgroundColor: '#fffbf7', borderTopLeftRadius: 32, borderTopRightRadius: 32,
     shadowColor: '#1e1e22', shadowOpacity: 0.1, shadowRadius: 18,
   },
@@ -162,7 +169,8 @@ const styles = StyleSheet.create({
   heading: { fontSize: 25, lineHeight: 31, fontWeight: '900', color: '#1b2b34', letterSpacing: -0.5 },
   intro: { fontSize: 12, color: '#93867c', lineHeight: 18 },
   close: { width: 39, height: 39, borderRadius: 20, backgroundColor: '#f6efe9', alignItems: 'center', justifyContent: 'center' },
-  options: { gap: 11 },
+  optionScroll: { flexGrow: 0 },
+  options: { gap: 11, paddingBottom: 4 },
   option: {
     flexDirection: 'row', alignItems: 'center', minHeight: 88,
     backgroundColor: '#ffffff', borderColor: '#efe4d8', borderWidth: 1,
