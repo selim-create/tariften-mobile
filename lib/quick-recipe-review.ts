@@ -109,8 +109,15 @@ export function validateQuickRecipe(draft: QuickRecipeDraft): string | null {
     return 'Malzeme isimlerini tamamla (1–40 malzeme).';
   }
   for (const [index, row] of draft.ingredients.entries()) {
-    const issue = validateRecipeAmount(row.amount) || validateRecipeUnit(row.unit);
-    if (issue) return `${index + 1}. malzeme: ${issue}`;
+    // Recognize the culinary composite "1 bütün + 2 sarı" literally.
+    // Do not recast as 3 whole eggs or permit arbitrary free-text amounts.
+    const composedEggAmount = /^\d{1,2}\s*(?:bütün|tam)\s*\+\s*\d{1,2}\s*(?:sarı|sarısı)$/iu.test(row.amount.trim());
+    if (!composedEggAmount) {
+      const amountIssue = validateRecipeAmount(row.amount);
+      if (amountIssue) return `${index + 1}. malzeme: ${amountIssue}`;
+    }
+    const unitIssue = validateRecipeUnit(row.unit);
+    if (unitIssue) return `${index + 1}. malzeme: ${unitIssue}`;
   }
   if (!draft.steps.length || draft.steps.length > 40 || draft.steps.some(step => !step.trim())) {
     return 'Hazırlanış adımlarını tamamla (1–40 adım).';
