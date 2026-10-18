@@ -14,6 +14,8 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { createRecipe, generateAIRecipe, getRecipes, getTerms } from '../../lib/api';
 import { RecipeCreateUnconfirmedError } from '../../lib/recipe-publish';
+import QuickRecipeReview from '../../components/recipe/QuickRecipeReview';
+import { quickRecipeFromAI, validateQuickRecipe, approvedQuickRecipe, type QuickRecipeDraft } from '../../lib/quick-recipe-review';
 import { Recipe, RecipeFilters } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
 import SearchBar from '../../components/SearchBar';
@@ -80,6 +82,13 @@ export default function RecipesScreen() {
   const [aiLoadingMessage, setAiLoadingMessage] = useState(AI_LOADING_MESSAGES[0]);
   const aiMsgIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const quickCreateInFlightRef = useRef(false);
+  const quickPublishInFlightRef = useRef(false);
+  const [reviewDraft, setReviewDraft] = useState<QuickRecipeDraft | null>(null);
+  const [reviewVisible, setReviewVisible] = useState(false);
+  const [reviewExistingId, setReviewExistingId] = useState<number | null>(null);
+  const [reviewError, setReviewError] = useState('');
+  const [reviewUncertain, setReviewUncertain] = useState(false);
+  const [reviewSaving, setReviewSaving] = useState(false);
 
   const loadRecipes = useCallback(
     async (pageNum: number = 1, currentFilters: RecipeFilters = filters, append = false) => {
@@ -174,6 +183,10 @@ export default function RecipesScreen() {
   const handleGenerateAI = useCallback(async (overridePrompt?: string) => {
     // Lock synchronously, before the first network await or React re-render.
     if (quickCreateInFlightRef.current) return;
+    if (reviewDraft) {
+      setReviewVisible(true); // Do not bill again for an already-generated proposal.
+      return;
+    }
     if (!token) {
       router.push('/login');
       return;
@@ -214,32 +227,20 @@ export default function RecipesScreen() {
       void quotas.refresh();
 
       if (aiResponse.success && aiResponse.recipe) {
-        // The backend validates the save and may report an unknown outcome.
-        // Never automatically repeat a publish after a transport failure.
-        const saveResponse = await createRecipe(token, aiResponse.recipe);
-        void quotas.refresh();
-        const slug = saveResponse?.slug || saveResponse?.data?.slug || saveResponse?.id;
-        setQuickPromptText('');
-        if (slug) {
-          router.push(`/recipe/${slug}`);
-        } else {
-          Alert.alert('Bilgi', 'Tarif kaydedildi fakat detay sayfasına yönlendirilemedi.');
-        }
+        // AI generation is a paid but UNSAVED candidate.
+        // Never call createRecipe until the user approves the editable preview.
+        const candidate = quickRecipeFromAI(aiResponse.recipe);
+        setReviewDraft(candidate);
+        setReviewExistingId(Number.isSafeInteger(aiResponse.existing_recipe_id) && aiResponse.existing_recipe_id > 0
+          ? aiResponse.existing_recipe_id : null);
+        setReviewError('');
+        setReviewUncertain(false);
+        setReviewVisible(true);
       } else {
-        const slug = aiResponse?.slug || aiResponse?.data?.slug;
-        if (slug) {
-          setQuickPromptText('');
-          router.push(`/recipe/${slug}`);
-        } else {
-          Alert.alert('Hata', 'Tarif oluşturulamadı. Lütfen tekrar deneyin.');
-        }
+        Alert.alert('Hata', 'Tarif hazırlanamadı. Lütfen tekrar dene.');
       }
     } catch (error: unknown) {
-      if (error instanceof RecipeCreateUnconfirmedError) {
-        Alert.alert('Tarifini kontrol et', 'Tarif kaydedilmiş olabilir. Yeniden oluşturmadan önce Profil > Tariflerim bölümünü kontrol et.');
-      } else {
-        Alert.alert('Hata', error instanceof Error ? error.message : 'AI tarif oluşturulamadı.');
-      }
+      Alert.alert('Hata', error instanceof Error ? error.message : 'AI tarif oluşturulamadı.');
     } finally {
       if (aiMsgIntervalRef.current) {
         clearInterval(aiMsgIntervalRef.current);
@@ -249,7 +250,61 @@ export default function RecipesScreen() {
       setAiLoading(false);
       quickCreateInFlightRef.current = false;
     }
-  }, [token, filters.query, query, router, quotas.refresh]);
+  }, [token, filters.query, query, router, quotas.refresh, reviewDraft]);
+
+  const handlePublishQuickRecipe = useCallback(async () => {
+    if (quickPublishInFlightRef.current || reviewSaving || reviewUncertain || !reviewDraft) return;
+    const problem = validateQuickRecipe(reviewDraft);
+    if (problem) { setReviewError(problem); return; }
+    if (!token) { setReviewError('Tarifini yayımlamak için giriş yapmalısın.'); return; }
+    quickPublishInFlightRef.current = true;
+    setReviewSaving(true);
+    setReviewError('');
+    let requestStarted = false;
+    try {
+      let rights;
+      try {
+        rights = await fetchAccountQuotas(token);
+      } catch {
+        setReviewError('Kullanım hakların doğrulanamadı. Tarifin burada korunuyor; yeniden deneyebilirsin.');
+        return;
+      }
+      if (reached(rights, 'recipe_day')) {
+        setReviewError('Bugünkü tarif yayımlama hakkın doldu. Yeni hak: ' + resetDate(rights, 'recipe_day'));
+        return;
+      }
+      const payload = approvedQuickRecipe(reviewDraft);
+      requestStarted = true;
+      const saved = await createRecipe(token, payload);
+      if (!saved?.success || !(saved.slug || saved.id)) {
+        setReviewError(saved?.message || 'Tarif kaydedilemedi.');
+        return;
+      }
+      void quotas.refresh();
+      setQuickPromptText('');
+      setReviewVisible(false);
+      router.push(`/recipe/${saved.slug || saved.id}`);
+    } catch (error: unknown) {
+      if (error instanceof RecipeCreateUnconfirmedError || requestStarted) {
+        setReviewUncertain(true);
+        setReviewError('Tarif kaydedilmiş olabilir. Yeniden oluşturmadan önce Profil > Tariflerim bölümünü kontrol et.');
+      } else setReviewError(error instanceof Error ? error.message : 'Tarif yayımlanamadı.');
+    } finally {
+      quickPublishInFlightRef.current = false;
+      setReviewSaving(false);
+    }
+  }, [reviewDraft, reviewSaving, reviewUncertain, token, router, quotas.refresh]);
+
+  const handleNewQuickRecipe = useCallback(() => {
+    if (reviewSaving || quickCreateInFlightRef.current) return;
+    setReviewDraft(null);
+    setReviewExistingId(null);
+    setReviewUncertain(false);
+    setReviewError('');
+    setReviewVisible(false);
+    setQuickPromptText('');
+    setQuickPromptVisible(true);
+  }, [reviewSaving]);
 
   useEffect(() => {
     return () => {
@@ -407,13 +462,13 @@ export default function RecipesScreen() {
               placeholder="Örn. Fırında tavuk veya patates, biber, peynir..."
               placeholderTextColor="#ac9c91" style={styles.quickInput} />
             <TouchableOpacity accessibilityRole="button" style={styles.quickAction}
-              disabled={!quickPromptText.trim()} onPress={() => {
+              disabled={!reviewDraft && !quickPromptText.trim()} onPress={() => {
                 const prompt = quickPromptText.trim();
                 setQuickPromptVisible(false);
                 void handleGenerateAI(prompt);
               }}>
               <Ionicons name="sparkles-outline" size={18} color="#fff" />
-              <Text style={styles.quickActionText}>Tarifimi oluştur</Text>
+              <Text style={styles.quickActionText}>{reviewDraft ? 'Tarif önizlemene dön' : 'Tarifimi oluştur'}</Text>
             </TouchableOpacity>
             <TouchableOpacity accessibilityRole="button" onPress={() => {
               setQuickPromptVisible(false);
@@ -425,7 +480,21 @@ export default function RecipesScreen() {
         </View>
       </Modal>
       {usageNotice ? <View style={styles.quickToast} accessibilityRole="alert"><Text style={styles.quickToastText}>{usageNotice}</Text></View> : null}
-      {/* AI Loading Modal */}
+      {reviewDraft ? (
+        <QuickRecipeReview
+          visible={reviewVisible}
+          draft={reviewDraft}
+          onChange={fn => setReviewDraft(old => old ? fn(old) : old)}
+          existingRecipeId={reviewExistingId}
+          saving={reviewSaving}
+          uncertain={reviewUncertain}
+          error={reviewError}
+          onClose={() => setReviewVisible(false)}
+          onNew={handleNewQuickRecipe}
+          onPublish={() => { void handlePublishQuickRecipe(); }}
+        />
+      ) : null}
+            {/* AI Loading Modal */}
       <Modal visible={aiModalVisible} transparent animationType="fade">
         <View style={styles.aiModalOverlay}>
           <View style={styles.aiModalCard}>
