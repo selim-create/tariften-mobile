@@ -95,7 +95,7 @@ test('mobile uses Core directly with quota preflight, no auto-publish, double ap
   assert.match(page, /createRecipe\(token, buildApprovedRecipe\(editor\), signal\)/);
   assert.match(page, /Alert\.alert\('Tarifini herkese açık yayımla'/);
   assert.match(page, /Onayla ve yayımla/);
-  assert.match(page, /malzeme miktarlarından tahmin etmiyoruz/);
+  assert.match(page, /yaklaşık önerisini kontrol et/);
   assert.match(page, /Kaynağındaki ifade/);
   assert.match(routes, /name="recipe\/import"/);
   assert.match(createSheet, /route: '\/recipe\/import'/);
