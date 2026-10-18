@@ -118,6 +118,74 @@ export async function generateAIRecipe(token: string, ingredients: string) {
   return data;
 }
 
+/**
+ * Personal content pages are strict authenticated reads. Never turn a network
+ * error or a stale Core deployment into a misleading empty "Tariflerim" state.
+ */
+export interface OwnedLibraryPage<T> {
+  items: T[];
+  total: number;
+  pages: number;
+  page: number;
+}
+async function fetchOwnedLibraryPage<T>(
+  token: string, resource: 'recipes' | 'menus', page: number, expectedOwnerId: number,
+): Promise<OwnedLibraryPage<T>> {
+  if (!token || !Number.isInteger(expectedOwnerId) || expectedOwnerId < 1) {
+    throw new Error('Tariflerini ve sofralarını görmek için giriş yapmalısın.');
+  }
+  const currentPage = Math.min(10000, Math.max(1, Math.trunc(page) || 1));
+  const url = `${API_URL}/tariften/v1/${resource}/search?author=me&page=${currentPage}`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    });
+  } catch {
+    throw new Error('Bağlantı kurulamadı. İnternetini kontrol edip tekrar dene.');
+  }
+  const json: unknown = await response.json().catch(() => null);
+  const data = json && typeof json === 'object' ? json as Record<string, unknown> : {};
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Oturumunu yenileyip tekrar denemelisin.');
+    }
+    throw new Error('İçeriklerin yüklenemedi. Birazdan tekrar dene.');
+  }
+  if (!Array.isArray(data.data) || !Number.isInteger(data.pages) || !Number.isInteger(data.count)) {
+    throw new Error('İçerik listesi eksik geldi. Tekrar dene.');
+  }
+  // Old Core versions ignored author=me and returned public menu pages. This
+  // positive confirmation prevents us from displaying stranger's content.
+  if (resource === 'menus' && data.scope !== 'owner') {
+    throw new Error('Sofralarım servisi güncelleniyor. Biraz sonra tekrar dene.');
+  }
+  const items = data.data as T[];
+  for (const item of items) {
+    const record = item as Record<string, unknown>;
+    const author = record.author;
+    const actualAuthorId = resource === 'menus' ? Number(record.author_id)
+      : author && typeof author === 'object' ? Number((author as { id?: number }).id) : 0;
+    if (actualAuthorId !== expectedOwnerId) {
+      throw new Error('Hesabına ait olmayan bir içerik döndü. Lütfen tekrar dene.');
+    }
+  }
+  return {
+    items,
+    total: Number(data.count),
+    pages: Math.max(0, Number(data.pages)),
+    page: currentPage,
+  };
+}
+
+export function getOwnedRecipesPage(token: string, page: number, userId: number): Promise<OwnedLibraryPage<Recipe>> {
+  return fetchOwnedLibraryPage<Recipe>(token, 'recipes', page, userId);
+}
+export function getOwnedMenusPage(token: string, page: number, userId: number): Promise<OwnedLibraryPage<Menu>> {
+  return fetchOwnedLibraryPage<Menu>(token, 'menus', page, userId);
+}
+
 export async function getUserRecipes(token: string): Promise<Recipe[]> {
   const data = await fetchData(`${API_URL}/tariften/v1/recipes/search?author=me`, {
     headers: { Authorization: `Bearer ${token}` },

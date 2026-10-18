@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -11,32 +11,32 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import QuotaCard from '../../components/QuotaCard';
 import { useQuotas } from '../../lib/quotas';
-import { deleteAccount, getInteractions, getUserRecipes } from '../../lib/api';
+import { deleteAccount, getInteractions } from '../../lib/api';
 import { Recipe } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import MyKitchenLibrary from '../../components/account/MyKitchenLibrary';
 
-type ProfileTab = 'favorites' | 'cooked' | 'my_recipes';
+type ProfileTab = 'my_recipes' | 'my_menus' | 'favorites' | 'cooked';
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, token, logout } = useAuth();
   const quotas = useQuotas(token);
-  const [activeTab, setActiveTab] = useState<ProfileTab>('favorites');
+  const [activeTab, setActiveTab] = useState<ProfileTab>('my_recipes');
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadRecipes = useCallback(
     async (tab: ProfileTab) => {
-      if (!token) return;
-      setRecipes([]);
+      if (!token || tab === 'my_recipes' || tab === 'my_menus') return;
       setLoading(true);
       try {
         let data: Recipe[] = [];
@@ -44,8 +44,6 @@ export default function ProfileScreen() {
           data = await getInteractions(token, 'favorite');
         } else if (tab === 'cooked') {
           data = await getInteractions(token, 'cooked');
-        } else if (tab === 'my_recipes') {
-          data = await getUserRecipes(token);
         }
         setRecipes(data);
       } catch (error) {
@@ -59,15 +57,19 @@ export default function ProfileScreen() {
     [token]
   );
 
-  useEffect(() => {
-    if (user && token) {
-      loadRecipes(activeTab);
+  // Returning after publication or interaction edits must always refresh the
+  // currently displayed personal tab; no stale screen-local cache.
+  useFocusEffect(useCallback(() => {
+    if (user && token && (activeTab === 'favorites' || activeTab === 'cooked')) {
+      void loadRecipes(activeTab);
     }
-  }, [user, token, activeTab, loadRecipes]);
+  }, [user?.id, token, activeTab, loadRecipes]));
 
   const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadRecipes(activeTab);
+    if (activeTab === 'favorites' || activeTab === 'cooked') {
+      setRefreshing(true);
+      void loadRecipes(activeTab);
+    }
   }, [activeTab, loadRecipes]);
 
   const handleLogout = () => {
@@ -123,14 +125,17 @@ export default function ProfileScreen() {
   }
 
   const tabs: { key: ProfileTab; label: string; icon: IoniconName; iconActive: IoniconName }[] = [
+    { key: 'my_recipes', label: 'Tariflerim', icon: 'document-text-outline', iconActive: 'document-text' },
+    { key: 'my_menus', label: 'Sofralarım', icon: 'book-outline', iconActive: 'book' },
     { key: 'favorites', label: 'Favoriler', icon: 'heart-outline', iconActive: 'heart' },
     { key: 'cooked', label: 'Pişirdiklerim', icon: 'restaurant-outline', iconActive: 'restaurant' },
-    { key: 'my_recipes', label: 'Tariflerim', icon: 'document-text-outline', iconActive: 'document-text' },
   ];
 
   return (
     <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing && (activeTab === 'favorites' || activeTab === 'cooked')}
+          onRefresh={onRefresh} tintColor="#df5043" />}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
@@ -178,8 +183,11 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        {/* Recipes */}
-        {loading ? (
+        {/* Kitchen library reads never silently trim the owner's first 10 or 12 items. */}
+        {(activeTab === 'my_recipes' || activeTab === 'my_menus') ? (
+          <MyKitchenLibrary kind={activeTab === 'my_recipes' ? 'recipes' : 'menus'}
+            token={token} userId={user.id} />
+        ) : loading ? (
           <LoadingSpinner />
         ) : (
           <FlatList
@@ -188,26 +196,18 @@ export default function ProfileScreen() {
             renderItem={({ item }) => <RecipeCard recipe={item} />}
             contentContainerStyle={styles.recipesList}
             scrollEnabled={false}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#e74c3c" />
-            }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>
                   {activeTab === 'favorites' && 'Henüz favori tarifiniz yok.'}
                   {activeTab === 'cooked' && 'Henüz pişirdiğiniz tarif yok.'}
-                  {activeTab === 'my_recipes' && 'Henüz tarif oluşturmadınız.'}
                 </Text>
                 <TouchableOpacity
                   style={styles.emptyButton}
-                  onPress={() =>
-                    activeTab === 'my_recipes'
-                      ? router.push('/recipes')
-                      : router.push('/')
-                  }
+                  onPress={() => router.push('/recipes')}
                 >
                   <Text style={styles.emptyButtonText}>
-                    {activeTab === 'my_recipes' ? 'Tarifleri Keşfet' : 'Tariflere Göz At'}
+                    {'Tarifleri Keşfet'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -252,7 +252,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fffbf7',
   },
   profileHeader: {
     alignItems: 'center',
@@ -313,8 +313,13 @@ const styles = StyleSheet.create({
   },
   tabsContainer: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    marginHorizontal: 14,
+    marginTop: 14,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#f0e3da',
+    overflow: 'hidden',
   },
   tab: {
     flex: 1,
@@ -323,11 +328,12 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   tabActive: {
+    backgroundColor: '#fff0eb',
     borderBottomWidth: 2,
     borderBottomColor: '#e74c3c',
   },
   tabLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#999999',
     fontWeight: '600',
   },
