@@ -175,7 +175,7 @@ export function publishValidation(editor: ImportEditor): string | null {
   if (!/^[1-9]\d*$/.test(editor.servings.trim()) || Number(editor.servings) > 36) {
     return "Tarifin kaç kişilik olduğunu seçmelisin (1–36 kişi).";
   }
-  if (editor.calories.trim() && (!/^[1-9]\\d*$/.test(editor.calories.trim()) || Number(editor.calories) > 3000)) {
+  if (editor.calories.trim() && (!/^[1-9]\d*$/.test(editor.calories.trim()) || Number(editor.calories) > 3000)) {
     return "Tahmini kalori değeri 1–3000 arasında olmalı veya boş bırakılmalı.";
   }
   if (!editor.ingredients.length || editor.ingredients.some(i => !i.name.trim())) {
