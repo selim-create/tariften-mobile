@@ -66,6 +66,22 @@ test('native importer validates provenance and requires explicit user servings',
   assert.ok(!Object.prototype.hasOwnProperty.call(payload, 'source_text'), 'Raw private notes never persisted on publish');
 });
 
+test('mobile accepts bounded editable metadata in one preview, never a second AI request', () => {
+  const candidate = previewFixture();
+  candidate.recipe.suggestions = {
+    servings: 4, calories_per_serving: 190, cuisine: 'Türk Mutfağı', meal_type: 'Öğle Yemeği',
+  };
+  const model = importLib.editorFromPreview(importLib.parseImportPreview(candidate));
+  assert.equal(model.servings, '4');
+  assert.equal(model.calories, '190');
+  model.calories = '205';
+  const payload = importLib.buildApprovedRecipe(model);
+  assert.equal(payload.calories, 205);
+  assert.deepEqual(payload.meal_type, ['Öğle Yemeği']);
+  model.calories = '9999';
+  assert.match(importLib.publishValidation(model), /kalori/);
+});
+
 test('mobile validates AI output against exact original text and explicit approval', () => {
   const unverified = previewFixture();
   unverified.recipe.ingredients[0].original_span = 'yeni malzeme ve miktar';
@@ -95,7 +111,7 @@ test('mobile uses Core directly with quota preflight, no auto-publish, double ap
   assert.match(page, /createRecipe\(token, buildApprovedRecipe\(editor\), signal\)/);
   assert.match(page, /Alert\.alert\('Tarifini herkese açık yayımla'/);
   assert.match(page, /Onayla ve yayımla/);
-  assert.match(page, /malzeme miktarlarından tahmin etmiyoruz/);
+  assert.match(page, /AI kişi sayısı önermiş olabilir/);
   assert.match(page, /Kaynağındaki ifade/);
   assert.match(routes, /name="recipe\/import"/);
   assert.match(createSheet, /route: '\/recipe\/import'/);

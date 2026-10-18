@@ -429,7 +429,6 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
         <Text style={styles.publishNote}>{editing ?
           'Kaydettiğinde tarifin mevcut herkese açık sayfası güncellenir.' :
           'Tarifin herkese açık yayımlanacak. Son kontrol ve onay senin elinde.'}</Text>
-        {!editing ? <Text style={styles.hint}>Bugünkü tarif hakkın: {quotas.data?.quotas?.recipe_day?.remaining === null ? 'Sınırsız' : quotas.data?.quotas?.recipe_day?.remaining ?? 'Kontrol ediliyor'}</Text> : null}
       </View> : null}
     </ScrollView>
     <View style={[styles.footer,{ paddingBottom: Math.max(insets.bottom,12) }]}>

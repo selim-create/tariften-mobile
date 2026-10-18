@@ -5,10 +5,24 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 
-type Destination = '/recipe/create' | '/recipe/import' | '/menu/create';
+type Destination = '/recipe/create' | '/recipe/import' | '/menu/create' | '/(tabs)/recipes?quick=1' | '/(tabs)/pantry';
 type Icon = React.ComponentProps<typeof Ionicons>['name'];
 
 const ACTIONS: { route: Destination; title: string; description: string; icon: Icon; tint: string }[] = [
+  {
+    route: '/(tabs)/recipes?quick=1',
+    title: 'Hızlı tarif oluştur',
+    description: 'Bir tarif adı veya malzemelerini yaz; AI Şef hazırlasın.',
+    icon: 'sparkles-outline',
+    tint: '#d74c3f',
+  },
+  {
+    route: '/(tabs)/pantry',
+    title: 'Dolabımdakilerle tarif bul',
+    description: 'Dolabında kayıtlı malzemelerden tarif üret.',
+    icon: 'basket-outline',
+    tint: '#397b64',
+  },
   {
     route: '/recipe/create',
     title: 'Tarifini kendin yaz',
@@ -119,9 +133,6 @@ export default function GlobalCreateAction({ tabBarHeight }: { tabBarHeight: num
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.footnote}>
-              {user && token ? 'Tariflerin yalnızca sen onayladığında yayımlanır.' : 'Devam etmek için hesabına giriş yapabilirsin.'}
-            </Text>
           </View>
         </View>
       </Modal>

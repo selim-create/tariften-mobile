@@ -39,6 +39,12 @@ export type GroundedImportPreview = {
     ingredients: ImportIngredient[];
     steps: ImportStep[];
     seo: ImportSeo;
+    suggestions?: {
+      servings: number | null;
+      calories_per_serving: number | null;
+      cuisine: string;
+      meal_type: string;
+    };
   };
   warnings: string[];
   needs_confirmation: string[];
@@ -56,8 +62,12 @@ export type EditableStep = ImportStep & { userEdited?: boolean };
 export type ImportEditor = {
   title: string;
   excerpt: string;
-  /** User-provided number of people. Never generated from ingredient mass. */
+  /** Editable AI suggestion; final serving count is approved by the user. */
   servings: string;
+  /** Per-person approximate energy suggestion (not verified nutrition). */
+  calories: string;
+  cuisine: string;
+  mealType: string;
   ingredients: EditableIngredient[];
   steps: EditableStep[];
   seoTitle: string;
@@ -132,6 +142,15 @@ export function parseImportPreview(value: unknown): GroundedImportPreview {
       throw new Error("Tarif adımı kaynakla doğrulanamadı.");
     }
   }
+  if (r.suggestions !== undefined) {
+    const hint = r.suggestions;
+    if (!isRecord(hint)
+      || !(hint.servings === null || (Number.isInteger(hint.servings) && Number(hint.servings) >= 1 && Number(hint.servings) <= 36))
+      || !(hint.calories_per_serving === null || (Number.isInteger(hint.calories_per_serving) && Number(hint.calories_per_serving) >= 10 && Number(hint.calories_per_serving) <= 3000))
+      || !isString(hint.cuisine) || !isString(hint.meal_type)) {
+      throw new Error("Tarifin tahmini alanları doğrulanamadı.");
+    }
+  }
   return value as GroundedImportPreview;
 }
 
@@ -139,7 +158,10 @@ export function editorFromPreview(p: GroundedImportPreview): ImportEditor {
   return {
     title: p.recipe.title,
     excerpt: p.recipe.excerpt,
-    servings: "", // Source does not verify servings; require explicit human choice.
+    servings: p.recipe.suggestions?.servings ? String(p.recipe.suggestions.servings) : "",
+    calories: p.recipe.suggestions?.calories_per_serving ? String(p.recipe.suggestions.calories_per_serving) : "",
+    cuisine: p.recipe.suggestions?.cuisine || "",
+    mealType: p.recipe.suggestions?.meal_type || "",
     ingredients: p.recipe.ingredients.map(i => ({ ...i })),
     steps: p.recipe.steps.map(s => ({ ...s })),
     seoTitle: p.recipe.seo.title,
@@ -152,6 +174,9 @@ export function publishValidation(editor: ImportEditor): string | null {
   if (!editor.title.trim()) return "Tarif başlığını tamamlamalısın.";
   if (!/^[1-9]\d*$/.test(editor.servings.trim()) || Number(editor.servings) > 36) {
     return "Tarifin kaç kişilik olduğunu seçmelisin (1–36 kişi).";
+  }
+  if (editor.calories.trim() && (!/^[1-9]\d*$/.test(editor.calories.trim()) || Number(editor.calories) > 3000)) {
+    return "Tahmini kalori değeri 1–3000 arasında olmalı veya boş bırakılmalı.";
   }
   if (!editor.ingredients.length || editor.ingredients.some(i => !i.name.trim())) {
     return "En az bir malzeme eklemeli ve tüm malzeme isimlerini tamamlamalısın.";
@@ -177,6 +202,9 @@ export function buildApprovedRecipe(editor: ImportEditor) {
     title: editor.title.trim(),
     excerpt: editor.excerpt.trim(),
     servings: Number(editor.servings),
+    ...(editor.calories.trim() ? { calories: Number(editor.calories) } : {}),
+    ...(editor.cuisine.trim() ? { cuisine: [editor.cuisine.trim()] } : {}),
+    ...(editor.mealType.trim() ? { meal_type: [editor.mealType.trim()] } : {}),
     ingredients: editor.ingredients.map(i => ({
       name: i.name.trim(),
       amount: i.amount.trim(),
