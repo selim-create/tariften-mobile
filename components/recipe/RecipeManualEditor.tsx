@@ -137,6 +137,7 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
   }, [stage]);
   const requireField = (field: ManualField, message: string) => {
     setInvalidField(field); setError(message);
+    setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 110);
     if (field === 'title' || field === 'servings' || field === 'prep_time' || field === 'cook_time' || field === 'calories') {
       jump(0); // jump clears errors, so restore the actionable message afterward.
       setInvalidField(field); setError(message);
@@ -388,7 +389,11 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
           <View style={styles.twoColumns}>
             <View style={styles.col}>{input('Miktar (isteğe bağlı)', item.amount, text => {
                 if (/[a-zA-ZğüşıöçĞÜŞİÖÇ]/.test(text) &&
-                  !['yarım','çeyrek'].some(value => value.startsWith(text.toLocaleLowerCase('tr-TR')))) return;
+                  !['yarım','çeyrek'].some(value => value.startsWith(text.toLocaleLowerCase('tr-TR')))) {
+                  setInvalidField('ingredients');
+                  setError((index + 1) + '. malzeme: Miktara sayı, kesir, yarım veya çeyrek yaz.');
+                  return;
+                }
                 ingredientEdit(index, 'amount', text);
               }, { placeholder: 'Örn. 2, 1/2 veya 1,5' })}</View>
             <View style={styles.col}><RecipePicker label="Ölçü birimi" value={item.unit}
