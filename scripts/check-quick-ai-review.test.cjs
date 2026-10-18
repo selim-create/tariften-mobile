@@ -1,0 +1,99 @@
+'use strict';
+const assert = require('node:assert/strict');
+const test = require('node:test');
+const fs = require('node:fs');
+const path = require('node:path');
+const ts = require('typescript');
+const read = p => fs.readFileSync(path.join(__dirname,'..',p),'utf8');
+const helper = read('lib/quick-recipe-review.ts');
+const js = ts.transpileModule(helper,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+const local = {exports:{}};
+new Function('module','exports',js)(local,local.exports);
+const {quickRecipeFromAI,validateQuickRecipe,approvedQuickRecipe} = local.exports;
+const good=()=>({
+ title:'Domatesli pilav', excerpt:'Evde kolay pilav.',
+ servings:4,calories:270,prep_time:10,cook_time:20,chef_tip:'Altını kapatıp dinlendir.',
+ image:'https://example.com/pilav.jpg', cuisine:['turk-mutfagi'], meal_type:['aksam-yemegi'],
+ difficulty:['kolay'],diet:[],quality_check:{warnings:['nutrition_unverified']},
+ ingredients:[{name:'Domates',amount:'2',unit:'adet'},{name:'Pirinç',amount:'1',unit:'su bardağı'}],
+ steps:['Domatesleri yıka.','Pirinci kavur.'],
+ seo:{title:'Evde Domatesli Pilav',description:'Domatesli pilav.',focus_keywords:['pilav','domates']}
+});
+test('AI generation returns a draft only; not a published recipe or a second paid request',()=>{
+ const flow=read('app/(tabs)/recipes.tsx');
+ const generate=flow.slice(flow.indexOf('const handleGenerateRecipe = async ()'),flow.indexOf('const handlePublishQuickRecipe ='));
+ const native=flow.slice(flow.indexOf('const handleGenerateAI = useCallback('),flow.indexOf('const handlePublishQuickRecipe ='));
+ const body=native;
+ assert.match(body,/await generateAIRecipe\(/);
+ assert.match(body,/quickRecipeFromAI\(aiResponse\.recipe\)/);
+ assert.doesNotMatch(body,/await createRecipe\(/);
+ const publish=flow.slice(flow.indexOf('const handlePublishQuickRecipe ='),flow.indexOf('const handleNewQuickRecipe',flow.indexOf('const handlePublishQuickRecipe =')));
+ assert.match(publish,/approvedQuickRecipe\(reviewDraft\)/);
+ assert.match(publish,/fetchAccountQuotas\(token\)/);
+ assert.match(publish,/await createRecipe\(token,/);
+ assert.ok(publish.indexOf('await fetchAccountQuotas(token)')<publish.indexOf('await createRecipe(token,'));
+ assert.match(flow,/quickPublishInFlightRef\.current/);
+ assert.match(flow,/setReviewUncertain\(true\)|setPublishUncertain\(true\)/);
+ assert.match(flow,/setUsageNotice\(/);
+ assert.doesNotMatch(flow,/<QuotaPanel|<QuotaCard/);
+ const component=read('components/recipe/QuickRecipeReview.tsx');
+ assert.match(component,/Kontrol ettim, yayımla/);
+ assert.match(component,/Tarif henüz yayımlanmadı|Henüz yayımlanmadı/);
+ assert.match(component,/Malzemeler/);
+ assert.match(component,/Hazırlanış/);
+ assert.match(component,/Kaç kişilik/);
+ assert.match(component,/kalori|kcal/i);
+});
+test('AI draft retains real source fields, suggested serving and per-person estimates',()=>{
+ const candidate=good();
+ const copy=JSON.parse(JSON.stringify(candidate));
+ const draft=quickRecipeFromAI(candidate);
+ assert.equal(draft.title,'Domatesli pilav');
+ assert.equal(draft.servings,'4');
+ assert.equal(draft.calories,'270');
+ assert.equal(draft.ingredients[0].name,'Domates');
+ assert.equal(draft.steps[1],'Pirinci kavur.');
+ assert.deepEqual(draft.cuisine,['turk-mutfagi']);
+ assert.deepEqual(candidate,copy);
+ assert.equal(validateQuickRecipe(draft),null);
+ const payload=approvedQuickRecipe(draft);
+ assert.equal(payload.servings,4);
+ assert.equal(payload.calories,270);
+ assert.equal(payload.image,candidate.image);
+ assert.deepEqual(payload.steps,candidate.steps);
+ assert.deepEqual(payload.quality_check,{warnings:['nutrition_unverified']});
+ assert.deepEqual(payload.seo,{title:'Evde Domatesli Pilav',description:'Domatesli pilav.',focus_keywords:'pilav, domates'});
+ assert.ok(!Object.hasOwn(payload,'existing_recipe_id'));
+ assert.ok(!Object.hasOwn(payload,'source_text'));
+});
+test('AI must never invent unknown serving/calories or blindly save unsafe records',()=>{
+ const zero=quickRecipeFromAI({...good(),servings:null,calories:0});
+ assert.equal(zero.servings,'');assert.equal(zero.calories,'');
+ assert.match(validateQuickRecipe(zero),/kaç kişilik/);
+ const bad=quickRecipeFromAI({...good(),servings:99,calories:'five'});
+ assert.equal(bad.servings,'');assert.equal(bad.calories,'');
+ assert.equal(quickRecipeFromAI({...good(),image:'javascript:alert(1)'}).image,'');
+ assert.throws(()=>quickRecipeFromAI({title:'boş'}));
+ assert.throws(()=>quickRecipeFromAI({...good(),steps:new Array(41).fill('hazırla')}));
+ assert.throws(()=>approvedQuickRecipe(zero));
+});
+test('user can edit headline, source ingredients, steps and metadata; validation blocks partial publication',()=>{
+ const draft=quickRecipeFromAI(good());
+ draft.title='Çift domatesli pilav';
+ draft.servings='6';draft.calories='';
+ draft.ingredients[0].name='Cherry domates';
+ draft.steps[0]='Cherry domatesleri ortadan ikiye böl.';
+ draft.cuisine=['italyan-mutfagi'];
+ assert.equal(validateQuickRecipe(draft),null);
+ const sent=approvedQuickRecipe(draft);
+ assert.equal(sent.title,'Çift domatesli pilav');assert.equal(sent.servings,6);
+ assert.deepEqual(sent.cuisine,['italyan-mutfagi']);
+ assert.equal(sent.ingredients[0].name,'Cherry domates');
+ assert.equal(sent.steps[0],draft.steps[0]);
+ assert.ok(!Object.hasOwn(sent,'calories'));
+ for(const changed of [
+  {...draft,title:''},{...draft,servings:'0'},
+  {...draft,calories:'-1'},{...draft,steps:['']},
+  {...draft,ingredients:[{name:'',amount:'2',unit:'adet'}]}
+ ]){assert.ok(validateQuickRecipe(changed));assert.throws(()=>approvedQuickRecipe(changed));}
+});
