@@ -9,7 +9,12 @@ const read = name => fs.readFileSync(path.join(root, name), 'utf8');
 const src = read('lib/manual-recipe.ts');
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const mod = { exports: {} };
+const measures = { exports: {} };
+const measureJs = ts.transpileModule(read('lib/recipe-measurements.ts'),
+  { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+new Function('module', 'exports', measureJs)(measures, measures.exports);
 new Function('module', 'exports', 'require', js)(mod, mod.exports, id => {
+  if (id === './recipe-measurements') return measures.exports;
   assert.equal(id, './recipeUtils');
   return {
     parseIngredients: value => Array.isArray(value) ? value : JSON.parse(value || '[]'),

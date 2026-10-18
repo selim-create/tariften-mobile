@@ -3,6 +3,8 @@
  * Pure/offline parsing and explicit user-approved payload preparation;
  * no extra AI calls, no inferred portions, no unverified nutrition facts.
  */
+import { validateRecipeAmount, validateRecipeUnit } from './recipe-measurements';
+
 export type QuickIngredient = { name: string; amount: string; unit: string };
 export type QuickRecipeDraft = {
   title: string;
@@ -105,6 +107,10 @@ export function validateQuickRecipe(draft: QuickRecipeDraft): string | null {
   if (!draft.ingredients.length || draft.ingredients.length > 40
     || draft.ingredients.some(row => !row.name.trim())) {
     return 'Malzeme isimlerini tamamla (1–40 malzeme).';
+  }
+  for (const [index, row] of draft.ingredients.entries()) {
+    const issue = validateRecipeAmount(row.amount) || validateRecipeUnit(row.unit);
+    if (issue) return `${index + 1}. malzeme: ${issue}`;
   }
   if (!draft.steps.length || draft.steps.length > 40 || draft.steps.some(step => !step.trim())) {
     return 'Hazırlanış adımlarını tamamla (1–40 adım).';

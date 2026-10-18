@@ -17,6 +17,8 @@ import { approvedManualPayload, draftFromRecipe, emptyRecipeDraft, EMPTY_INGREDI
   validateManualDraft, type ManualField, type RecipeManualDraft } from '../../lib/manual-recipe';
 import { prepareManualRecipePhoto, uploadManualRecipePhoto } from '../../lib/manual-recipe-image';
 import LokmaIngredientIcon from '../LokmaIngredientIcon';
+import RecipePicker from './RecipePicker';
+import { RECIPE_UNITS } from '../../lib/recipe-measurements';
 
 const RED = '#df5043', INK = '#1a283e';
 type CategoryKey = 'cuisine' | 'meal_type' | 'difficulty' | 'diet';
@@ -112,16 +114,30 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
   }, [busy]);
 
   const setField = <K extends keyof RecipeManualDraft>(field: K, value: RecipeManualDraft[K]) => {
+    if (typeof value === 'string' && ['servings','prep_time','cook_time','calories'].includes(field)) {
+      const max = field === 'servings' ? 36 : field === 'calories' ? 3000 : 720;
+      if (Number(value) > max) {
+        setInvalidField(field as ManualField);
+        setError(field === 'servings' ? 'En fazla 36 kişilik tarif oluşturabilirsin.' : 'Bu değer en fazla ' + max + ' olabilir.');
+        return;
+      }
+    }
     setDraft(prev => ({ ...prev, [field]: value }));
     setError(''); setInvalidField(null);
   };
   const jump = (next: number) => {
     setStage(next);
     setError(''); setInvalidField(null);
-    requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }));
+    // A stage is conditionally rendered: scrolling before its layout commits
+    // can leave the user at the bottom of the previous stage.
   };
+  useEffect(() => {
+    const timer = setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: false }), 85);
+    return () => clearTimeout(timer);
+  }, [stage]);
   const requireField = (field: ManualField, message: string) => {
     setInvalidField(field); setError(message);
+    setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 110);
     if (field === 'title' || field === 'servings' || field === 'prep_time' || field === 'cook_time' || field === 'calories') {
       jump(0); // jump clears errors, so restore the actionable message afterward.
       setInvalidField(field); setError(message);
@@ -305,6 +321,7 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
         </View>
       </View>
 
+      {error && !busy ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
       {stage === 0 ? <View style={styles.card}>
         <Text style={styles.section}>Tarifinin hikâyesi</Text>
         <Text style={styles.hint}>Önce temel bilgileri tamamlayalım.</Text>
@@ -345,18 +362,13 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
         </TouchableOpacity>
         <Text style={styles.hint}>Fotoğrafın kaydetme sırasında güvenli biçimde yüklenir. Yapay zekâyla görsel üretilmez.</Text>
 
-        {CATEGORIES.map(key => options[key].length ? <View key={key} style={styles.field}>
-          <Text style={styles.label}>{CATEGORY_LABELS[key]}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categories}>
-            <TouchableOpacity style={[styles.category, !draft[key].length && styles.categoryActive]}
-              onPress={() => setField(key, [])}><Text style={styles.categoryText}>Belirtilmemiş</Text></TouchableOpacity>
-            {[...new Set([...draft[key], ...options[key]])].map(term =>
-              <TouchableOpacity key={term} style={[styles.category, draft[key].includes(term) && styles.categoryActive]}
-                onPress={() => setField(key, draft[key].includes(term) ? [] : [term])}>
-                <Text style={styles.categoryText}>{term}</Text>
-              </TouchableOpacity>)}
-          </ScrollView>
-        </View> : null)}
+        <View style={styles.categoryGrid}>
+          {CATEGORIES.map(key => <View key={key} style={styles.categoryGridItem}>
+            <RecipePicker label={CATEGORY_LABELS[key]} value={draft[key][0] || ''}
+              options={[...new Set([...draft[key], ...options[key]])]}
+              onChange={value => setField(key, value ? [value] : [])} />
+          </View>)}
+        </View>
       </View> : null}
 
       {stage === 1 ? <View style={styles.card}>
@@ -375,8 +387,18 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
           </View>
           {input('Malzeme adı', item.name, text => ingredientEdit(index, 'name', text), { placeholder: 'Örn. Domates' })}
           <View style={styles.twoColumns}>
-            <View style={styles.col}>{input('Miktar (isteğe bağlı)', item.amount, text => ingredientEdit(index, 'amount', text), { placeholder: 'Örn. 2' })}</View>
-            <View style={styles.col}>{input('Birim', item.unit, text => ingredientEdit(index, 'unit', text), { placeholder: 'Örn. adet' })}</View>
+            <View style={styles.col}>{input('Miktar (isteğe bağlı)', item.amount, text => {
+                if (/[a-zA-ZğüşıöçĞÜŞİÖÇ]/.test(text) &&
+                  !['yarım','çeyrek'].some(value => value.startsWith(text.toLocaleLowerCase('tr-TR')))) {
+                  setInvalidField('ingredients');
+                  setError((index + 1) + '. malzeme: Miktara sayı, kesir, yarım veya çeyrek yaz.');
+                  return;
+                }
+                ingredientEdit(index, 'amount', text);
+              }, { placeholder: 'Örn. 2, 1/2 veya 1,5' })}</View>
+            <View style={styles.col}><RecipePicker label="Ölçü birimi" value={item.unit}
+                options={RECIPE_UNITS} placeholder="Birim seç"
+                onChange={value => ingredientEdit(index, 'unit', value)} /></View>
           </View>
           {!item.amount.trim() ? <Text style={styles.unknown}>Miktar belirtmedin; tahmin etmiyoruz.</Text> : null}
         </View>)}
@@ -483,6 +505,8 @@ const styles = StyleSheet.create({
   chipText:{fontSize:12,fontWeight:'700',color:'#7b645a'},
   selectedText:{color:RED},
   twoColumns:{flexDirection:'row',gap:10},
+  categoryGrid:{flexDirection:'row',flexWrap:'wrap',gap:10},
+  categoryGridItem:{width:'48%',minWidth:0},
   col:{flex:1,minWidth:0},
   photoHeader:{gap:5,marginTop:6},
   photoCard:{borderRadius:18,overflow:'hidden',backgroundColor:'#fff8f3',borderWidth:1,borderColor:'#efddd0',height:190},

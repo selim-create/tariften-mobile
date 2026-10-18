@@ -486,6 +486,8 @@ export default function RecipesScreen() {
           draft={reviewDraft}
           onChange={fn => setReviewDraft(old => old ? fn(old) : old)}
           existingRecipeId={reviewExistingId}
+          cuisineOptions={terms?.cuisine?.map(item => item.label) || []}
+          mealOptions={terms?.meal_type?.map(item => item.label) || []}
           saving={reviewSaving}
           uncertain={reviewUncertain}
           error={reviewError}

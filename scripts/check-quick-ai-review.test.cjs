@@ -8,7 +8,14 @@ const read = p => fs.readFileSync(path.join(__dirname,'..',p),'utf8');
 const helper = read('lib/quick-recipe-review.ts');
 const js = ts.transpileModule(helper,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
 const local = {exports:{}};
-new Function('module','exports',js)(local,local.exports);
+const measureSource = read('lib/recipe-measurements.ts');
+const measureJs = ts.transpileModule(measureSource,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+const measures = {exports:{}};
+new Function('module','exports',measureJs)(measures,measures.exports);
+new Function('module','exports','require',js)(local,local.exports,id => {
+ assert.equal(id,'./recipe-measurements');
+ return measures.exports;
+});
 const {quickRecipeFromAI,validateQuickRecipe,approvedQuickRecipe} = local.exports;
 const good=()=>({
  title:'Domatesli pilav', excerpt:'Evde kolay pilav.',

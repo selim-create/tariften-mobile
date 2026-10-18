@@ -1,4 +1,5 @@
 import type { Recipe } from './types';
+import { validateRecipeAmount, validateRecipeUnit } from './recipe-measurements';
 import { parseIngredients, parseSteps } from './recipeUtils';
 
 export type ManualIngredient = { name: string; amount: string; unit: string };
@@ -45,14 +46,21 @@ export function validateManualDraft(draft: RecipeManualDraft): { field: ManualFi
     return { field: 'servings', message: 'Tarifin kaç kişilik olduğunu seçmelisin (1–36).' };
   }
   for (const key of ['prep_time', 'cook_time', 'calories'] as const) {
-    if (draft[key].trim() && (!/^\d+$/.test(draft[key].trim()) || Number(draft[key]) > 9999)) {
-      return { field: key, message: 'Süre ve kalori alanlarında negatif olmayan bir sayı kullan.' };
+    const max = key === 'calories' ? 3000 : 720;
+    if (draft[key].trim() && (!/^\d+$/.test(draft[key].trim()) || Number(draft[key]) > max)) {
+      return { field: key, message: key === 'calories'
+        ? 'Kişi başına kalori 0–3000 arasında olmalı.'
+        : 'Süre 0–720 dakika arasında olmalı.' };
     }
   }
   if (!draft.ingredients.length || draft.ingredients.some(item => !item.name.trim())) {
     return { field: 'ingredients', message: 'Malzeme satırlarında isim boş bırakılamaz.' };
   }
   if (draft.ingredients.length > 40) return { field: 'ingredients', message: 'En fazla 40 malzeme ekleyebilirsin.' };
+  for (const [index, row] of draft.ingredients.entries()) {
+    const issue = validateRecipeAmount(row.amount) || validateRecipeUnit(row.unit);
+    if (issue) return { field: 'ingredients', message: `${index + 1}. malzeme: ${issue}` };
+  }
   if (!draft.steps.length || draft.steps.some(step => !step.trim())) {
     return { field: 'steps', message: 'Yapılış adımlarını doldurmalısın.' };
   }
