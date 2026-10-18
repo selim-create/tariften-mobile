@@ -265,6 +265,17 @@ export default function CookingAssistant({
     setCloudBusy(false);
   }, []);
 
+  // Native TTS and cloud MP3 share one output. Every cloud play/replay
+  // invalidates queued local speech and waits for its serialized stop.
+  const stopDeviceSpeechForCloud = useCallback(async () => {
+    const generation = ++speechGenerationRef.current;
+    speechQueueRef.current = speechQueueRef.current.catch(() => {}).then(async () => {
+      await Speech.stop();
+    });
+    await speechQueueRef.current;
+    return visibleRef.current && generation === speechGenerationRef.current;
+  }, []);
+
   const speakCloud = useCallback(async (step: number, requestedVoice: string) => {
     if (!visibleRef.current || !token || !cloudStatus?.enabled || !Number.isSafeInteger(recipeId) || recipeId < 1) {
       setSpeechError('Doğal seslendirme şu anda kullanılamıyor. Cihaz sesini seçebilirsin.');
@@ -272,12 +283,18 @@ export default function CookingAssistant({
     }
     const key = `${recipeId}:${step}:${requestedVoice}`;
     if (cloudPlayerRef.current && cloudKeyRef.current === key) {
+      const player = cloudPlayerRef.current;
+      const playbackGeneration = cloudGenerationRef.current;
       try {
-        await cloudPlayerRef.current.seekTo(0);
-        cloudPlayerRef.current.play();
+        if (!await stopDeviceSpeechForCloud()) return;
+        if (playbackGeneration !== cloudGenerationRef.current || cloudPlayerRef.current !== player) return;
+        await player.seekTo(0);
+        if (!visibleRef.current || playbackGeneration !== cloudGenerationRef.current || cloudPlayerRef.current !== player) return;
+        player.play();
         setSpeechStatus('playing');
         setSpeechError(null);
       } catch {
+        if (!visibleRef.current || playbackGeneration !== cloudGenerationRef.current) return;
         setSpeechStatus('error');
         setSpeechError('Ses tekrar oynatılamadı.');
       }
@@ -293,7 +310,7 @@ export default function CookingAssistant({
     setSpeechError(null);
     let tempUri: string | null = null;
     try {
-      await Speech.stop();
+      if (!await stopDeviceSpeechForCloud()) return;
       if (requestGeneration !== cloudGenerationRef.current) return;
       const audioBase64 = await synthesizeRecipeStep(token, recipeId, step, requestedVoice, controller.signal);
       if (!visibleRef.current || requestGeneration !== cloudGenerationRef.current) return;
@@ -325,7 +342,7 @@ export default function CookingAssistant({
       }
       if (cloudControllerRef.current === controller) cloudControllerRef.current = null;
     }
-  }, [token, recipeId, cloudStatus?.enabled, speechRate, clearCloud]);
+  }, [token, recipeId, cloudStatus?.enabled, speechRate, clearCloud, stopDeviceSpeechForCloud]);
 
   const stopSpeech = useCallback(() => {
     clearCloud();
@@ -339,11 +356,17 @@ export default function CookingAssistant({
 
   const speak = useCallback((text: string, voiceOverride?: string | null) => {
     if (cloudMode && voiceOverride === undefined) {
+      if (!text.trim()) {
+        setSpeechStatus('idle');
+        setSpeechError('Bu adımda okunacak metin bulunmuyor.');
+        return;
+      }
       void speakCloud(currentIndex, cloudVoice);
       return;
     }
-    // An explicit offline voice preview must never overlap an existing MP3.
-    if (cloudPlayerRef.current) clearCloud();
+    // A local voice preview must also abort pending cloud synthesis, not only
+    // an already-mounted MP3 player, or its late response could overlap TTS.
+    if (cloudPlayerRef.current || cloudControllerRef.current) clearCloud();
     if (!visibleRef.current) return;
     const words = text.trim();
     if (!words) {
