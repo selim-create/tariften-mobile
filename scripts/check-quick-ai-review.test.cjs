@@ -102,3 +102,25 @@ test('AI generated draft fields are preserved when preparing a safe auto-publish
   {...draft,ingredients:[{name:'',amount:'2',unit:'adet'}]}
  ]){assert.ok(validateQuickRecipe(changed));assert.throws(()=>approvedQuickRecipe(changed));}
 });
+\ntest('AI can publish grounded composite egg amounts without inventing whole eggs',()=> {
+ const candidate=good();
+ candidate.ingredients[0]={name:'Yumurta',amount:'1 bütün + 2 sarı',unit:'adet'};
+ const draft=quickRecipeFromAI(candidate);
+ assert.equal(validateQuickRecipe(draft),null);
+ assert.equal(approvedQuickRecipe(draft).ingredients[0].amount,'1 bütün + 2 sarı');
+ candidate.ingredients[0].amount='domatas';
+ assert.ok(validateQuickRecipe(quickRecipeFromAI(candidate)));
+});
+test('Numeric recipe deep-links work and duplicate choice only presents a published recipe',()=> {
+ const api=read('lib/api.ts');
+ assert.match(api,/recipes\\/search\\?\\$\\{\\/\\^\\[1-9\\]/);
+ assert.match(api,/id=\\$\\{encodeURIComponent\\(slug\\)\\}/);
+ const screen=read('app/(tabs)/recipes.tsx');
+ assert.match(screen,/existing_recipe_slug/);
+ assert.match(screen,/setReviewDraft\\(draft\\)/);
+ assert.match(screen,/await publishGeneratedRecipe\\(draft, token\\)/);
+ assert.doesNotMatch(screen,/<QuickRecipeReview/);
+ const decision=read('components/recipe/SimilarRecipeChoice.tsx');
+ assert.match(decision,/Mevcut tarifi görüntüle/);
+ assert.match(decision,/Yine de yeni tarif oluştur/);
+});
