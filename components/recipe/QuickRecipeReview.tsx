@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { QuickRecipeDraft } from '../../lib/quick-recipe-review';
 import { validateQuickRecipe } from '../../lib/quick-recipe-review';
-import { RECIPE_UNITS } from '../../lib/recipe-measurements';
+import { RECIPE_UNITS, canTypeRecipeAmount } from '../../lib/recipe-measurements';
 import RecipePicker from './RecipePicker';
 
 type Props = {
@@ -98,8 +98,7 @@ export default function QuickRecipeReview({
               <View style={styles.twoCol}>
                 <View style={styles.col}><FormField label="Miktar" value={row.amount}
                   onChange={v => {
-                    if (/[a-zA-ZğüşıöçĞÜŞİÖÇ]/.test(v) &&
-                      !['yarım','çeyrek'].some(word => word.startsWith(v.toLocaleLowerCase('tr-TR')))) return;
+                    if (!canTypeRecipeAmount(v)) return;
                     patch({ ingredients: draft.ingredients.map((r, j) => j === i ? { ...r, amount: v } : r) });
                   }} /></View>
                 <View style={styles.col}><RecipePicker label="Ölçü birimi" value={row.unit} options={RECIPE_UNITS}
