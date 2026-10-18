@@ -6,6 +6,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { QuickRecipeDraft } from '../../lib/quick-recipe-review';
 import { validateQuickRecipe } from '../../lib/quick-recipe-review';
+import { RECIPE_UNITS } from '../../lib/recipe-measurements';
+import RecipePicker from './RecipePicker';
 
 type Props = {
   visible: boolean;
@@ -62,22 +64,24 @@ export default function QuickRecipeReview({
             <FormField label="Tarifin adı *" value={draft.title} onChange={v => patch({ title: v })} />
             <FormField label="Editoryal spot" value={draft.excerpt} multiline onChange={v => patch({ excerpt: v })} />
             <View style={styles.twoCol}>
-              <View style={styles.col}><FormField label="Kaç kişilik? *" numeric value={draft.servings} onChange={v => patch({ servings: v })} /></View>
+              <View style={styles.col}><FormField label="Kaç kişilik? *" numeric value={draft.servings} onChange={v => { if (Number(v) <= 36) patch({ servings: v }); }} /></View>
               <View style={styles.col}><FormField label="Kişi başına yaklaşık kcal" numeric value={draft.calories}
-                placeholder="Bilinmiyor" onChange={v => patch({ calories: v })} /></View>
+                placeholder="Bilinmiyor" onChange={v => { if (Number(v) <= 3000) patch({ calories: v }); }} /></View>
             </View>
             <Text style={styles.hint}>Kalori AI tahminidir; beslenme analizi değildir. Bilinmiyorsa boş kalabilir.</Text>
             <View style={styles.twoCol}>
-              <View style={styles.col}><FormField label="Mutfak" value={draft.cuisine[0] || ''}
+              <View style={styles.col}><RecipePicker label="Mutfak" value={draft.cuisine[0] || ''}
+                options={[...new Set([...draft.cuisine, 'Türk Mutfağı', 'İtalyan Mutfağı', 'Akdeniz Mutfağı'])]}
                 onChange={v => patch({ cuisine: v ? [v] : [] })} /></View>
-              <View style={styles.col}><FormField label="Öğün türü" value={draft.meal_type[0] || ''}
+              <View style={styles.col}><RecipePicker label="Öğün türü" value={draft.meal_type[0] || ''}
+                options={[...new Set([...draft.meal_type, 'Kahvaltı', 'Öğle Yemeği', 'Akşam Yemeği', 'Ara Öğün', 'Tatlı'])]}
                 onChange={v => patch({ meal_type: v ? [v] : [] })} /></View>
             </View>
             <View style={styles.twoCol}>
               <View style={styles.col}><FormField label="Hazırlama · dk" numeric value={draft.prep_time}
-                onChange={v => patch({ prep_time: v })} /></View>
+                onChange={v => { if (Number(v) <= 720) patch({ prep_time: v }); }} /></View>
               <View style={styles.col}><FormField label="Pişirme · dk" numeric value={draft.cook_time}
-                onChange={v => patch({ cook_time: v })} /></View>
+                onChange={v => { if (Number(v) <= 720) patch({ cook_time: v }); }} /></View>
             </View>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Malzemeler</Text>
@@ -91,8 +95,12 @@ export default function QuickRecipeReview({
                 onChange={v => patch({ ingredients: draft.ingredients.map((r, j) => j === i ? { ...r, name: v } : r) })} />
               <View style={styles.twoCol}>
                 <View style={styles.col}><FormField label="Miktar" value={row.amount}
-                  onChange={v => patch({ ingredients: draft.ingredients.map((r, j) => j === i ? { ...r, amount: v } : r) })} /></View>
-                <View style={styles.col}><FormField label="Birim" value={row.unit}
+                  onChange={v => {
+                    if (/[a-zA-ZğüşıöçĞÜŞİÖÇ]/.test(v) &&
+                      !['yarım','çeyrek'].some(word => word.startsWith(v.toLocaleLowerCase('tr-TR')))) return;
+                    patch({ ingredients: draft.ingredients.map((r, j) => j === i ? { ...r, amount: v } : r) });
+                  }} /></View>
+                <View style={styles.col}><RecipePicker label="Ölçü birimi" value={row.unit} options={RECIPE_UNITS}
                   onChange={v => patch({ ingredients: draft.ingredients.map((r, j) => j === i ? { ...r, unit: v } : r) })} /></View>
               </View>
               <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${i + 1}. malzemeyi kaldır`}
