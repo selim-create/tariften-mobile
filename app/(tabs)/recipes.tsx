@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -20,7 +21,6 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import ResponsiveGrid from '../../components/ResponsiveGrid';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import QuotaCard from '../../components/QuotaCard';
 import { fetchAccountQuotas, reached, resetDate, useQuotas } from '../../lib/quotas';
 
 const AI_LOADING_MESSAGES = [
@@ -39,6 +39,7 @@ export default function RecipesScreen() {
     difficulty?: string;
     mealType?: string;
     collection?: string;
+    quick?: string;
   }>();
   const router = useRouter();
   const { token } = useAuth();
@@ -60,6 +61,20 @@ export default function RecipesScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [query, setQuery] = useState(params.query || '');
   const [aiModalVisible, setAiModalVisible] = useState(false);
+  const [quickPromptVisible, setQuickPromptVisible] = useState(false);
+  const [quickPromptText, setQuickPromptText] = useState('');
+  const [usageNotice, setUsageNotice] = useState('');
+  useEffect(() => {
+    if (params.quick === '1') {
+      setQuickPromptVisible(true);
+      router.setParams({ quick: undefined });
+    }
+  }, [params.quick, router]);
+  useEffect(() => {
+    if (!usageNotice) return;
+    const timer = setTimeout(() => setUsageNotice(''), 3200);
+    return () => clearTimeout(timer);
+  }, [usageNotice]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiLoadingMessage, setAiLoadingMessage] = useState(AI_LOADING_MESSAGES[0]);
   const aiMsgIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -154,12 +169,12 @@ export default function RecipesScreen() {
     setFilters(newFilters);
   }, []);
 
-  const handleGenerateAI = useCallback(async () => {
+  const handleGenerateAI = useCallback(async (overridePrompt?: string) => {
     if (!token) {
       router.push('/login');
       return;
     }
-    const searchQuery = filters.query || query;
+    const searchQuery = overridePrompt?.trim() || filters.query || query;
     if (!searchQuery.trim()) {
       Alert.alert('Hata', 'Tarif oluşturmak için önce bir arama yapın.');
       return;
@@ -181,6 +196,7 @@ export default function RecipesScreen() {
     }, 2000);
     try {
       const aiResponse = await generateAIRecipe(token, searchQuery);
+      setUsageNotice("AI tarif oluşturma denemen kullanıldı. Kalan hakların Profil'de.");
 
       if (aiResponse.success && aiResponse.recipe) {
         void quotas.refresh();
@@ -338,7 +354,6 @@ export default function RecipesScreen() {
               <Text style={styles.emptySubtext}>Farklı filtreler deneyin.</Text>
               {(filters.query || query) ? (
                 <View>
-                  <QuotaCard data={quotas.data} error={quotas.error} loading={quotas.loading} kinds={['recipe_day', 'recipe_ai_day']} />
                   <TouchableOpacity
                     style={[styles.aiCard, (reached(quotas.data, 'recipe_day') || reached(quotas.data, 'recipe_ai_day')) && { opacity: 0.45 }]}
                     disabled={reached(quotas.data, 'recipe_day') || reached(quotas.data, 'recipe_ai_day')}
@@ -369,6 +384,40 @@ export default function RecipesScreen() {
         terms={terms ?? undefined}
       />
 
+      {/* One global + shortcut. An explicit user-submitted prompt starts AI. */}
+      <Modal visible={quickPromptVisible} transparent animationType="slide" onRequestClose={() => setQuickPromptVisible(false)}>
+        <View style={styles.aiModalOverlay}>
+          <View style={styles.quickCard}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Pencereyi kapat"
+              style={styles.quickClose} onPress={() => setQuickPromptVisible(false)}>
+              <Ionicons name="close" size={20} color="#98887c" />
+            </TouchableOpacity>
+            <Ionicons name="sparkles" size={28} color="#db4c3f" />
+            <Text style={styles.quickTitle}>Hızlı tarif oluştur</Text>
+            <Text style={styles.quickDesc}>Tarif adını veya elindeki malzemeleri yaz. AI Şef senin için hazırlasın.</Text>
+            <TextInput value={quickPromptText} onChangeText={setQuickPromptText}
+              accessibilityLabel="Tarif adı veya malzemeler" multiline
+              placeholder="Örn. Fırında tavuk veya patates, biber, peynir..."
+              placeholderTextColor="#ac9c91" style={styles.quickInput} />
+            <TouchableOpacity accessibilityRole="button" style={styles.quickAction}
+              disabled={!quickPromptText.trim()} onPress={() => {
+                const prompt = quickPromptText.trim();
+                setQuickPromptVisible(false);
+                void handleGenerateAI(prompt);
+              }}>
+              <Ionicons name="sparkles-outline" size={18} color="#fff" />
+              <Text style={styles.quickActionText}>Tarifimi oluştur</Text>
+            </TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" onPress={() => {
+              setQuickPromptVisible(false);
+              router.push('/(tabs)/pantry');
+            }}>
+              <Text style={styles.quickPantry}>Dolabımdaki malzemeleri kullan →</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      {usageNotice ? <View style={styles.quickToast} accessibilityRole="alert"><Text style={styles.quickToastText}>{usageNotice}</Text></View> : null}
       {/* AI Loading Modal */}
       <Modal visible={aiModalVisible} transparent animationType="fade">
         <View style={styles.aiModalOverlay}>
@@ -459,6 +508,16 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.75)',
     lineHeight: 20,
   },
+  quickCard: { backgroundColor: '#fffbf7', borderRadius: 28, padding: 23, width: '100%', gap: 13 },
+  quickClose: { alignSelf: 'flex-end' },
+  quickTitle: { fontSize: 23, fontWeight: '900', color: '#1f303a' },
+  quickDesc: { fontSize: 13, lineHeight: 19, color: '#8f8177' },
+  quickInput: { minHeight: 98, borderWidth: 1, borderRadius: 16, borderColor: '#ecd9cc', backgroundColor: '#fff', padding: 13, fontSize: 14, textAlignVertical: 'top', color: '#202f3f' },
+  quickAction: { minHeight: 51, backgroundColor: '#db4c3f', borderRadius: 14, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 8 },
+  quickActionText: { fontSize: 14, fontWeight: '900', color: '#fff' },
+  quickPantry: { color: '#b35744', fontSize: 12, fontWeight: '800', textAlign: 'center', paddingTop: 4 },
+  quickToast: { position: 'absolute', bottom: 90, left: 20, right: 20, zIndex: 20, borderRadius: 14, backgroundColor: '#274538', padding: 13 },
+  quickToastText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   aiModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
