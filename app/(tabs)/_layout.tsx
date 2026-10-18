@@ -6,6 +6,7 @@ import { Image } from 'expo-image';
 import { useAuth } from '../../context/AuthContext';
 import { useResponsive } from '../../hooks/useResponsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import GlobalCreateAction from '../../components/navigation/GlobalCreateAction';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -34,6 +35,7 @@ export default function TabLayout() {
   const headerTitleSize = isTablet ? 22 : 18;
 
   return (
+    <View style={{ flex: 1 }}>
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#e74c3c',
@@ -118,6 +120,8 @@ export default function TabLayout() {
         />
       ))}
     </Tabs>
+    <GlobalCreateAction tabBarHeight={tabBarHeight} />
+    </View>
   );
 }
 
