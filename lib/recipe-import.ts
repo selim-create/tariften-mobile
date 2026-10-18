@@ -27,6 +27,14 @@ export type ImportSeo = {
   focus_keywords: string[];
 };
 
+export type ImportSuggestions = {
+  servings: number | null;
+  calories_per_serving: number | null;
+  cuisine: string;
+  meal_type: string;
+  nutrition_note: string;
+};
+
 export type GroundedImportPreview = {
   success: true;
   mode: "manual_text_import";
@@ -39,6 +47,7 @@ export type GroundedImportPreview = {
     ingredients: ImportIngredient[];
     steps: ImportStep[];
     seo: ImportSeo;
+    suggestions?: ImportSuggestions;
   };
   warnings: string[];
   needs_confirmation: string[];
@@ -56,8 +65,12 @@ export type EditableStep = ImportStep & { userEdited?: boolean };
 export type ImportEditor = {
   title: string;
   excerpt: string;
-  /** User-provided number of people. Never generated from ingredient mass. */
+  /** Editable AI serving suggestion, never a source-proven fact. */
   servings: string;
+  /** Editable, explicitly estimated kcal per person. Empty when unavailable. */
+  calories: string;
+  cuisine: string;
+  mealType: string;
   ingredients: EditableIngredient[];
   steps: EditableStep[];
   seoTitle: string;
@@ -96,6 +109,14 @@ function isIngredient(value: unknown): value is ImportIngredient {
     && (value.source_name === undefined || isString(value.source_name))
     && (value.name_corrected === undefined || typeof value.name_corrected === "boolean");
 }
+function isSuggestion(value: unknown): value is ImportSuggestions {
+  if (!isRecord(value)) return false;
+  const serving = value.servings;
+  const calories = value.calories_per_serving;
+  return (serving === null || (Number.isInteger(serving) && Number(serving) >= 1 && Number(serving) <= 36))
+    && (calories === null || (Number.isInteger(calories) && Number(calories) >= 1 && Number(calories) <= 3000))
+    && isString(value.cuisine) && isString(value.meal_type) && isString(value.nutrition_note);
+}
 function isStep(value: unknown): value is ImportStep {
   return isRecord(value) && isString(value.content) && isString(value.original_span)
     && value.source_verified === true
@@ -115,6 +136,7 @@ export function parseImportPreview(value: unknown): GroundedImportPreview {
     || !Array.isArray(r.steps) || !r.steps.every(isStep)
     || r.ingredients.length > 40 || r.steps.length > 40 || !isRecord(r.seo)
     || !isString(r.seo.title) || !isString(r.seo.description)
+    || (r.suggestions !== undefined && !isSuggestion(r.suggestions))
     || !isStringArray(r.seo.focus_keywords)
     || value.provenance.origin_type !== "manual_text") {
     throw new Error("Tarif alanları eksik veya beklenmeyen türde.");
@@ -139,7 +161,10 @@ export function editorFromPreview(p: GroundedImportPreview): ImportEditor {
   return {
     title: p.recipe.title,
     excerpt: p.recipe.excerpt,
-    servings: "", // Source does not verify servings; require explicit human choice.
+    servings: p.recipe.suggestions?.servings ? String(p.recipe.suggestions.servings) : "",
+    calories: p.recipe.suggestions?.calories_per_serving ? String(p.recipe.suggestions.calories_per_serving) : "",
+    cuisine: p.recipe.suggestions?.cuisine || "",
+    mealType: p.recipe.suggestions?.meal_type || "",
     ingredients: p.recipe.ingredients.map(i => ({ ...i })),
     steps: p.recipe.steps.map(s => ({ ...s })),
     seoTitle: p.recipe.seo.title,
@@ -152,6 +177,9 @@ export function publishValidation(editor: ImportEditor): string | null {
   if (!editor.title.trim()) return "Tarif başlığını tamamlamalısın.";
   if (!/^[1-9]\d*$/.test(editor.servings.trim()) || Number(editor.servings) > 36) {
     return "Tarifin kaç kişilik olduğunu seçmelisin (1–36 kişi).";
+  }
+  if (editor.calories.trim() && (!/^[1-9]\d*$/.test(editor.calories.trim()) || Number(editor.calories) > 3000)) {
+    return "Tahmini kalori değerini kontrol etmelisin (1–3000 kcal/kişi).";
   }
   if (!editor.ingredients.length || editor.ingredients.some(i => !i.name.trim())) {
     return "En az bir malzeme eklemeli ve tüm malzeme isimlerini tamamlamalısın.";
@@ -177,6 +205,9 @@ export function buildApprovedRecipe(editor: ImportEditor) {
     title: editor.title.trim(),
     excerpt: editor.excerpt.trim(),
     servings: Number(editor.servings),
+    ...(editor.calories.trim() ? { calories: Number(editor.calories) } : {}),
+    ...(editor.cuisine.trim() ? { cuisine: [editor.cuisine.trim()] } : {}),
+    ...(editor.mealType.trim() ? { meal_type: [editor.mealType.trim()] } : {}),
     ingredients: editor.ingredients.map(i => ({
       name: i.name.trim(),
       amount: i.amount.trim(),
