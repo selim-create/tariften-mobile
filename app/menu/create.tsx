@@ -15,7 +15,6 @@ import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
 import { beginMenu, readMenu, findMenu, advanceMenu, retryMenu, type MenuJob } from '../../lib/menu-jobs';
 import { fetchAccountQuotas, reached, resetDate, useQuotas } from '../../lib/quotas';
-import QuotaCard from '../../components/QuotaCard';
 
 const MEAL_TYPES = ['Kahvaltı', 'Öğle Yemeği', 'Beş Çayı', 'Akşam Yemeği', 'Kokteyl'];
 const DIET_OPTIONS = ['Normal', 'Vejetaryen', 'Vegan', 'Glutensiz', 'Düşük Karb'];
@@ -340,7 +339,7 @@ export default function CreateMenuScreen() {
             <SummaryRow label="Öğün Tipi" value={eventType} />
             <SummaryRow label="Diyet Tercihi" value={diet} />
           </View>
-          <QuotaCard data={quotas.data} error={quotas.error} loading={quotas.loading} kinds={['menu_month']} />
+          
           {job && <View style={styles.summaryCard}><Text style={styles.summaryLabel}>Kayıtlı menü: {job.completed} / {job.total} tarif hazır.</Text></View>}
           {!!errorMessage && <View style={styles.summaryCard}><Text style={{ color: '#925326', lineHeight: 20 }}>{errorMessage}</Text></View>}
           <TouchableOpacity
