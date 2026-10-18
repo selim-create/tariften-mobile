@@ -27,6 +27,8 @@ jobs:
         run: node --test scripts/check-mobile-recipe-edit-review.test.cjs
       - name: Guard global create sheet and restored recipe discovery feed
         run: node --test scripts/check-mobile-global-create-sheet.test.cjs
+      - name: Quick recipe/pantry UX and profile-only quota displays
+        run: node --test scripts/check-quick-create-quota-ux.test.cjs
       - name: Check owner-verified Tariflerim and Sofralarım paging
         run: node --test scripts/check-mobile-my-kitchen-library.test.cjs
       - name: Review premium recipe checklist and import editor accessibility
