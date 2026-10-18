@@ -23,6 +23,8 @@ jobs:
         run: node --test scripts/check-mobile-recipe-publish.test.cjs
       - name: Guard native manual recipe creation, editing and image upload
         run: node --test scripts/check-mobile-manual-recipes.test.cjs
+      - name: Guard native manual recipe edit moderation and approval states
+        run: node --test scripts/check-mobile-recipe-edit-review.test.cjs
       - name: Guard global create sheet and restored recipe discovery feed
         run: node --test scripts/check-mobile-global-create-sheet.test.cjs
       - name: Check owner-verified Tariflerim and Sofralarım paging
