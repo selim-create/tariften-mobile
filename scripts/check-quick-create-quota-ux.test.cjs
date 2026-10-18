@@ -34,3 +34,19 @@ test('membership rights live in profile only, import metadata is editable',()=>{
  assert.doesNotMatch(read('app/menu/create.tsx'),/<QuotaCard/);
  assert.doesNotMatch(read('components/recipe/RecipeManualEditor.tsx'),/Bugünkü tarif hakkın:/);
 });
+test('mobile quick AI guards offline quotas, double taps and uncertain saves',()=>{
+ const list=read('app/(tabs)/recipes.tsx');
+ const start=list.indexOf('const handleGenerateAI = useCallback(');
+ const end=list.indexOf('  useEffect(() => {\n    return () => {\n      if (aiMsgIntervalRef.current)',start);
+ assert.ok(start>=0 && end>start);
+ const flow=list.slice(start,end);
+ assert.match(flow,/if \(quickCreateInFlightRef\.current\) return/);
+ assert.match(flow,/quickCreateInFlightRef\.current = true/);
+ assert.match(flow,/await fetchAccountQuotas\(token\)/);
+ assert.match(flow,/catch \{\s*Alert\.alert\('Şu anda oluşturulamıyor'/);
+ assert.ok(flow.indexOf('await fetchAccountQuotas(token)') < flow.indexOf('await generateAIRecipe(token, searchQuery)'));
+ assert.match(flow,/finally \{[\s\S]*quickCreateInFlightRef\.current = false;/);
+ assert.doesNotMatch(flow,/fetchAccountQuotas\(token\)\.catch\(\(\) => null\)/);
+ assert.match(flow,/error instanceof RecipeCreateUnconfirmedError/);
+ assert.match(flow,/Yeniden oluşturmadan önce Profil > Tariflerim/);
+});
