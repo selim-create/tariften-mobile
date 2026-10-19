@@ -91,7 +91,7 @@ test('native create and edit share one staged editor, preserve author permission
   assert.match(layout,/name="recipe\/create"/);
   assert.match(layout,/name="recipe\/edit\/\[id\]"/);
   assert.match(createSheet,/route: '\/recipe\/create'/);
-  assert.match(createSheet,/route: '\/recipe\/import'/);
+  assert.match(createSheet,/route: '\/recipe\/aktar'/);
   assert.match(details,/router.push\(`\/recipe\/edit\/\$\{recipe.id\}`\)/);
   assert.match(editor,/Number\(existing.author\?\.id\) !== Number\(user.id\)/);
   assert.match(editor,/approvedManualPayload\(draft, image\)/);

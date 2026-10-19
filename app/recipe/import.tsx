@@ -349,8 +349,8 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
       {stage === 'source' ? <>
         <View style={styles.hero}>
           <Text style={styles.kicker}>TARİFTEN MUTFAK STÜDYOSU</Text>
-          <Text style={styles.heading}>{importMethod === 'social' ? 'Sosyal medyadan tarif ekle.' : 'Sen anlat, biz düzenleyelim.'}</Text>
-          <Text style={styles.subtitle}>{importMethod === 'social' ? 'Paylaşım bağlantısını ekle. Ulaşılabilen kaynak bilgileriyle Tariften tarifine dönüştürelim.' : 'Notlarını kendi kelimelerinle yaz. Tarifinin son sözü sende.'}</Text>
+          <Text style={styles.heading}>Tarif Aktar</Text>
+          <Text style={styles.subtitle}>Bağlantı veya tarif notlarını ekle; son kararı sen ver.</Text>
           <View style={styles.stageRow}>
             <Text style={styles.stageActive}>1 · Notların</Text>
             <Ionicons name="arrow-forward" size={15} color="#ad9c8f" />

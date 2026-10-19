@@ -4,11 +4,12 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
-test('global + sheet prioritizes quick text AI and pantry; no bureaucratic note',()=>{
+test('global + sheet prioritizes quick AI and unifies import while pantry remains a main tab',()=>{
  const menu=read('components/navigation/GlobalCreateAction.tsx');
  assert.match(menu,/route: '\/\(tabs\)\/recipes\?quick=1'/);
- assert.match(menu,/route: '\/\(tabs\)\/pantry'/);
- assert.ok(menu.indexOf('Hızlı tarif oluştur')<menu.indexOf('Tarifini kendin yaz'));
+ assert.doesNotMatch(menu,/route: '\/\(tabs\)\/pantry'/);
+ assert.match(menu,/route: '\/recipe\/aktar'/);
+ assert.ok(menu.indexOf('AI ile Tarif Oluştur')<menu.indexOf('Tarifimi Kendim Yazacağım'));
  assert.doesNotMatch(menu,/Tariflerin yalnızca sen onayladığında yayımlanır|styles\.footnote.*\/\//);
 });
 test('quick route opens AI prompt before any paid call, uses the same quota guard',()=>{

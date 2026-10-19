@@ -5,49 +5,35 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 
-type Destination = '/recipe/create' | '/recipe/social' | '/recipe/import' | '/menu/create' | '/(tabs)/recipes?quick=1' | '/(tabs)/pantry';
+type Destination = '/recipe/create' | '/recipe/aktar' | '/menu/create' | '/(tabs)/recipes?quick=1';
 type Icon = React.ComponentProps<typeof Ionicons>['name'];
 
 const ACTIONS: { route: Destination; title: string; description: string; icon: Icon; tint: string }[] = [
   {
     route: '/(tabs)/recipes?quick=1',
-    title: 'Hızlı tarif oluştur',
-    description: 'Bir tarif adı veya malzemelerini yaz; AI Şef hazırlasın.',
+    title: 'AI ile Tarif Oluştur',
+    description: 'Tarif adı veya malzemelerini yaz; AI Şef hazırlasın.',
     icon: 'sparkles-outline',
     tint: '#d74c3f',
   },
   {
-    route: '/(tabs)/pantry',
-    title: 'Dolabımdakilerle tarif bul',
-    description: 'Dolabında kayıtlı malzemelerden tarif üret.',
-    icon: 'basket-outline',
-    tint: '#397b64',
+    route: '/recipe/aktar',
+    title: 'Tarif Aktar',
+    description: 'Reels, TikTok, YouTube bağlantısı veya tarif metni.',
+    icon: 'link-outline',
+    tint: '#d75445',
   },
   {
     route: '/recipe/create',
-    title: 'Tarifini kendin yaz',
-    description: 'Malzemeleri, adımları ve fotoğrafı sen belirle.',
+    title: 'Tarifimi Kendim Yazacağım',
+    description: 'Malzemeleri, adımları ve görseli sen belirle.',
     icon: 'create-outline',
     tint: '#d75445',
   },
   {
-    route: '/recipe/social',
-    title: 'Sosyal medyadan tarif ekle',
-    description: 'Reels, TikTok ve Shorts bağlantısından tarif.',
-    icon: 'videocam-outline',
-    tint: '#d75445',
-  },
-  {
-    route: '/recipe/import',
-    title: 'Tarif metninden aktar',
-    description: 'Aklındaki tarifi anlat, birlikte düzenleyelim.',
-    icon: 'book-outline',
-    tint: '#d7784e',
-  },
-  {
     route: '/menu/create',
-    title: 'Yeni menü oluştur',
-    description: 'Davetin veya günlük sofran için bir menü hazırla.',
+    title: 'Menü Oluştur',
+    description: 'Günlük sofran veya özel davetin için menü hazırla.',
     icon: 'restaurant-outline',
     tint: '#387b64',
   },
@@ -120,7 +106,7 @@ export default function GlobalCreateAction({ tabBarHeight }: { tabBarHeight: num
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.optionScroll} contentContainerStyle={styles.options} showsVerticalScrollIndicator={false}>
-              {ACTIONS.map(action => (
+              {ACTIONS.map((action, index) => (
                 <TouchableOpacity
                   key={action.route}
                   onPress={() => navigate(action.route)}
@@ -128,7 +114,7 @@ export default function GlobalCreateAction({ tabBarHeight }: { tabBarHeight: num
                   accessibilityLabel={action.title}
                   accessibilityHint={action.description}
                   activeOpacity={0.8}
-                  style={styles.option}>
+                  style={[styles.option, index === 0 && styles.primaryOption]}>
                   <View style={styles.iconTile}>
                     <Ionicons name={action.icon} size={24} color={action.tint} />
                   </View>
@@ -170,12 +156,13 @@ const styles = StyleSheet.create({
   intro: { fontSize: 12, color: '#93867c', lineHeight: 18 },
   close: { width: 39, height: 39, borderRadius: 20, backgroundColor: '#f6efe9', alignItems: 'center', justifyContent: 'center' },
   optionScroll: { flexGrow: 0 },
-  options: { gap: 11, paddingBottom: 4 },
+  options: { gap: 9, paddingBottom: 4 },
   option: {
-    flexDirection: 'row', alignItems: 'center', minHeight: 88,
+    flexDirection: 'row', alignItems: 'center', minHeight: 76,
     backgroundColor: '#ffffff', borderColor: '#efe4d8', borderWidth: 1,
     borderRadius: 20, paddingHorizontal: 14, paddingVertical: 13, gap: 13,
   },
+  primaryOption: { backgroundColor: '#fff0e9', borderColor: '#ebb9aa' },
   iconTile: {
     width: 51, height: 51, borderRadius: 17, backgroundColor: '#fff0e6',
     alignItems: 'center', justifyContent: 'center',

@@ -39,16 +39,19 @@ test('sheet uses a native dimmed bottom modal with accessible close and navigati
 test('global create sheet exposes only real manual, import and menu create destinations', () => {
   const component = read('components/navigation/GlobalCreateAction.tsx');
   const destinations = [...component.matchAll(/route: '(\/[^']+)'/g)].map(x => x[1]);
-  assert.deepEqual(destinations, ['/(tabs)/recipes?quick=1', '/(tabs)/pantry', '/recipe/create', '/recipe/social', '/recipe/import', '/menu/create']);
+  assert.deepEqual(destinations, ['/(tabs)/recipes?quick=1', '/recipe/aktar', '/recipe/create', '/menu/create']);
   for(const [route, file] of [
     ['/recipe/create', 'app/recipe/create.tsx'],
-    ['/recipe/social', 'app/recipe/social.tsx'],
+    ['/recipe/aktar', 'app/recipe/aktar.tsx'],
     ['/recipe/import', 'app/recipe/import.tsx'],
     ['/menu/create', 'app/menu/create.tsx']
   ]) {
     assert.ok(fs.existsSync(path.join(root, file)), route + ' should have a real screen');
   }
-  assert.match(component, /Sosyal medyadan tarif ekle/);
+  assert.match(component, /Tarif Aktar/);
+  assert.match(read('app/recipe/aktar.tsx'), /RecipeTextImportScreen initialMethod="social"/);
+  assert.match(read('app/recipe/import.tsx'), /Tarif metni/);
+  assert.match(read('app/_layout.tsx'), /name="recipe\/aktar"/);
   assert.doesNotMatch(component, /camera\/import|AI fotoğraf/i);
 });
 
