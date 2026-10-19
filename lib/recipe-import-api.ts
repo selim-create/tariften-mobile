@@ -131,3 +131,61 @@ export async function previewRecipeSocial(
     signal?.removeEventListener('abort', onAbort);
   }
 }
+
+
+/**
+ * Real native-video beta: Core owns the job, quota and payment; this client
+ * never invokes Cloud Run or Gemini and never retries a provider call.
+ */
+import { parseVideoJob, type VideoJob } from './video-recipe-import';
+
+const VIDEO_BASE = 'https://api.tariften.com/wp-json/tariften/v1/ai/recipe-social/video';
+async function videoRequest(
+  token: string, url: string, options: RequestInit, signal?: AbortSignal,
+): Promise<VideoJob> {
+  if (!token) throw new Error('Video aktarmak için giriş yapmalısın.');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  const onAbort = () => controller.abort();
+  signal?.addEventListener('abort', onAbort, { once: true });
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...options.headers },
+      signal: controller.signal,
+    });
+    const payload: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+      const error = asError(payload);
+      if (error.code === 'rest_no_route' || error.code === 'video_job_unavailable') {
+        throw new Error('YouTube video analizi henüz etkinleştirilmedi.');
+      }
+      throw new Error(error.message || 'Video analizi sunucusundan yanıt alınamadı.');
+    }
+    return parseVideoJob(payload);
+  } catch (cause) {
+    if (controller.signal.aborted) {
+      throw new Error('Video işinin yanıtı gecikti. Aynı bağlantıyla durumunu kontrol edebilirsin; yeni ücretli analiz başlatılmaz.');
+    }
+    if (cause instanceof TypeError) {
+      throw new Error('Tariften sunucusuna ulaşılamadı. Aynı bağlantıyla tekrar kontrol edebilirsin.');
+    }
+    throw cause;
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', onAbort);
+  }
+}
+export function startVideoRecipeJob(
+  token: string, sourceUrl: string, requestId: string, signal?: AbortSignal,
+): Promise<VideoJob> {
+  if (!/^[A-Za-z0-9-]{16,80}$/.test(requestId)) throw new Error('Video iş kimliği geçersiz.');
+  return videoRequest(token, VIDEO_BASE + '/start', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source_url: sourceUrl.trim(), request_id: requestId }),
+  }, signal);
+}
+export function getVideoRecipeJob(token: string, id: number, signal?: AbortSignal): Promise<VideoJob> {
+  if (!Number.isSafeInteger(id) || id < 1) throw new Error('Video iş kimliği geçersiz.');
+  return videoRequest(token, VIDEO_BASE + '/status/' + id, { method: 'GET' }, signal);
+}
