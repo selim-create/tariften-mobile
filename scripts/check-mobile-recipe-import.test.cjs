@@ -125,10 +125,10 @@ test('AI preview takes the user into a dedicated review stage, not below a long 
   assert.match(page, /setStage\('review'\)/);
   assert.match(page, /setStage\('source'\)/);
   assert.match(page, /stage === 'source' \? <>/);
-  assert.match(page, /stage === 'review' && editor && preview/);
+  assert.match(page, /stage === 'review' && editor && \(preview \|\| videoReview\)/);
   assert.match(page, /scrollRef\.current\?\.scrollTo\(\{ y: 0, animated: true \}\)/);
   assert.match(page, /Mutfak notlarıma dön/);
-  assert.match(page, /preview && editor/);
+  assert.match(page, /\(preview \|\| videoReview\) && editor/);
   assert.match(page, /Return to saved preview at no extra AI cost/);
   assert.match(page, /Düzenlenmiş tarifime dön/);
   assert.match(page, /Henüz yayımlanmadı/);
@@ -158,4 +158,46 @@ test('mobile editor uses quiet semantic ingredient marks rather than meaningless
   assert.match(page, /<LokmaIngredientIcon name=\{ingredient\.name\} size=\{22\} \/>/);
   assert.match(page, /import LokmaIngredientIcon from/);
   assert.doesNotMatch(page, /<View style=\{styles\.dot\} \/>/);
+});
+
+
+test('mobile uses Core video jobs without forging source evidence or auto-publishing', () => {
+  const compiled = ts.transpileModule(read('lib/video-recipe-import.ts'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  });
+  const moduleShim = { exports: {} };
+  new Function('module', 'exports', compiled.outputText)(moduleShim, moduleShim.exports);
+  const lib = moduleShim.exports;
+  const link = 'https://www.youtube.com/watch?v=abcdefghijk';
+  assert.equal(lib.isYouTubeVideoLink(link), true);
+  assert.equal(lib.isYouTubeVideoLink('https://youtube.com.evil.test/watch?v=abcdefghijk'), false);
+  const job = lib.parseVideoJob({
+    success: true, id: 19, status: 'needs_review', source_url: link,
+    message: 'Tarif hazır', requires_approval: true, preview: {
+      status: 'needs_review', requires_approval: true,
+      recipe: {
+        title: 'Gnocchi', excerpt: 'Kuru domates sosu.', servings: 2,
+        cuisine: 'İtalyan', meal_type: 'Ana Yemek', nutrition: { calories_per_serving: null },
+        ingredients: [
+          { name: 'Gnocchi', amount: 400, unit: 'g', quantity_verified: false, evidence: 'visual' },
+          { name: 'Sarımsak', amount: null, unit: null, quantity_verified: false, evidence: 'inferred' },
+        ],
+        steps: [{ instruction: 'Pişirin.', evidence: 'visual' }],
+        needs_confirmation: ['Sarımsak görüntüden doğrulanamadı.'],
+      },
+    },
+  });
+  const { editor, warnings } = lib.videoEditorFromJob(job);
+  assert.equal(editor.servings, '2');
+  assert.equal(editor.calories, '');
+  assert.equal(editor.ingredients[0].amount, '400');
+  assert.equal(editor.ingredients[1].amount, '');
+  assert.ok(editor.ingredients.every(i => i.source_verified === false && i.original_span === ''));
+  assert.equal(editor.steps[0].source_verified, false);
+  assert.ok(warnings.some(w => /Sarımsak/.test(w)));
+  assert.match(read('lib/recipe-import-api.ts'), /ai\/recipe-social\/video/);
+  assert.match(read('app/recipe/import.tsx'), /requestVideoPreview/);
+  assert.match(read('app/recipe/import.tsx'), /getVideoRecipeJob\(token, job\.id/);
+  assert.match(read('app/recipe/import.tsx'), /randomUUID\(\)/);
+  assert.match(read('app/recipe/import.tsx'), /buildApprovedRecipe\(editor\)/);
 });
