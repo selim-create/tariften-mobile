@@ -6,6 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { randomUUID } from 'expo-crypto';
 import { useAuth } from '../../context/AuthContext';
 import { createRecipe } from '../../lib/api';
 import { isPublishResultUncertain, RequestDeadlineError, withDeadline } from '../../lib/recipe-publish';
@@ -15,7 +16,8 @@ import {
   buildApprovedRecipe, editorFromPreview, importReviewNotes, publishValidation,
   validateRecipeSource,
 } from '../../lib/recipe-import';
-import { previewRecipeSocial, previewRecipeText } from '../../lib/recipe-import-api';
+import { previewRecipeSocial, previewRecipeText, startVideoRecipeJob, getVideoRecipeJob } from '../../lib/recipe-import-api';
+import { isYouTubeVideoLink, videoEditorFromJob } from '../../lib/video-recipe-import';
 import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
 
 type Busy = 'preview' | 'publish' | null;
@@ -60,6 +62,10 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
   const [fieldError, setFieldError] = useState<'servings' | null>(null);
   const [reviewNotesOpen, setReviewNotesOpen] = useState(false);
   const [preview, setPreview] = useState<GroundedImportPreview | null>(null);
+  const [videoReview, setVideoReview] = useState(false);
+  const [videoWarnings, setVideoWarnings] = useState<string[]>([]);
+  const [videoStatus, setVideoStatus] = useState('');
+  const videoRequestRef = useRef<{ url: string; id: string } | null>(null);
   const [editor, setEditor] = useState<ImportEditor | null>(null);
   const [accepted, setAccepted] = useState(true);
   const [busy, setBusy] = useState<Busy>(null);
@@ -88,6 +94,9 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
     setSource(text);
     setStage('source');
     setPreview(null);
+    setVideoReview(false);
+    setVideoWarnings([]);
+    setVideoStatus('');
     setEditor(null);
     setOpenIngredient(null);
     setOpenStep(null);
@@ -171,10 +180,65 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
     }
   };
 
+
+  const requestVideoPreview = async (url: string) => {
+    if (!token || requestLock.current) return;
+    requestLock.current = true;
+    setBusy('preview');
+    setError('');
+    setVideoReview(false);
+    setVideoWarnings([]);
+    setVideoStatus('queued');
+    const previous = videoRequestRef.current;
+    const requestId = previous && previous.url === url ? previous.id : randomUUID();
+    videoRequestRef.current = { url, id: requestId };
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      let job = await startVideoRecipeJob(token, url, requestId, controller.signal);
+      for (let n = 0; n < 100 && !controller.signal.aborted; n++) {
+        setVideoStatus(job.status);
+        if (job.status === 'needs_review') {
+          const checked = videoEditorFromJob(job);
+          setEditor(checked.editor);
+          setVideoWarnings(checked.warnings);
+          setVideoReview(true);
+          setPreview(null);
+          setStage('review');
+          setAccepted(true);
+          setReviewNotesOpen(false);
+          setFieldError(null);
+          setOpenIngredient(null);
+          setOpenStep(null);
+          requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }));
+          void quotas.refresh();
+          return;
+        }
+        if (job.status === 'failed' || job.status === 'uncertain') {
+          throw new Error(job.message || 'Video analiz sonucu doğrulanamadı.');
+        }
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        if (controller.signal.aborted) return;
+        job = await getVideoRecipeJob(token, job.id, controller.signal);
+      }
+      if (!controller.signal.aborted) {
+        setError('Video hâlâ işleniyor olabilir. Aynı bağlantıyla tekrar kontrol edebilirsin; yeni ücretli işlem oluşturulmaz.');
+      }
+    } catch (cause) {
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Video analiz durumu alınamadı.');
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
+      void quotas.refresh();
+      setBusy(null);
+      requestLock.current = false;
+    }
+  };
+
   const requestSocialPreview = async () => {
     if (!token) { router.push('/login'); return; }
     if (requestLock.current) return;
     const link = socialUrl.trim();
+    if (isYouTubeVideoLink(link)) { await requestVideoPreview(link); return; }
     if (!/^https:\/\/[^\s]+$/i.test(link) || link.length > 2048) {
       setError('Geçerli bir HTTPS paylaşım bağlantısı gir.');
       return;
@@ -213,7 +277,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
   };
 
   const publishApproved = async () => {
-    if (!token || !editor || !preview || !accepted || requestLock.current || publishUnknown) return;
+    if (!token || !editor || (!preview && !videoReview) || !accepted || requestLock.current || publishUnknown) return;
     if (!checkBeforePublish()) return;
     requestLock.current = true;
     setBusy('publish');
@@ -278,7 +342,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
         <View style={styles.itemContent}>
           <Text style={styles.itemTitle}>{ingredient.name || 'Yeni malzeme'}</Text>
           <Text style={[styles.itemNote, !ingredient.source_verified && styles.amber]}>
-            {!ingredient.source_verified ? 'Sen ekledin · kontrol et' : ingredient.name_corrected ? 'Yazım önerisi · kontrol et' : 'Kaynakla karşılaştırıldı'}
+            {ingredient.userEdited ? 'Sen ekledin · kontrol et' : videoReview ? 'AI önerisi · videoyla karşılaştır' : !ingredient.source_verified ? 'Kontrol et' : ingredient.name_corrected ? 'Yazım önerisi · kontrol et' : 'Kaynakla karşılaştırıldı'}
           </Text>
         </View>
         <View style={[styles.amountPill, !ingredient.amount.trim() && styles.amountPillMissing]}>
@@ -321,7 +385,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
         <View style={styles.stepNumber}><Text style={styles.stepNumberText}>{index + 1}</Text></View>
         <View style={styles.itemContent}>
           <Text style={styles.stepContent} numberOfLines={open ? undefined : 3}>{step.content || 'Yeni hazırlanış adımı'}</Text>
-          <Text style={styles.itemNote}>{step.editorial_rewrite ? 'Editoryal öneri · kontrol et' : 'Kaynakla karşılaştırıldı'}</Text>
+          <Text style={styles.itemNote}>{videoReview ? 'Videodan önerildi · kontrol et' : step.editorial_rewrite ? 'Editoryal öneri · kontrol et' : 'Kaynakla karşılaştırıldı'}</Text>
         </View>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={17} color="#a39589" />
       </TouchableOpacity>
@@ -338,7 +402,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
     </View>;
   };
 
-  const notes = preview ? importReviewNotes(preview.warnings, preview.needs_confirmation) : [];
+  const notes = preview ? importReviewNotes(preview.warnings, preview.needs_confirmation) : videoWarnings;
   return <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     {usageNotice ? <View style={styles.usageToast} accessibilityRole="alert">
       <Ionicons name="checkmark-circle" size={16} color="#ffffff" />
@@ -385,13 +449,14 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
           </> : <>
             <EditorLabel>PAYLAŞIM BAĞLANTISI</EditorLabel>
             <TextInput value={socialUrl}
-              onChangeText={url => { setSocialUrl(url); setPreview(null); setEditor(null); setError(''); }}
+              onChangeText={url => { abortRef.current?.abort(); videoRequestRef.current = null; setSocialUrl(url); setPreview(null); setVideoReview(false); setVideoWarnings([]); setVideoStatus(''); setEditor(null); setError(''); }}
               placeholder="https://www.youtube.com/shorts/…"
               placeholderTextColor="#a59b95" autoCapitalize="none" autoCorrect={false}
               keyboardType="url" editable={!busy} maxLength={2048} style={styles.input} />
             <Text style={styles.socialHelp}>
-              Reels, TikTok, Shorts veya bir yemek gönderisinin bağlantısını ekle. Bu beta sürümünde erişilebilen paylaşım açıklaması kullanılır; videonun sesi veya görüntüsü henüz analiz edilmez.
+              Reels, TikTok, Shorts veya bir yemek gönderisinin bağlantısını ekle. YouTube Shorts bağlantısında video analizi beta erişimi açıksa görüntü ve ses incelenir. Diğer platformlarda erişilebilen açıklama kullanılır.
             </Text>
+            {videoStatus && !videoReview ? <Text style={styles.socialHelp} accessibilityRole="text">{busy === 'preview' ? (videoStatus === 'queued' ? 'Video analiz sırasına alındı…' : 'Video inceleniyor…') : 'Analiz durumunu aynı bağlantıyla yeniden kontrol edebilirsin.'}</Text> : null}
             {preview?.provenance.origin_type === 'social_creator_description' ? (
               <View style={styles.socialSourceBox}>
                 <Text style={styles.socialSourceTitle}>Kaynak açıklaması</Text>
@@ -401,7 +466,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
           </>}
 
         </View>
-      </> : editor && preview ? <>
+      </> : editor && (preview || videoReview) ? <>
         <View style={styles.reviewHero}>
           <View style={styles.reviewStep}><Ionicons name="checkmark" size={15} color="#25845e" />
             <Text style={styles.reviewStepText}>NOTLARIN DÜZENLENDİ</Text></View>
@@ -538,7 +603,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
         <Ionicons name="cloud-upload-outline" size={15} color="#946a47" />
         <Text style={styles.footerProgressText}>Sunucu yanıtını bekliyoruz. Tarifini yeniden göndermiyoruz.</Text>
       </View> : null}
-      {stage === 'review' && editor && preview ? <>
+      {stage === 'review' && editor && (preview || videoReview) ? <>
         {!editor.servings.trim() && <TouchableOpacity style={styles.footerRequired}
           accessibilityRole="button" onPress={() => {
             scrollToSection('servings'); setTimeout(() => servingsRef.current?.focus(), 260);
@@ -563,7 +628,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
             return;
           }
           if (stage === 'review') { confirmPublish(); return; }
-          if (preview && editor) {
+          if ((preview || videoReview) && editor) {
             setStage('review'); // Return to saved preview at no extra AI cost.
             setError('');
             requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }));
@@ -575,11 +640,11 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
         accessibilityRole="button" accessibilityLabel={publishUnknown ? 'Tariflerim bölümünde kontrol et' : stage === 'source' ? (importMethod === 'social' ? 'Bağlantıdan tarif oluştur' : 'Tarifimi güzelleştir') : 'Onayla ve yayımla'}>
         {busy ? <ActivityIndicator color="#fff" />
           : <Ionicons name={publishUnknown ? 'search-outline' : stage === 'source' ? 'sparkles' : 'checkmark-circle-outline'} size={19} color="#fff" />}
-        <Text style={styles.mainButtonText}>{busy === 'preview' ? 'Tarifini düzenliyoruz…'
+        <Text style={styles.mainButtonText}>{busy === 'preview' ? (importMethod === 'social' && isYouTubeVideoLink(socialUrl) ? 'Videon inceleniyor…' : 'Tarifini düzenliyoruz…')
           : busy === 'publish' ? 'Tarifin yayımlanıyor…'
             : publishUnknown ? 'Tariflerimde kontrol et'
             : stage === 'source'
-              ? (preview && editor ? 'Düzenlenmiş tarifime dön' : importMethod === 'social' ? 'Bağlantıdan tarif oluştur' : 'Tarifimi güzelleştir')
+              ? ((preview || videoReview) && editor ? 'Düzenlenmiş tarifime dön' : importMethod === 'social' ? 'Bağlantıdan tarif oluştur' : 'Tarifimi güzelleştir')
               : 'Onayla ve yayımla'}</Text>
         {!busy && <Ionicons name="arrow-forward" size={17} color="#fff" />}
       </TouchableOpacity>
