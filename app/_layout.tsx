@@ -21,6 +21,15 @@ export default function RootLayout() {
           options={{ headerShown: true, headerTitle: 'Tarifi Düzenle', headerBackTitle: 'Geri', headerTintColor: '#df5043' }}
         />
         <Stack.Screen
+          name="recipe/aktar"
+          options={{
+            headerShown: true,
+            headerTitle: 'Tarif Aktar',
+            headerBackTitle: 'Geri',
+            headerTintColor: '#db4c3f',
+          }}
+        />
+        <Stack.Screen
           name="recipe/import"
           options={{
             headerShown: true,
