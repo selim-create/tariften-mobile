@@ -114,7 +114,7 @@ test('mobile uses Core directly with quota preflight, no auto-publish, double ap
   assert.match(page, /AI kişi sayısı önermiş olabilir/);
   assert.match(page, /Kaynağındaki ifade/);
   assert.match(routes, /name="recipe\/import"/);
-  assert.match(createSheet, /route: '\/recipe\/import'/);
+  assert.match(createSheet, /route: '\/recipe\/aktar'/);
   assert.doesNotMatch(page, /generateAIRecipe|generateImage|AsyncStorage|SecureStore/);
   assert.doesNotMatch(api, /console\./);
 });
