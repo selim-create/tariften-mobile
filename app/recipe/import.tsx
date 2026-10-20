@@ -52,7 +52,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
   const [source, setSource] = useState('');
   const [importMethod, setImportMethod] = useState<'social' | 'text'>(initialMethod);
   const [socialUrl, setSocialUrl] = useState('');
-  const [instagramRightsConfirmed, setInstagramRightsConfirmed] = useState(false);
+  const [instagramRightsConfirmed, setInstagramRightsConfirmed] = useState(true);
   const [stage, setStage] = useState<Stage>('source');
   const scrollRef = useRef<ScrollView>(null);
   const servingsRef = useRef<TextInput>(null);
@@ -456,7 +456,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
           </> : <>
             <EditorLabel>PAYLAŞIM BAĞLANTISI</EditorLabel>
             <TextInput value={socialUrl}
-              onChangeText={url => { abortRef.current?.abort(); videoRequestRef.current = null; setInstagramRightsConfirmed(false); setSocialUrl(url); setPreview(null); setVideoReview(false); setVideoWarnings([]); setVideoStatus(''); setEditor(null); setError(''); }}
+              onChangeText={url => { abortRef.current?.abort(); videoRequestRef.current = null; setInstagramRightsConfirmed(true); setSocialUrl(url); setPreview(null); setVideoReview(false); setVideoWarnings([]); setVideoStatus(''); setEditor(null); setError(''); }}
               placeholder="https://www.instagram.com/reel/…"
               placeholderTextColor="#a59b95" autoCapitalize="none" autoCorrect={false}
               keyboardType="url" editable={!busy} maxLength={2048} style={styles.input} />
@@ -467,10 +467,10 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
                <TouchableOpacity onPress={() => setInstagramRightsConfirmed(value => !value)}
                  disabled={!!busy} accessibilityRole="checkbox"
                  accessibilityState={{ checked: instagramRightsConfirmed }}
-                 style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9, marginTop: 12 }}>
-                 <Ionicons name={instagramRightsConfirmed ? 'checkbox' : 'square-outline'} size={21} color={BRAND} />
-                 <Text style={[styles.socialHelp, { flex: 1, marginTop: 0 }]}>
-                   Bu videoyu analiz ettirmeye ve tarif taslağına dönüştürmeye yetkim olduğunu onaylıyorum. Herkese açık olması tek başına kullanım hakkı vermez.
+                 style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 7, marginTop: 8, minHeight: 32 }}>
+                 <Ionicons name={instagramRightsConfirmed ? 'checkbox' : 'square-outline'} size={17} color={BRAND} />
+                 <Text style={[styles.socialHelp, { flex: 1, marginTop: 0, fontSize: 11, lineHeight: 16 }]}>
+                   Bu videoyu analiz ettirmeye ve içeriğini tarif taslağına dönüştürmeye yetkim olduğunu onaylıyorum.
                  </Text>
                </TouchableOpacity>
              ) : null}
