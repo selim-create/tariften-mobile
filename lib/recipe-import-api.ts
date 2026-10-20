@@ -137,7 +137,7 @@ export async function previewRecipeSocial(
  * Real native-video beta: Core owns the job, quota and payment; this client
  * never invokes Cloud Run or Gemini and never retries a provider call.
  */
-import { parseVideoJob, type VideoJob } from './video-recipe-import';
+import { isInstagramReelLink, parseVideoJob, type VideoJob } from './video-recipe-import';
 
 const VIDEO_BASE = 'https://api.tariften.com/wp-json/tariften/v1/ai/recipe-social/video';
 async function videoRequest(
@@ -158,7 +158,7 @@ async function videoRequest(
     if (!response.ok) {
       const error = asError(payload);
       if (error.code === 'rest_no_route' || error.code === 'video_job_unavailable') {
-        throw new Error('YouTube video analizi henüz etkinleştirilmedi.');
+        throw new Error('Video analizi henüz etkinleştirilmedi.');
       }
       throw new Error(error.message || 'Video analizi sunucusundan yanıt alınamadı.');
     }
@@ -177,12 +177,18 @@ async function videoRequest(
   }
 }
 export function startVideoRecipeJob(
-  token: string, sourceUrl: string, requestId: string, signal?: AbortSignal,
+  token: string, sourceUrl: string, requestId: string, signal?: AbortSignal, rightsConfirmed = false,
 ): Promise<VideoJob> {
   if (!/^[A-Za-z0-9-]{16,80}$/.test(requestId)) throw new Error('Video iş kimliği geçersiz.');
+  const instagram = isInstagramReelLink(sourceUrl);
+  if (instagram && rightsConfirmed !== true) {
+    throw new Error('Instagram videosunu analiz etmek için kullanım iznini onaylamalısın.');
+  }
   return videoRequest(token, VIDEO_BASE + '/start', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ source_url: sourceUrl.trim(), request_id: requestId }),
+    body: JSON.stringify(instagram
+      ? { source_url: sourceUrl.trim(), request_id: requestId, rights_confirmed: true }
+      : { source_url: sourceUrl.trim(), request_id: requestId }),
   }, signal);
 }
 export function getVideoRecipeJob(token: string, id: number, signal?: AbortSignal): Promise<VideoJob> {
