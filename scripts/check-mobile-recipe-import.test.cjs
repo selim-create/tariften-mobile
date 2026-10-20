@@ -192,7 +192,12 @@ test('mobile uses Core video jobs without forging source evidence or auto-publis
   })).editor.title, 'Gnocchi');
   assert.match(read('lib/recipe-import-api.ts'), /rights_confirmed: true/);
   assert.match(read('lib/recipe-import-api.ts'), /rightsConfirmed !== true/);
-  assert.match(read('app/recipe/import.tsx'), /instagramRightsConfirmed/);
+  const pageConsent = read('app/recipe/import.tsx');
+  assert.match(pageConsent, /\[instagramRightsConfirmed, setInstagramRightsConfirmed\] = useState\(true\)/);
+  assert.match(pageConsent, /setInstagramRightsConfirmed\(true\); setSocialUrl/);
+  assert.match(pageConsent, /setInstagramRightsConfirmed\(value => !value\)/);
+  assert.match(pageConsent, /fontSize: 11, lineHeight: 16/);
+  assert.doesNotMatch(pageConsent, /Herkese açık olması tek başına kullanım hakkı vermez/);
   const job = lib.parseVideoJob({
     success: true, id: 19, status: 'needs_review', source_url: link,
     message: 'Tarif hazır', requires_approval: true, preview: {
