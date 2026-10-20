@@ -17,7 +17,7 @@ import {
   validateRecipeSource,
 } from '../../lib/recipe-import';
 import { previewRecipeSocial, previewRecipeText, startVideoRecipeJob, getVideoRecipeJob } from '../../lib/recipe-import-api';
-import { isYouTubeVideoLink, videoEditorFromJob } from '../../lib/video-recipe-import';
+import { isInstagramReelLink, isVideoRecipeLink, videoEditorFromJob } from '../../lib/video-recipe-import';
 import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
 
 type Busy = 'preview' | 'publish' | null;
@@ -52,6 +52,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
   const [source, setSource] = useState('');
   const [importMethod, setImportMethod] = useState<'social' | 'text'>(initialMethod);
   const [socialUrl, setSocialUrl] = useState('');
+  const [instagramRightsConfirmed, setInstagramRightsConfirmed] = useState(false);
   const [stage, setStage] = useState<Stage>('source');
   const scrollRef = useRef<ScrollView>(null);
   const servingsRef = useRef<TextInput>(null);
@@ -195,7 +196,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      let job = await startVideoRecipeJob(token, url, requestId, controller.signal);
+      let job = await startVideoRecipeJob(token, url, requestId, controller.signal, instagramRightsConfirmed);
       for (let n = 0; n < 100 && !controller.signal.aborted; n++) {
         setVideoStatus(job.status);
         if (job.status === 'needs_review') {
@@ -238,7 +239,13 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
     if (!token) { router.push('/login'); return; }
     if (requestLock.current) return;
     const link = socialUrl.trim();
-    if (isYouTubeVideoLink(link)) { await requestVideoPreview(link); return; }
+    if (isVideoRecipeLink(link)) {
+      if (isInstagramReelLink(link) && !instagramRightsConfirmed) {
+        setError('Instagram videosunu analiz etmek için gerekli kullanım iznine sahip olduğunu onayla.');
+        return;
+      }
+      await requestVideoPreview(link); return;
+    }
     if (!/^https:\/\/[^\s]+$/i.test(link) || link.length > 2048) {
       setError('Geçerli bir HTTPS paylaşım bağlantısı gir.');
       return;
@@ -449,14 +456,25 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
           </> : <>
             <EditorLabel>PAYLAŞIM BAĞLANTISI</EditorLabel>
             <TextInput value={socialUrl}
-              onChangeText={url => { abortRef.current?.abort(); videoRequestRef.current = null; setSocialUrl(url); setPreview(null); setVideoReview(false); setVideoWarnings([]); setVideoStatus(''); setEditor(null); setError(''); }}
-              placeholder="https://www.youtube.com/shorts/…"
+              onChangeText={url => { abortRef.current?.abort(); videoRequestRef.current = null; setInstagramRightsConfirmed(false); setSocialUrl(url); setPreview(null); setVideoReview(false); setVideoWarnings([]); setVideoStatus(''); setEditor(null); setError(''); }}
+              placeholder="https://www.instagram.com/reel/…"
               placeholderTextColor="#a59b95" autoCapitalize="none" autoCorrect={false}
               keyboardType="url" editable={!busy} maxLength={2048} style={styles.input} />
             <Text style={styles.socialHelp}>
-              Reels, TikTok, Shorts veya bir yemek gönderisinin bağlantısını ekle. YouTube Shorts bağlantısında video analizi beta erişimi açıksa görüntü ve ses incelenir. Diğer platformlarda erişilebilen açıklama kullanılır.
+              Instagram Reels veya YouTube videosunda özellik etkinse görüntü ve ses incelenir. Diğer desteklenen paylaşımlarda erişilebilen açıklama kullanılır.
             </Text>
-            {videoStatus && !videoReview ? <Text style={styles.socialHelp} accessibilityRole="text">{busy === 'preview' ? (videoStatus === 'queued' ? 'Video analiz sırasına alındı…' : 'Video inceleniyor…') : 'Analiz durumunu aynı bağlantıyla yeniden kontrol edebilirsin.'}</Text> : null}
+            {isInstagramReelLink(socialUrl) ? (
+               <TouchableOpacity onPress={() => setInstagramRightsConfirmed(value => !value)}
+                 disabled={!!busy} accessibilityRole="checkbox"
+                 accessibilityState={{ checked: instagramRightsConfirmed }}
+                 style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9, marginTop: 12 }}>
+                 <Ionicons name={instagramRightsConfirmed ? 'checkbox' : 'square-outline'} size={21} color={BRAND} />
+                 <Text style={[styles.socialHelp, { flex: 1, marginTop: 0 }]}>
+                   Bu videoyu analiz ettirmeye ve tarif taslağına dönüştürmeye yetkim olduğunu onaylıyorum. Herkese açık olması tek başına kullanım hakkı vermez.
+                 </Text>
+               </TouchableOpacity>
+             ) : null}
+             {videoStatus && !videoReview ? <Text style={styles.socialHelp} accessibilityRole="text">{busy === 'preview' ? (videoStatus === 'queued' ? 'Video analiz sırasına alındı…' : 'Video inceleniyor…') : 'Analiz durumunu aynı bağlantıyla yeniden kontrol edebilirsin.'}</Text> : null}
             {preview?.provenance.origin_type === 'social_creator_description' ? (
               <View style={styles.socialSourceBox}>
                 <Text style={styles.socialSourceTitle}>Kaynak açıklaması</Text>
@@ -640,7 +658,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
         accessibilityRole="button" accessibilityLabel={publishUnknown ? 'Tariflerim bölümünde kontrol et' : stage === 'source' ? (importMethod === 'social' ? 'Bağlantıdan tarif oluştur' : 'Tarifimi güzelleştir') : 'Onayla ve yayımla'}>
         {busy ? <ActivityIndicator color="#fff" />
           : <Ionicons name={publishUnknown ? 'search-outline' : stage === 'source' ? 'sparkles' : 'checkmark-circle-outline'} size={19} color="#fff" />}
-        <Text style={styles.mainButtonText}>{busy === 'preview' ? (importMethod === 'social' && isYouTubeVideoLink(socialUrl) ? 'Videon inceleniyor…' : 'Tarifini düzenliyoruz…')
+        <Text style={styles.mainButtonText}>{busy === 'preview' ? (importMethod === 'social' && isVideoRecipeLink(socialUrl) ? 'Videon inceleniyor…' : 'Tarifini düzenliyoruz…')
           : busy === 'publish' ? 'Tarifin yayımlanıyor…'
             : publishUnknown ? 'Tariflerimde kontrol et'
             : stage === 'source'
