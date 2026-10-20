@@ -27,10 +27,23 @@ export function isYouTubeVideoLink(value: string): boolean {
   } catch { return false; }
 }
 
+export function isInstagramReelLink(value: string): boolean {
+  try {
+    const u = new URL(value.trim());
+    return u.protocol === 'https:' && !u.username && !u.password && !u.port
+      && ['instagram.com', 'www.instagram.com'].includes(u.hostname.toLowerCase())
+      && /^\/(?:reel|reels)\/[A-Za-z0-9_-]{5,64}\/?$/.test(u.pathname);
+  } catch { return false; }
+}
+
+export function isVideoRecipeLink(value: string): boolean {
+  return isYouTubeVideoLink(value) || isInstagramReelLink(value);
+}
+
 export function parseVideoJob(value: unknown): VideoJob {
   if (!object(value) || value.success !== true || !Number.isSafeInteger(value.id) || Number(value.id) < 1
       || !statuses.includes(value.status as VideoJobStatus) || !str(value.source_url)
-      || !isYouTubeVideoLink(value.source_url) || !str(value.message) || value.requires_approval !== true) {
+      || !isVideoRecipeLink(value.source_url) || !str(value.message) || value.requires_approval !== true) {
     throw new Error("Video analiz işi sunucudan beklenen biçimde dönmedi.");
   }
   return value as VideoJob;
