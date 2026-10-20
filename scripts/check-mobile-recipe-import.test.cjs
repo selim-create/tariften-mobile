@@ -171,6 +171,28 @@ test('mobile uses Core video jobs without forging source evidence or auto-publis
   const link = 'https://www.youtube.com/watch?v=abcdefghijk';
   assert.equal(lib.isYouTubeVideoLink(link), true);
   assert.equal(lib.isYouTubeVideoLink('https://youtube.com.evil.test/watch?v=abcdefghijk'), false);
+  const reel = 'https://www.instagram.com/reel/C5ToOyqIZvb/';
+  assert.equal(lib.isInstagramReelLink(reel), true);
+  assert.equal(lib.isInstagramReelLink('https://instagram.com/reels/C5ToOyqIZvb/?igsh=abc'), true);
+  assert.equal(lib.isVideoRecipeLink(reel), true);
+  assert.equal(lib.isVideoRecipeLink(link), true);
+  for (const bad of [
+    'http://instagram.com/reel/C5ToOyqIZvb/', 'https://instagram.com.evil.test/reel/C5ToOyqIZvb/',
+    'https://user@instagram.com/reel/C5ToOyqIZvb/', 'https://instagram.com:444/reel/C5ToOyqIZvb/',
+    'https://instagram.com/p/C5ToOyqIZvb/', 'https://instagram.com/tv/C5ToOyqIZvb/',
+    'https://instagram.com/reel/C5ToOyqIZvb/extra',
+  ]) assert.equal(lib.isInstagramReelLink(bad), false, bad);
+  assert.equal(lib.videoEditorFromJob(lib.parseVideoJob({
+    success: true, id: 21, status: 'needs_review', source_url: reel,
+    message: 'Tarif hazır', requires_approval: true,
+    preview: { status: 'needs_review', requires_approval: true, recipe: {
+      title: 'Gnocchi', excerpt: 'Pesto', ingredients: [{ name: 'Gnocchi' }],
+      steps: [{ instruction: 'Pişir.' }],
+    } },
+  })).editor.title, 'Gnocchi');
+  assert.match(read('lib/recipe-import-api.ts'), /rights_confirmed: true/);
+  assert.match(read('lib/recipe-import-api.ts'), /rightsConfirmed !== true/);
+  assert.match(read('app/recipe/import.tsx'), /instagramRightsConfirmed/);
   const job = lib.parseVideoJob({
     success: true, id: 19, status: 'needs_review', source_url: link,
     message: 'Tarif hazır', requires_approval: true, preview: {
