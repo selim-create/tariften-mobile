@@ -16,7 +16,7 @@ import { colors, fonts } from '../../constants/theme';
  */
 const hiddenTabs: { name: string; title: string; ownHeader?: boolean }[] = [
   { name: 'recipes', title: 'Tarifler', ownHeader: true },
-  { name: 'pantry', title: 'Dolap' },
+  { name: 'pantry', title: 'Dolap', ownHeader: true },
   { name: 'menus', title: 'Menüler', ownHeader: true },
   { name: 'profile', title: 'Profil' },
 ];

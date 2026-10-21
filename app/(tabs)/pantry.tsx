@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -14,13 +15,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { analyzePantry, createRecipe, generateAIRecipe, getPantry, updatePantry } from '../../lib/api';
 import { PantryItem } from '../../lib/types';
 import { useTabBarSpace } from '../../components/navigation/FloatingTabBar';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
+import { AccentText } from '../../components/ui/ScreenTitle';
+import { colors, fonts, radius, shadow } from '../../constants/theme';
+
+type Shelf = 'all' | 'expired' | 'warning' | 'fresh';
+const SHELVES: { key: Shelf; label: string }[] = [
+  { key: 'all', label: 'Tümü' },
+  { key: 'expired', label: 'Hemen tüket' },
+  { key: 'warning', label: 'Bu hafta' },
+  { key: 'fresh', label: 'Taze' },
+];
 
 // --- TYPES ---
 type SaveStatus = 'saved' | 'saving' | 'error';
@@ -106,6 +117,7 @@ export default function PantryScreen() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [tempDateInput, setTempDateInput] = useState('');
   const [aiStatus, setAiStatus] = useState<AiStatus>({ loading: false, message: '' });
+  const [shelf, setShelf] = useState<Shelf>('all');
 
   const showModalMessage = (type: ModalType, message: string) => {
     setModal({ show: true, type, message });
@@ -364,6 +376,10 @@ export default function PantryScreen() {
   const expiredPct = (expiredCount / totalItems) * 100;
   const warningPct = (warningCount / totalItems) * 100;
 
+  const freshCount = items.length - expiredCount - warningCount;
+  const shelfCount: Record<Shelf, number> = { all: items.length, expired: expiredCount, warning: warningCount, fresh: freshCount };
+  const visibleItems = shelf === 'all' ? items : items.filter((i) => calculateStatus(i.expiresIn).status === shelf);
+
   const getStatusDotStyle = (status: string) => {
     switch (status) {
       case 'fresh':
@@ -377,34 +393,57 @@ export default function PantryScreen() {
     }
   };
 
+  const backToNotebook = () => router.navigate('/defterim');
+  const topBar = (
+    <View style={styles.topRow}>
+      <TouchableOpacity style={styles.circle} onPress={backToNotebook} accessibilityRole="button" accessibilityLabel="Defterim'e dön">
+        <Ionicons name="chevron-back" size={21} color={colors.ink} />
+      </TouchableOpacity>
+      <View style={styles.art} pointerEvents="none">
+        {['süt', 'yumurta', 'domates'].map((name, i) => (
+          <View key={name} style={[styles.artDot, { marginLeft: i ? -8 : 0 }]}><LokmaIngredientIcon name={name} size={22} /></View>
+        ))}
+      </View>
+    </View>
+  );
+
   if (!token) {
     return (
-      <View style={styles.notLoggedIn}>
-        <Ionicons name="basket-outline" size={72} color="#e74c3c" style={styles.notLoggedInIcon} />
-        <Text style={styles.notLoggedInTitle}>Dolap Asistanı</Text>
-        <Text style={styles.notLoggedInText}>
-          {'Mutfağını Yönet\nEvdeki malzemeleri gir, israfı önle ve tasarruf et.'}
-        </Text>
-        <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/login')}>
-          <Text style={styles.loginButtonText}>Giriş Yap</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <ScrollView contentContainerStyle={[styles.pad, { paddingBottom: tabSpace }]}>
+          {topBar}
+          <Text style={styles.kicker}>Dolap</Text>
+          <AccentText style={styles.title}>{'Evde ne *var?*'}</AccentText>
+          <View style={styles.guest}>
+            <View style={styles.guestArt}>
+              {['süt', 'peynir', 'muz'].map((name) => <LokmaIngredientIcon key={name} name={name} size={30} />)}
+            </View>
+            <Text style={styles.guestTitle}>Dolap Asistanı</Text>
+            <Text style={styles.guestText}>
+              {'Mutfağını Yönet\nEvdeki malzemeleri gir, israfı önle ve tasarruf et.'}
+            </Text>
+            <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/login')} accessibilityRole="button">
+              <Text style={styles.loginButtonText}>Giriş Yap</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
   if (loading) return <LoadingSpinner fullScreen />;
 
   return (
-    <SafeAreaView style={styles.container} edges={['left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Save Status Indicator */}
       {saveStatus === 'saving' && (
-        <View style={styles.saveIndicatorSaving}>
+        <View style={[styles.saveIndicator, { bottom: tabSpace }]}>
           <ActivityIndicator size="small" color="#fff" />
           <Text style={styles.saveIndicatorText}>Kaydediliyor...</Text>
         </View>
       )}
       {saveStatus === 'error' && (
-        <View style={styles.saveIndicatorError}>
+        <View style={[styles.saveIndicator, styles.saveIndicatorError, { bottom: tabSpace }]}>
           <Ionicons name="close" size={12} color="#fff" />
           <Text style={styles.saveIndicatorText}>Kayıt Hatası</Text>
         </View>
@@ -412,24 +451,43 @@ export default function PantryScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={{ paddingBottom: tabSpace }}
+        contentContainerStyle={[styles.pad, { paddingBottom: tabSpace }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#e74c3c" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />
         }
       >
+        {topBar}
+
         {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.headerTitle}>Mutfağını Yönet</Text>
-            <Text style={styles.headerSubtitle}>
-              Evdeki malzemeleri gir, israfı önle ve tasarruf et.
-            </Text>
+        <Text style={styles.kicker}>Dolap · {items.length} Malzeme Stokta</Text>
+        <AccentText style={styles.title}>{'Evde ne *var?*'}</AccentText>
+        <Text style={styles.subtitle}>Mutfağını Yönet: evdeki malzemeleri gir, israfı önle ve tasarruf et.</Text>
+
+        {/* Freshness summary */}
+        {items.length > 0 && (
+          <View style={styles.summary}>
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryCell}>
+                <Text style={[styles.summaryValue, { color: colors.brand }]}>{expiredCount}</Text>
+                <Text style={styles.summaryLabel}>Kritik (Hemen Tüket)</Text>
+              </View>
+              <View style={[styles.summaryCell, styles.summaryLine]}>
+                <Text style={[styles.summaryValue, { color: colors.warning }]}>{warningCount}</Text>
+                <Text style={styles.summaryLabel}>7 gün içinde</Text>
+              </View>
+              <View style={[styles.summaryCell, styles.summaryLine]}>
+                <Text style={[styles.summaryValue, { color: colors.success }]}>{freshCount}</Text>
+                <Text style={styles.summaryLabel}>Taze</Text>
+              </View>
+            </View>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressExpired, { width: `${expiredPct}%` }]} />
+              <View style={[styles.progressWarning, { width: `${warningPct}%` }]} />
+            </View>
           </View>
-          <View style={styles.stockBadge}>
-            <Ionicons name="basket-outline" size={12} color="#9a3412" />
-            <Text style={styles.stockBadgeText}>{items.length} Malzeme Stokta</Text>
-          </View>
-        </View>
+        )}
 
         {/* Quick Add Card */}
         <View style={styles.card}>
@@ -439,8 +497,9 @@ export default function PantryScreen() {
               style={styles.scanButton}
               onPress={handleReceiptScan}
               disabled={analyzing}
+              accessibilityRole="button"
             >
-              <Ionicons name="camera-outline" size={14} color="#e74c3c" />
+              {analyzing ? <ActivityIndicator size="small" color={colors.ink} /> : <Ionicons name="receipt-outline" size={15} color={colors.ink} />}
               <Text style={styles.scanButtonText}>
                 {analyzing ? 'Fiş Okunuyor...' : 'Fiş Okut'}
               </Text>
@@ -453,115 +512,122 @@ export default function PantryScreen() {
               onChangeText={setInputValue}
               onSubmitEditing={handleManualAdd}
               placeholder='"Süt 3 gün", "Yumurta", "Peynir"'
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.textFaint}
               returnKeyType="done"
+              accessibilityLabel="Dolaba malzeme ekle"
             />
-            <TouchableOpacity style={styles.addBtn} onPress={handleManualAdd}>
-              <Ionicons name="add" size={20} color="#fff" />
+            <TouchableOpacity style={styles.addBtn} onPress={handleManualAdd} accessibilityRole="button" accessibilityLabel="Ekle">
+              <Ionicons name="add" size={22} color="#fff" />
             </TouchableOpacity>
           </View>
           <Text style={styles.tipText}>
-            💡 İpucu: "Muz 3 gün" yazarsan tarihi otomatik ayarlarım.
+            İpucu: "Muz 3 gün" yazarsan tarihi otomatik ayarlarım. Virgülle birden çok malzeme ekleyebilirsin.
           </Text>
         </View>
 
         {/* AI Action Buttons */}
-        <View style={styles.aiSection}>
-          <Text style={styles.aiSectionTitle}>✨ Yapay Zeka Şef</Text>
-
-          <TouchableOpacity
-            style={styles.rescueButtonWrapper}
+        <Text style={styles.sectionKicker}>Yapay Zeka Şef</Text>
+        <AccentText style={styles.sectionTitle}>{'Dolaptakilerle *ne pişer?*'}</AccentText>
+        <View style={styles.aiRow}>
+          <Pressable
+            style={({ pressed }) => [styles.rescueButton, pressed && { opacity: 0.92 }]}
             onPress={() => handleAiAction('rescue')}
-            activeOpacity={0.85}
+            accessibilityRole="button"
           >
-            <LinearGradient
-              colors={['#ef4444', '#f97316']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.rescueButton}
-            >
-              <View style={styles.aiButtonIconContainer}>
-                <Ionicons name="flame" size={24} color="#fff" />
-              </View>
-              <View>
-                <Text style={styles.rescueButtonTitle}>Bozulacakları Kurtar</Text>
-                <Text style={styles.rescueButtonSub}>Kritik ürünler için tarif.</Text>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.suggestButton}
+            <View style={styles.rescueIcon}>
+              <Ionicons name="flame" size={20} color={colors.brand} />
+            </View>
+            <Text style={styles.rescueButtonTitle}>Bozulacakları Kurtar</Text>
+            <Text style={styles.rescueButtonSub}>Kritik ürünler için tarif.</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.suggestButton, pressed && { opacity: 0.92 }]}
             onPress={() => handleAiAction('suggest')}
-            activeOpacity={0.85}
+            accessibilityRole="button"
           >
-            <View style={styles.aiButtonIconContainerGray}>
-              <Ionicons name="restaurant-outline" size={24} color="#555" />
+            <View style={styles.suggestIcon}>
+              <Ionicons name="restaurant-outline" size={20} color={colors.ink} />
             </View>
-            <View>
-              <Text style={styles.suggestButtonTitle}>Rastgele Tarif Öner</Text>
-              <Text style={styles.suggestButtonSub}>Dolaptakilerle ne yapabilirim?</Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Critical Progress Bar */}
-          <View style={styles.progressCard}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>Kritik (Hemen Tüket)</Text>
-              <Text style={styles.progressCount}>{expiredCount}</Text>
-            </View>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressExpired, { width: `${expiredPct}%` }]} />
-              <View style={[styles.progressWarning, { width: `${warningPct}%` }]} />
-            </View>
-          </View>
+            <Text style={styles.suggestButtonTitle}>Rastgele Tarif Öner</Text>
+            <Text style={styles.suggestButtonSub}>Dolaptakilerle ne yapabilirim?</Text>
+          </Pressable>
         </View>
 
         {/* Item List */}
+        <View style={styles.listHead}>
+          <Text style={styles.listTitle}>Dolabın</Text>
+          <Text style={styles.listCount}>{items.length} malzeme</Text>
+        </View>
+        {items.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.shelvesScroll} contentContainerStyle={styles.shelves}>
+            {SHELVES.map((s) => {
+              const active = shelf === s.key;
+              return (
+                <Pressable key={s.key} onPress={() => setShelf(s.key)} style={[styles.shelf, active && styles.shelfActive]}
+                  accessibilityRole="tab" accessibilityState={{ selected: active }}>
+                  <Text style={[styles.shelfText, active && styles.shelfTextActive]}>{s.label}</Text>
+                  <Text style={[styles.shelfCount, active && styles.shelfCountActive]}>{shelfCount[s.key]}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
         <View style={styles.listSection}>
           {items.length > 0 ? (
-            items.map((item) => {
+            visibleItems.length > 0 ? visibleItems.map((item) => {
               const info = calculateStatus(item.expiresIn);
               return (
                 <View key={item.id} style={styles.pantryItem}>
-                  <View style={styles.itemLeft}>
+                  <View style={styles.itemIcon}>
+                    <LokmaIngredientIcon name={item.name} size={26} />
                     <View style={[styles.statusDot, getStatusDotStyle(info.status)]} />
-                    <View style={styles.itemInfo}>
-                      <Text style={styles.itemName}>{item.name}</Text>
-                      <TouchableOpacity
-                        style={styles.itemDateRow}
-                        onPress={() => {
-                          setEditingItemId(String(item.id));
-                          setTempDateInput(item.expiresIn || '');
-                          setShowDateModal(true);
-                        }}
+                  </View>
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                    <TouchableOpacity
+                      style={styles.itemDateRow}
+                      onPress={() => {
+                        setEditingItemId(String(item.id));
+                        setTempDateInput(item.expiresIn || '');
+                        setShowDateModal(true);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${item.name} son kullanma tarihini güncelle`}
+                    >
+                      <Ionicons name="calendar-outline" size={12} color={colors.textFaint} />
+                      <Text
+                        style={[
+                          styles.itemDateText,
+                          info.status === 'expired' && styles.itemDateExpired,
+                          info.status === 'warning' && styles.itemDateWarning,
+                        ]}
                       >
-                        <Ionicons name="calendar-outline" size={10} color="#999" />
-                        <Text
-                          style={[
-                            styles.itemDateText,
-                            info.status === 'expired' && styles.itemDateExpired,
-                            info.status === 'warning' && styles.itemDateWarning,
-                          ]}
-                        >
-                          {item.expiresIn ? info.text : 'Tarih Yok (7 gün)'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
+                        {item.expiresIn ? info.text : 'Tarih Yok (7 gün)'}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                   <TouchableOpacity
                     style={styles.removeButton}
                     onPress={() => removeItem(item.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${item.name} dolaptan çıkar`}
                   >
-                    <Ionicons name="trash-outline" size={16} color="#ccc" />
+                    <Ionicons name="trash-outline" size={17} color={colors.textFaint} />
                   </TouchableOpacity>
                 </View>
               );
-            })
+            }) : (
+              <View style={styles.emptyShelf}>
+                <Text style={styles.emptyShelfText}>Bu rafta şu an malzeme yok.</Text>
+              </View>
+            )
           ) : (
             <View style={styles.emptyContainer}>
-              <Ionicons name="basket-outline" size={52} color="#d1d5db" />
+              <View style={styles.guestArt}>
+                {['un', 'yumurta', 'tereyağı'].map((name) => <LokmaIngredientIcon key={name} name={name} size={28} />)}
+              </View>
               <Text style={styles.emptyText}>Dolabın boş görünüyor.</Text>
+              <Text style={styles.emptySub}>Yukarıdan ilk malzemeni ekle ya da market fişini okut.</Text>
             </View>
           )}
         </View>
@@ -575,20 +641,21 @@ export default function PantryScreen() {
         onRequestClose={() => setShowDateModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.dateModalBox}>
-            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowDateModal(false)}>
-              <Ionicons name="close" size={20} color="#666" />
+          <View style={styles.modalBox}>
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowDateModal(false)} accessibilityRole="button" accessibilityLabel="Kapat">
+              <Ionicons name="close" size={20} color={colors.textMuted} />
             </TouchableOpacity>
-            <Text style={styles.dateModalTitle}>⏰ Tarihi Güncelle</Text>
+            <Text style={styles.modalKicker}>Son kullanma</Text>
+            <Text style={styles.modalTitle}>Tarihi Güncelle</Text>
             <TextInput
               style={styles.dateInput}
               value={tempDateInput}
               onChangeText={setTempDateInput}
               placeholder="YYYY-AA-GG (ör: 2025-06-15)"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.textFaint}
             />
-            <TouchableOpacity style={styles.saveDateBtn} onPress={saveDate}>
-              <Text style={styles.saveDateBtnText}>Kaydet</Text>
+            <TouchableOpacity style={styles.primaryBtn} onPress={saveDate} accessibilityRole="button">
+              <Text style={styles.primaryBtnText}>Kaydet</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -601,14 +668,14 @@ export default function PantryScreen() {
         animationType="fade"
         onRequestClose={() => {}}
       >
-        <View style={styles.aiModalOverlay}>
-          <View style={styles.aiModalContent}>
-            <View style={styles.aiRobotIcon}>
-              <Ionicons name="hardware-chip-outline" size={40} color="#e74c3c" />
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalBox, { alignItems: 'center' }]}>
+            <View style={styles.aiArt}>
+              {['domates', 'soğan', 'sarımsak'].map((name) => <LokmaIngredientIcon key={name} name={name} size={30} />)}
             </View>
-            <Text style={styles.aiModalTitle}>Şef Dolabına Bakıyor...</Text>
-            <Text style={styles.aiModalSubtitle}>{aiStatus.message}</Text>
-            <ActivityIndicator size="large" color="#e74c3c" style={{ marginTop: 16 }} />
+            <Text style={[styles.modalTitle, { textAlign: 'center' }]}>Şef Dolabına Bakıyor...</Text>
+            <Text style={styles.modalText}>{aiStatus.message}</Text>
+            <ActivityIndicator size="large" color={colors.brand} style={{ marginTop: 16 }} />
           </View>
         </View>
       </Modal>
@@ -621,12 +688,14 @@ export default function PantryScreen() {
         onRequestClose={() => setModal({ ...modal, show: false })}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.resultModalBox}>
+          <View style={[styles.modalBox, { alignItems: 'center' }]}>
             <TouchableOpacity
               style={styles.modalCloseBtn}
               onPress={() => setModal({ ...modal, show: false })}
+              accessibilityRole="button"
+              accessibilityLabel="Kapat"
             >
-              <Ionicons name="close" size={20} color="#666" />
+              <Ionicons name="close" size={20} color={colors.textMuted} />
             </TouchableOpacity>
             <View
               style={[
@@ -636,19 +705,20 @@ export default function PantryScreen() {
             >
               <Ionicons
                 name={modal.type === 'success' ? 'checkmark' : 'close'}
-                size={32}
-                color={modal.type === 'success' ? '#22c55e' : '#ef4444'}
+                size={30}
+                color={modal.type === 'success' ? colors.success : colors.brand}
               />
             </View>
-            <Text style={styles.resultTitle}>
+            <Text style={[styles.modalTitle, { textAlign: 'center' }]}>
               {modal.type === 'success' ? 'Başarılı!' : 'Hata'}
             </Text>
-            <Text style={styles.resultMessage}>{modal.message}</Text>
+            <Text style={styles.modalText}>{modal.message}</Text>
             <TouchableOpacity
-              style={styles.resultOkBtn}
+              style={[styles.primaryBtn, styles.inkBtn, { alignSelf: 'stretch' }]}
               onPress={() => setModal({ ...modal, show: false })}
+              accessibilityRole="button"
             >
-              <Text style={styles.resultOkBtnText}>Tamam</Text>
+              <Text style={styles.primaryBtnText}>Tamam</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -658,520 +728,150 @@ export default function PantryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fcfcfc',
+  container: { flex: 1, backgroundColor: colors.canvas },
+  scrollView: { flex: 1 },
+  pad: { paddingHorizontal: 20 },
+
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6, marginBottom: 18 },
+  circle: {
+    width: 42, height: 42, borderRadius: 21, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.lineStrong,
   },
-  scrollView: {
-    flex: 1,
+  art: { flexDirection: 'row' },
+  artDot: {
+    width: 42, height: 42, borderRadius: 21, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: colors.canvas,
   },
-  // Save indicator
-  saveIndicatorSaving: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    zIndex: 50,
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  kicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', color: colors.brand },
+  title: { fontFamily: fonts.headingBold, fontSize: 36, lineHeight: 41, letterSpacing: -1.2, color: colors.ink, marginTop: 8 },
+  subtitle: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22, color: colors.textMuted, marginTop: 8 },
+
+  saveIndicator: {
+    position: 'absolute', alignSelf: 'center', zIndex: 50, backgroundColor: colors.ink,
+    paddingHorizontal: 14, height: 34, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 6,
+    ...shadow.floating,
   },
-  saveIndicatorError: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    zIndex: 50,
-    backgroundColor: '#dc2626',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  saveIndicatorError: { backgroundColor: '#b42318' },
+  saveIndicatorText: { fontFamily: fonts.bodySemi, color: '#fff', fontSize: 12 },
+
+  summary: {
+    marginTop: 20, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line,
+    overflow: 'hidden',
   },
-  saveIndicatorText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  // Header
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  headerLeft: {
-    flex: 1,
-    marginRight: 12,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: '#64748b',
-    marginTop: 4,
-  },
-  stockBadge: {
-    backgroundColor: '#fff7ed',
-    borderWidth: 1,
-    borderColor: '#fed7aa',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  stockBadgeText: {
-    color: '#9a3412',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  // Card
+  summaryRow: { flexDirection: 'row' },
+  summaryCell: { flex: 1, paddingVertical: 14, paddingHorizontal: 12, gap: 2 },
+  summaryLine: { borderLeftWidth: 1, borderLeftColor: colors.line },
+  summaryValue: { fontFamily: fonts.headingBold, fontSize: 22 },
+  summaryLabel: { fontFamily: fonts.body, fontSize: 11, color: colors.textMuted },
+  progressBar: { flexDirection: 'row', height: 5, backgroundColor: colors.successSoft },
+  progressExpired: { backgroundColor: colors.brand, height: '100%' },
+  progressWarning: { backgroundColor: '#e7a93c', height: '100%' },
+
   card: {
-    margin: 16,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    marginTop: 16, backgroundColor: colors.surface, borderRadius: radius.xl, padding: 18,
+    borderWidth: 1, borderColor: colors.line, ...shadow.card,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  cardTitle: { fontFamily: fonts.heading, fontSize: 17, color: colors.ink },
   scanButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#fca5a5',
+    flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingHorizontal: 13,
+    borderRadius: radius.pill, borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.canvas,
   },
-  scanButtonText: {
-    color: '#e74c3c',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
+  scanButtonText: { fontFamily: fonts.bodySemi, color: colors.ink, fontSize: 13 },
+  inputRow: { flexDirection: 'row', gap: 8 },
   quickInput: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: '#1e293b',
+    flex: 1, height: 50, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line,
+    borderRadius: radius.pill, paddingHorizontal: 18, fontFamily: fonts.body, fontSize: 15, color: colors.ink,
   },
-  addBtn: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#0f172a',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tipText: {
-    fontSize: 10,
-    color: '#94a3b8',
-    marginTop: 8,
-    marginLeft: 4,
-  },
-  // AI Section
-  aiSection: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    gap: 8,
-  },
-  aiSectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  rescueButtonWrapper: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  rescueButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 16,
-  },
-  aiButtonIconContainer: {
-    width: 48,
-    height: 48,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  rescueButtonTitle: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  rescueButtonSub: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-  },
+  addBtn: { width: 50, height: 50, backgroundColor: colors.brand, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
+  tipText: { fontFamily: fonts.body, fontSize: 12, lineHeight: 17, color: colors.textMuted, marginTop: 10, marginLeft: 4 },
+
+  sectionKicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', color: colors.brand, marginTop: 30 },
+  sectionTitle: { fontFamily: fonts.headingBold, fontSize: 25, lineHeight: 30, letterSpacing: -0.6, color: colors.ink, marginTop: 6 },
+  aiRow: { flexDirection: 'row', gap: 12, marginTop: 14 },
+  rescueButton: { flex: 1, padding: 16, borderRadius: radius.xl, backgroundColor: colors.ink, gap: 4 },
+  rescueIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  rescueButtonTitle: { fontFamily: fonts.heading, color: '#fff', fontSize: 15, lineHeight: 20 },
+  rescueButtonSub: { fontFamily: fonts.body, color: 'rgba(255,255,255,0.7)', fontSize: 12, lineHeight: 17 },
   suggestButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    flex: 1, padding: 16, borderRadius: radius.xl, backgroundColor: colors.surface,
+    borderWidth: 1, borderColor: colors.line, gap: 4, ...shadow.card,
   },
-  aiButtonIconContainerGray: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+  suggestIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  suggestButtonTitle: { fontFamily: fonts.heading, color: colors.ink, fontSize: 15, lineHeight: 20 },
+  suggestButtonSub: { fontFamily: fonts.body, color: colors.textMuted, fontSize: 12, lineHeight: 17 },
+
+  listHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 32 },
+  listTitle: { fontFamily: fonts.headingBold, fontSize: 22, letterSpacing: -0.4, color: colors.ink },
+  listCount: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted },
+  shelvesScroll: { marginHorizontal: -20, marginTop: 12 },
+  shelves: { gap: 8, paddingHorizontal: 20 },
+  shelf: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, height: 38, paddingHorizontal: 15, borderRadius: radius.pill,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line,
   },
-  suggestButtonTitle: {
-    fontWeight: '700',
-    color: '#1e293b',
-    fontSize: 15,
-  },
-  suggestButtonSub: {
-    color: '#64748b',
-    fontSize: 12,
-  },
-  // Progress bar
-  progressCard: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 16,
-    padding: 16,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  progressLabel: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  progressCount: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#ef4444',
-  },
-  progressBar: {
-    flexDirection: 'row',
-    height: 6,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressExpired: {
-    backgroundColor: '#ef4444',
-    height: '100%',
-  },
-  progressWarning: {
-    backgroundColor: '#facc15',
-    height: '100%',
-  },
-  // Item list
-  listSection: {
-    marginHorizontal: 16,
-    marginBottom: 32,
-  },
+  shelfActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  shelfText: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.text },
+  shelfTextActive: { color: '#fff' },
+  shelfCount: { fontFamily: fonts.body, fontSize: 12, color: colors.textFaint },
+  shelfCountActive: { color: 'rgba(255,255,255,0.6)' },
+  listSection: { marginTop: 14, gap: 8 },
   pantryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface,
+    borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg, padding: 10, paddingRight: 6,
   },
-  itemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
+  itemIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
   statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    position: 'absolute', right: -2, top: -2, width: 12, height: 12, borderRadius: 6,
+    borderWidth: 2, borderColor: colors.surface,
   },
-  dotFresh: {
-    backgroundColor: '#22c55e',
-  },
-  dotWarning: {
-    backgroundColor: '#eab308',
-  },
-  dotExpired: {
-    backgroundColor: '#ef4444',
-  },
-  itemInfo: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  itemDateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginTop: 2,
-  },
-  itemDateText: {
-    fontSize: 11,
-    color: '#94a3b8',
-    fontWeight: '500',
-  },
-  itemDateExpired: {
-    color: '#ef4444',
-  },
-  itemDateWarning: {
-    color: '#eab308',
-  },
-  removeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  dotFresh: { backgroundColor: colors.success },
+  dotWarning: { backgroundColor: '#e7a93c' },
+  dotExpired: { backgroundColor: colors.brand },
+  itemInfo: { flex: 1, minWidth: 0 },
+  itemName: { fontFamily: fonts.heading, fontSize: 16, color: colors.ink },
+  itemDateRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, alignSelf: 'flex-start', paddingVertical: 2 },
+  itemDateText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.textMuted },
+  itemDateExpired: { color: colors.brand },
+  itemDateWarning: { color: colors.warning },
+  removeButton: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  emptyShelf: { padding: 20, borderRadius: radius.lg, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.lineStrong, alignItems: 'center' },
+  emptyShelfText: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted },
   emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 48,
-    backgroundColor: '#f9fafb',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    gap: 12,
+    alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20, borderRadius: radius.xl,
+    borderWidth: 1, borderStyle: 'dashed', borderColor: colors.lineStrong, gap: 6,
   },
-  emptyText: {
-    fontSize: 15,
-    color: '#6b7280',
-    fontWeight: '500',
+  emptyText: { fontFamily: fonts.heading, fontSize: 17, color: colors.ink },
+  emptySub: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.textMuted, textAlign: 'center' },
+
+  guest: {
+    marginTop: 22, padding: 24, borderRadius: radius.xl, backgroundColor: colors.surface,
+    borderWidth: 1, borderColor: colors.line, alignItems: 'center',
   },
-  // Not logged in
-  notLoggedIn: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-    backgroundColor: '#ffffff',
-  },
-  notLoggedInIcon: {
-    marginBottom: 16,
-  },
-  notLoggedInTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  notLoggedInText: {
-    fontSize: 15,
-    color: '#666666',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
+  guestArt: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  guestTitle: { fontFamily: fonts.headingBold, fontSize: 20, color: colors.ink, textAlign: 'center' },
+  guestText: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22, color: colors.textMuted, textAlign: 'center', marginTop: 8 },
   loginButton: {
-    backgroundColor: '#e74c3c',
-    borderRadius: 12,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
+    alignSelf: 'stretch', height: 52, borderRadius: radius.pill, backgroundColor: colors.brand,
+    alignItems: 'center', justifyContent: 'center', marginTop: 22,
   },
-  loginButtonText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  // Modal overlay
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  // Date modal
-  dateModalBox: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 24,
-    width: '100%',
-    maxWidth: 380,
-    position: 'relative',
-  },
-  modalCloseBtn: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    padding: 4,
-  },
-  dateModalTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 16,
-    marginTop: 4,
-  },
+  loginButtonText: { fontFamily: fonts.bodySemi, color: '#ffffff', fontSize: 16 },
+
+  modalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  modalBox: { backgroundColor: colors.canvas, borderRadius: radius.xl, padding: 24, width: '100%', maxWidth: 380 },
+  modalCloseBtn: { position: 'absolute', top: 14, right: 14, padding: 6, zIndex: 2 },
+  modalKicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: colors.brand },
+  modalTitle: { fontFamily: fonts.headingBold, fontSize: 22, color: colors.ink, marginTop: 4, marginBottom: 14 },
+  modalText: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22, color: colors.textMuted, textAlign: 'center', marginBottom: 20 },
   dateInput: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#1e293b',
-    marginBottom: 16,
+    height: 50, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md,
+    paddingHorizontal: 16, fontFamily: fonts.body, fontSize: 15, color: colors.ink, marginBottom: 14,
   },
-  saveDateBtn: {
-    backgroundColor: '#e74c3c',
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: 'center',
-  },
-  saveDateBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  // AI modal
-  aiModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  aiModalContent: {
-    alignItems: 'center',
-  },
-  aiRobotIcon: {
-    width: 80,
-    height: 80,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  aiModalTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  aiModalSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
-  // Result modal
-  resultModalBox: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 32,
-    width: '100%',
-    maxWidth: 380,
-    alignItems: 'center',
-    position: 'relative',
-  },
-  resultIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  resultIconSuccess: {
-    backgroundColor: '#dcfce7',
-  },
-  resultIconError: {
-    backgroundColor: '#fee2e2',
-  },
-  resultTitle: {
-    fontSize: 19,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 8,
-  },
-  resultMessage: {
-    fontSize: 14,
-    color: '#64748b',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  resultOkBtn: {
-    width: '100%',
-    backgroundColor: '#0f172a',
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: 'center',
-  },
-  resultOkBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 15,
-  },
+  primaryBtn: { height: 52, backgroundColor: colors.brand, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  inkBtn: { backgroundColor: colors.ink },
+  primaryBtnText: { fontFamily: fonts.bodySemi, color: '#fff', fontSize: 15 },
+  aiArt: { flexDirection: 'row', gap: 10, marginBottom: 16, marginTop: 6 },
+  resultIcon: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  resultIconSuccess: { backgroundColor: colors.successSoft },
+  resultIconError: { backgroundColor: colors.brandSoft },
 });
