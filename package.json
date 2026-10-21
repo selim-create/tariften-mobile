@@ -8,6 +8,7 @@
     "ios": "expo start --ios",
     "ios:sim": "APP_VARIANT=development NODE_OPTIONS=--dns-result-order=ipv4first expo start --clear --localhost --port 8081 --dev-client",
     "ios:sim:install": "bash scripts/ios-simulator-local-build.sh",
+    "ios:sim:rebuild": "TARIFTEN_REGENERATE_IOS=1 bash scripts/ios-simulator-local-build.sh",
     "ios:sim:open": "xcrun simctl openurl booted 'tariften-dev://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081'",
     "check:types": "tsc --noEmit",
     "check:expo": "expo install --check",

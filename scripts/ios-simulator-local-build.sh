@@ -40,7 +40,14 @@ fi
 echo "Açık simülatör: $DEVICE_ID"
 
 # Never delete an existing native iOS directory: it may contain uncommitted
-# local Xcode edits or an older production-native prebuild.
+# local Xcode edits or an older production-native prebuild. To pick up new
+# native config (share extension, icons, splash) `npm run ios:sim:rebuild`
+# MOVES the old folder to ios.backup-<time> and generates a fresh one.
+if [[ -d ios && "${TARIFTEN_REGENERATE_IOS:-0}" == "1" ]]; then
+  BACKUP="ios.backup-$(date +%Y%m%d-%H%M%S)"
+  mv ios "$BACKUP"
+  echo "Eski ios/ klasörü taşındı (silinmedi): $BACKUP"
+fi
 if [[ -d ios ]]; then
   if ! grep -R -q 'com.tariften.app.dev' ios/*.xcodeproj/project.pbxproj 2>/dev/null; then
     echo 'ios/ mevcut ama Tariften DEV bundle ID ile oluşturulmamış olabilir.' >&2
@@ -48,6 +55,10 @@ if [[ -d ios ]]; then
     exit 1
   fi
   echo 'Var olan ios/ DEV projesi korunuyor.'
+  if ! ls -d ios/*Aktar >/dev/null 2>&1; then
+    echo 'Not: Bu ios/ klasöründe "Tariften'"'"'e Aktar" paylaşım uzantısı yok.' >&2
+    echo 'Yeni ikon, açılış ekranı ve Paylaş → Tariften için bir kez: npm run ios:sim:rebuild' >&2
+  fi
 else
   echo 'Expo prebuild: yalnızca yerel iOS DEV projesi üretiliyor...'
   npx expo prebuild --platform ios --no-install
@@ -86,11 +97,21 @@ fi
 DERIVED="$PWD/.expo/ios-local-build"
 mkdir -p "$DERIVED"
 echo "iOS simülatör için yerel derleme: $SCHEME"
-xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
+# Ad-hoc "Sign to Run Locally" embeds the App Group entitlement the share
+# extension needs to hand links to the app; no Apple team is required for the
+# simulator. If that fails, build unsigned (everything except sharing works).
+if ! xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
   -configuration Debug -sdk iphonesimulator \
   -destination "platform=iOS Simulator,id=$DEVICE_ID" \
   -derivedDataPath "$DERIVED" \
-  CODE_SIGNING_ALLOWED=NO build
+  CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= build; then
+  echo 'İmzalı simülatör derlemesi olmadı; imzasız deneniyor (Paylaş → Tariften simülatörde veri alamayabilir).' >&2
+  xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
+    -configuration Debug -sdk iphonesimulator \
+    -destination "platform=iOS Simulator,id=$DEVICE_ID" \
+    -derivedDataPath "$DERIVED" \
+    CODE_SIGNING_ALLOWED=NO build
+fi
 
 # The generated native bundle must match the isolated development identifier.
 PRODUCTS="$DERIVED/Build/Products/Debug-iphonesimulator"
