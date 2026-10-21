@@ -482,6 +482,37 @@ export async function getMenus(params?: { slug?: string; collection?: string }):
   return data?.data || [];
 }
 
+/** One archive page (12 menus) with the API's own total and page count. */
+export async function getMenusPage(page = 1): Promise<{ data: Menu[]; count: number; pages: number; page: number }> {
+  const safe = Number.isInteger(page) && page > 0 ? page : 1;
+  const data = await fetchData(`${API_URL}/tariften/v1/menus/search?page=${safe}`);
+  const list: Menu[] = data && Array.isArray(data.data) ? data.data : [];
+  const count = Number(data?.count);
+  const pages = Number(data?.pages);
+  return {
+    data: list,
+    count: Number.isFinite(count) && count >= 0 ? count : list.length,
+    pages: Number.isFinite(pages) && pages > 0 ? pages : 1,
+    page: safe,
+  };
+}
+
+/** Non-empty blog categories, largest first ("Genel" / "Uncategorized" left out). */
+export async function getBlogCategories(): Promise<{ id: number; name: string; slug: string; count: number }[]> {
+  try {
+    const res = await fetch(`${API_URL}/wp/v2/categories?per_page=50&hide_empty=true`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+    return data
+      .filter((c: { count?: number; slug?: string }) => c && Number(c.count) > 0 && !/^(genel|uncategorized|kategorisiz)$/i.test(String(c.slug)))
+      .map((c: { id: number; name: string; slug: string; count: number }) => ({ id: c.id, name: c.name, slug: c.slug, count: c.count }))
+      .sort((a: { count: number }, b: { count: number }) => b.count - a.count);
+  } catch {
+    return [];
+  }
+}
+
 export async function getMenu(slug: string): Promise<Menu | null> {
   const data = await fetchData(`${API_URL}/tariften/v1/menus/search?slug=${encodeURIComponent(slug)}`);
   if (!data) return null;
@@ -523,7 +554,7 @@ export async function getBlogPosts(params?: {
   slug?: string;
   categories?: number[];
   exclude?: number[];
-}): Promise<{ data: BlogPost[]; totalPages: number }> {
+}): Promise<{ data: BlogPost[]; totalPages: number; total?: number }> {
   const urlParams = new URLSearchParams();
   urlParams.append('_embed', '1');
   if (params?.page) urlParams.append('page', params.page.toString());
@@ -539,8 +570,9 @@ export async function getBlogPosts(params?: {
       return { data: [], totalPages: 0 };
     }
     const totalPages = parseInt(res.headers.get('X-WP-TotalPages') || '1');
+    const totalHeader = parseInt(res.headers.get('X-WP-Total') || '', 10);
     const data = await res.json();
-    return { data: Array.isArray(data) ? data : [], totalPages };
+    return { data: Array.isArray(data) ? data : [], totalPages, total: Number.isFinite(totalHeader) ? totalHeader : undefined };
   } catch (error) {
     if (__DEV__) console.warn('Tariften blog bağlantısı kurulamadı:', error instanceof Error ? error.message : 'Bilinmeyen hata');
     return { data: [], totalPages: 0 };

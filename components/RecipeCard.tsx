@@ -1,165 +1,125 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Recipe } from '../lib/types';
 import ImagePlaceholder, { isPlaceholderImage } from './ImagePlaceholder';
+import SocialBadge from './recipe/SocialBadge';
 import { useResponsive } from '../hooks/useResponsive';
-import { rf } from '../utils/responsiveFont';
+import { colors, fonts, radius } from '../constants/theme';
 
 interface RecipeCardProps {
   recipe: Recipe;
+  /** Rail card (fixed width) for horizontal lists. */
   horizontal?: boolean;
   badge?: string;
   fullWidth?: boolean;
+  /** tile: grid cell (2 columns on phones); row: compact list row. */
+  variant?: 'card' | 'tile' | 'row';
 }
 
-export default function RecipeCard({ recipe, horizontal = false, badge, fullWidth = false }: RecipeCardProps) {
-  const router = useRouter();
-  const { isTablet, cardWidth, fontScale } = useResponsive();
+export function recipeMinutes(recipe: Pick<Recipe, 'prep_time' | 'cook_time'>) {
+  const total = (Number(recipe.prep_time) || 0) + (Number(recipe.cook_time) || 0);
+  return total > 0 ? total : 0;
+}
 
-  const horizontalCardWidth = isTablet ? 260 : 200;
-  const imageHeight = isTablet ? 220 : 180;
-  const horizontalImageHeight = isTablet ? 160 : 140;
-  const contentPadding = isTablet ? 16 : 12;
+function metaLine(recipe: Recipe) {
+  const minutes = recipeMinutes(recipe);
+  return [minutes > 0 ? `${minutes} dk` : null, recipe.difficulty?.[0] || null].filter(Boolean).join(' · ');
+}
+
+/**
+ * Editorial recipe card: the photograph carries the card, the title sits
+ * under it in Poppins, one quiet line of facts. Recipes imported from a video
+ * carry the platform mark on the photo.
+ */
+export default function RecipeCard({ recipe, horizontal = false, badge, fullWidth = false, variant = 'card' }: RecipeCardProps) {
+  const router = useRouter();
+  const { isTablet, cardWidth } = useResponsive();
+  const photo = !isPlaceholderImage(recipe.image);
+  const kicker = recipe.cuisine?.[0] || recipe.meal_type?.[0] || null;
+  const meta = metaLine(recipe);
+  const rating = typeof recipe.average_rating === 'number' && recipe.average_rating > 0 ? recipe.average_rating : 0;
+  const platform = recipe.social_source?.platform;
+  const open = () => router.push(`/recipe/${recipe.slug}`);
+
+  if (variant === 'row') {
+    return (
+      <Pressable onPress={open} style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+        accessibilityRole="link" accessibilityLabel={recipe.title}>
+        <View style={styles.rowThumb}>
+          {photo
+            ? <Image source={{ uri: recipe.image }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
+            : <ImagePlaceholder title={recipe.title} style={StyleSheet.absoluteFill} compact />}
+        </View>
+        <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+          {kicker ? <Text style={styles.kicker} numberOfLines={1}>{kicker}</Text> : null}
+          <Text style={styles.rowTitle} numberOfLines={2}>{recipe.title}</Text>
+          {meta ? <Text style={styles.meta}>{meta}</Text> : null}
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
+      </Pressable>
+    );
+  }
+
+  const tile = variant === 'tile';
+  const width = horizontal ? (isTablet ? 260 : 210) : tile ? undefined : fullWidth ? '100%' : cardWidth;
+  const mediaStyle = tile ? styles.mediaTile : horizontal ? styles.mediaRail : styles.mediaCard;
 
   return (
-    <TouchableOpacity
-      style={[
-        styles.card,
-        !horizontal && !fullWidth && { width: cardWidth },
-        horizontal && { width: horizontalCardWidth },
-        horizontal && styles.horizontalCardBase,
-        !horizontal && fullWidth && { width: '100%' },
-      ]}
-      onPress={() => router.push(`/recipe/${recipe.slug}`)}
-      activeOpacity={0.8}
-    >
-      {isPlaceholderImage(recipe.image) ? (
-        <ImagePlaceholder
-          title={recipe.title}
-          style={[styles.image, { height: horizontal ? horizontalImageHeight : imageHeight }]}
-        />
-      ) : (
-        <Image
-          source={{ uri: recipe.image }}
-          style={[styles.image, { height: horizontal ? horizontalImageHeight : imageHeight }]}
-          contentFit="cover"
-          transition={200}
-        />
-      )}
-      {badge ? (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{badge}</Text>
+    <Pressable onPress={open}
+      style={({ pressed }) => [styles.card, tile && { flex: 1 }, width !== undefined && { width }, horizontal && styles.rail, pressed && styles.pressed]}
+      accessibilityRole="link" accessibilityLabel={recipe.title}>
+      <View style={[styles.media, mediaStyle]}>
+        {photo
+          ? <Image source={{ uri: recipe.image }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
+          : <ImagePlaceholder title={recipe.title} style={StyleSheet.absoluteFill} compact={tile || horizontal} />}
+        <View style={styles.badges} pointerEvents="none">
+          {badge ? <View style={styles.badge}><Text style={styles.badgeText}>{badge}</Text></View> : null}
+          {platform ? <SocialBadge platform={platform} label={tile || horizontal ? '' : undefined} /> : null}
         </View>
-      ) : null}
-      <View style={[styles.content, { padding: contentPadding }]}>
-        <Text style={[styles.title, { fontSize: rf(15, fontScale) }]} numberOfLines={2}>
-          {recipe.title}
-        </Text>
-        {recipe.excerpt ? (
-          <Text style={[styles.excerpt, { fontSize: rf(13, fontScale) }]} numberOfLines={2}>
-            {recipe.excerpt}
-          </Text>
-        ) : null}
-        <View style={styles.meta}>
-          {recipe.prep_time ? (
-            <View style={styles.metaItem}>
-              <Ionicons name="time-outline" size={11} color="#666666" />
-              <Text style={[styles.metaText, { fontSize: rf(12, fontScale) }]}>{recipe.prep_time} dk</Text>
-            </View>
-          ) : null}
-          {recipe.difficulty?.length > 0 ? (
-            <View style={styles.metaItem}>
-              <Ionicons name="stats-chart-outline" size={11} color="#666666" />
-              <Text style={[styles.metaText, { fontSize: rf(12, fontScale) }]}>{recipe.difficulty[0]}</Text>
-            </View>
-          ) : null}
-          {recipe.calories ? (
-            <View style={styles.metaItem}>
-              <Ionicons name="flame-outline" size={11} color="#666666" />
-              <Text style={[styles.metaText, { fontSize: rf(12, fontScale) }]}>{recipe.calories} kcal</Text>
-            </View>
-          ) : null}
-        </View>
-        {recipe.average_rating && recipe.average_rating > 0 ? (
-          <View style={styles.ratingRow}>
-            <Ionicons name="star" size={12} color="#e74c3c" />
-            <Text style={[styles.rating, { fontSize: rf(13, fontScale) }]}>{recipe.average_rating.toFixed(1)}</Text>
+        {rating > 0 ? (
+          <View style={styles.rating} pointerEvents="none">
+            <Ionicons name="star" size={11} color={colors.brand} />
+            <Text style={styles.ratingText}>{rating.toFixed(1).replace('.', ',')}</Text>
           </View>
         ) : null}
       </View>
-    </TouchableOpacity>
+      <View style={styles.body}>
+        {kicker ? <Text style={styles.kicker} numberOfLines={1}>{kicker}</Text> : null}
+        <Text style={[styles.title, tile && styles.titleTile]} numberOfLines={2}>{recipe.title}</Text>
+        {meta ? <Text style={styles.meta} numberOfLines={1}>{meta}</Text> : null}
+      </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-  },
-  horizontalCardBase: {
-    marginRight: 12,
-    marginBottom: 0,
-  },
-  image: {
-    width: '100%',
-  },
-  badge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: '#e74c3c',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  badgeText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  content: {
-    padding: 12,
-  },
-  title: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 4,
-  },
-  excerpt: {
-    fontSize: 13,
-    color: '#666666',
-    marginBottom: 8,
-  },
-  meta: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  metaText: {
-    fontSize: 12,
-    color: '#666666',
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginTop: 4,
-  },
+  card: { marginBottom: 6 },
+  rail: { marginRight: 12, marginBottom: 0 },
+  pressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
+  media: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.cream },
+  mediaCard: { aspectRatio: 16 / 11 },
+  mediaRail: { height: 150 },
+  mediaTile: { aspectRatio: 0.84 },
+  badges: { position: 'absolute', top: 10, left: 10, right: 10, flexDirection: 'row', gap: 6 },
+  badge: { height: 26, paddingHorizontal: 9, borderRadius: radius.pill, backgroundColor: colors.brand, justifyContent: 'center' },
+  badgeText: { fontFamily: fonts.bodySemi, fontSize: 11, color: '#fff' },
   rating: {
-    fontSize: 13,
-    color: '#e74c3c',
+    position: 'absolute', bottom: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 4,
+    height: 24, paddingHorizontal: 8, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.94)',
   },
+  ratingText: { fontFamily: fonts.bodySemi, fontSize: 11, color: colors.ink },
+  body: { paddingTop: 10, paddingHorizontal: 2, gap: 3 },
+  kicker: { fontFamily: fonts.bodySemi, fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: colors.brand },
+  title: { fontFamily: fonts.heading, fontSize: 17, lineHeight: 22, letterSpacing: -0.2, color: colors.ink },
+  titleTile: { fontSize: 15, lineHeight: 20 },
+  meta: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted },
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 14, padding: 10, paddingRight: 14,
+    borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line,
+  },
+  rowThumb: { width: 76, height: 76, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.cream },
+  rowTitle: { fontFamily: fonts.heading, fontSize: 16, lineHeight: 21, color: colors.ink },
 });

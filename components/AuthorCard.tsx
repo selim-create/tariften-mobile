@@ -2,24 +2,28 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Author } from '../lib/types';
+import { colors, fonts, radius } from '../constants/theme';
 
 interface AuthorCardProps {
   author: Author;
+  /** Small caps line above the name. */
+  label?: string;
 }
 
-export default function AuthorCard({ author }: AuthorCardProps) {
+export default function AuthorCard({ author, label = 'Tarifi Hazırlayan' }: AuthorCardProps) {
+  const name = String(author.name || '').trim();
   return (
     <View style={styles.card}>
       {author.avatar ? (
         <Image source={{ uri: author.avatar }} style={styles.avatar} contentFit="cover" />
       ) : (
         <View style={styles.avatarPlaceholder}>
-          <Text style={styles.avatarInitial}>{(author.name[0] ?? 'U').toUpperCase()}</Text>
+          <Text style={styles.avatarInitial}>{(name[0] ?? 'T').toLocaleUpperCase('tr-TR')}</Text>
         </View>
       )}
       <View style={styles.info}>
-        <Text style={styles.label}>Tarifi Hazırlayan</Text>
-        <Text style={styles.name}>{author.name}</Text>
+        <Text style={styles.label}>{label}</Text>
+        <Text style={styles.name}>{name || 'Tariften'}</Text>
         {author.bio ? (
           <Text style={styles.bio} numberOfLines={3}>
             {author.bio}
@@ -32,55 +36,17 @@ export default function AuthorCard({ author }: AuthorCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#f9f9f9',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    gap: 14,
+    flexDirection: 'row', alignItems: 'flex-start', gap: 14, padding: 16,
+    backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line,
   },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    flexShrink: 0,
-  },
+  avatar: { width: 52, height: 52, borderRadius: 26, flexShrink: 0 },
   avatarPlaceholder: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#e74c3c',
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
+    width: 52, height: 52, borderRadius: 26, backgroundColor: colors.brand,
+    justifyContent: 'center', alignItems: 'center', flexShrink: 0,
   },
-  avatarInitial: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  info: {
-    flex: 1,
-  },
-  label: {
-    fontSize: 11,
-    color: '#999999',
-    fontWeight: '600',
-    marginBottom: 2,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 4,
-  },
-  bio: {
-    fontSize: 13,
-    color: '#666666',
-    lineHeight: 19,
-  },
+  avatarInitial: { fontFamily: fonts.headingBold, fontSize: 21, color: '#ffffff' },
+  info: { flex: 1 },
+  label: { fontFamily: fonts.bodySemi, fontSize: 10, letterSpacing: 1.6, textTransform: 'uppercase', color: colors.textFaint, marginBottom: 2 },
+  name: { fontFamily: fonts.heading, fontSize: 16, color: colors.ink, marginBottom: 4 },
+  bio: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: colors.textMuted },
 });

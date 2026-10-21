@@ -4,10 +4,14 @@ import { useResponsive } from '../hooks/useResponsive';
 
 interface ResponsiveGridProps<T> extends Omit<FlatListProps<T>, 'numColumns'> {
   gap?: number;
+  /** Minimum columns (e.g. 2 for a phone recipe grid); tablets may use more. */
+  minColumns?: number;
 }
 
-export default function ResponsiveGrid<T>({ gap = 10, contentContainerStyle, ...props }: ResponsiveGridProps<T>) {
-  const { columns, horizontalPadding } = useResponsive();
+export default function ResponsiveGrid<T>({ gap = 10, minColumns = 1, contentContainerStyle, ...props }: ResponsiveGridProps<T>) {
+  const responsive = useResponsive();
+  const columns = Math.max(minColumns, responsive.columns);
+  const { horizontalPadding } = responsive;
 
   const ItemSeparator = useMemo(
     () => () => <View style={{ height: gap }} />,

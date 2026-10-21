@@ -35,7 +35,8 @@ import CookingAssistant from '../../components/CookingAssistant';
 import RecipeCard from '../../components/RecipeCard';
 import ImagePlaceholder, { isPlaceholderImage } from '../../components/ImagePlaceholder';
 import AuthorCard from '../../components/AuthorCard';
-import SocialSourceCard from '../../components/recipe/SocialSourceCard';
+import SocialSourceCard, { PLATFORM_ICON, watchSocialVideo } from '../../components/recipe/SocialSourceCard';
+import { creatorLabel, PLATFORM_COPY } from '../../lib/social-format';
 import WeekPickerSheet from '../../components/recipe/WeekPickerSheet';
 import { colors, fonts, radius, shadow } from '../../constants/theme';
 import { formatAmountTr } from '../../lib/amount-format';
@@ -281,6 +282,19 @@ export default function RecipeDetailScreen() {
               <Ionicons name="share-outline" size={20} color={colors.ink} />
             </TouchableOpacity>
           </View>
+          {/* Only over a real photograph; the pending-photo cover carries its own caption there. */}
+          {recipe.social_source && PLATFORM_COPY[recipe.social_source.platform] && !isPlaceholderImage(recipe.image) ? (
+            <TouchableOpacity style={styles.heroSource} activeOpacity={0.85}
+              onPress={() => { if (recipe.social_source) void watchSocialVideo(recipe.social_source); }}
+              accessibilityRole="button"
+              accessibilityLabel={`Orijinal videoyu ${PLATFORM_COPY[recipe.social_source.platform].at} izle`}>
+              <View style={styles.heroSourcePlay}><Ionicons name="play" size={11} color={colors.ink} style={{ marginLeft: 1 }} /></View>
+              <Ionicons name={PLATFORM_ICON[recipe.social_source.platform]} size={14} color="#fff" />
+              <Text style={styles.heroSourceText} numberOfLines={1}>
+                {creatorLabel(recipe.social_source).primary || `${PLATFORM_COPY[recipe.social_source.platform].from} aktarıldı`}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
       <View style={styles.content}>
@@ -587,6 +601,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.95)', alignItems: 'center', justifyContent: 'center', ...shadow.card,
   },
   heroRight: { position: 'absolute', right: 16, flexDirection: 'row', gap: 10 },
+  heroSource: {
+    position: 'absolute', left: 16, bottom: 46, maxWidth: '78%', flexDirection: 'row', alignItems: 'center', gap: 7,
+    height: 36, paddingLeft: 5, paddingRight: 13, borderRadius: radius.pill, backgroundColor: 'rgba(31,26,23,0.78)',
+  },
+  heroSourcePlay: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  heroSourceText: { flexShrink: 1, fontFamily: fonts.bodySemi, fontSize: 13, color: '#fff' },
   heroCircle: {
     width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.95)',
     alignItems: 'center', justifyContent: 'center', ...shadow.card,

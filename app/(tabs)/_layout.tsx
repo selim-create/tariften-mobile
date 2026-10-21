@@ -14,10 +14,10 @@ import { colors, fonts } from '../../constants/theme';
  * Tarifler, Dolap, Menüler and Profil stay real routes (deep links, pushes)
  * but are reached from Keşfet, Defterim and the header avatar.
  */
-const hiddenTabs: { name: string; title: string }[] = [
-  { name: 'recipes', title: 'Tarifler' },
+const hiddenTabs: { name: string; title: string; ownHeader?: boolean }[] = [
+  { name: 'recipes', title: 'Tarifler', ownHeader: true },
   { name: 'pantry', title: 'Dolap' },
-  { name: 'menus', title: 'Menüler' },
+  { name: 'menus', title: 'Menüler', ownHeader: true },
   { name: 'profile', title: 'Profil' },
 ];
 
@@ -79,7 +79,7 @@ export default function TabLayout() {
         <Tabs.Screen name="bu-hafta" options={{ title: 'Bu Hafta', headerShown: false }} />
         <Tabs.Screen name="alisveris" options={{ title: 'Alışveriş', headerShown: false }} />
         {hiddenTabs.map(tab => (
-          <Tabs.Screen key={tab.name} name={tab.name} options={{ title: tab.title, href: null }} />
+          <Tabs.Screen key={tab.name} name={tab.name} options={{ title: tab.title, href: null, headerShown: !tab.ownHeader }} />
         ))}
       </Tabs>
       <GlobalCreateAction visible={createOpen} onClose={() => setCreateOpen(false)} />

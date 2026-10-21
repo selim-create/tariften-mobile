@@ -3,14 +3,17 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { createRecipe, generateAIRecipe, getRecipes, getTerms } from '../../lib/api';
 import { RecipeCreateUnconfirmedError } from '../../lib/recipe-publish';
@@ -23,6 +26,11 @@ import SearchBar from '../../components/SearchBar';
 import FilterSheet from '../../components/FilterSheet';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ResponsiveGrid from '../../components/ResponsiveGrid';
+import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
+import { AccentText } from '../../components/ui/ScreenTitle';
+import { SORT_OPTIONS } from '../../components/FilterSheet';
+import { useResponsive } from '../../hooks/useResponsive';
+import { colors, fonts, radius, shadow } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { fetchAccountQuotas, reached, resetDate, useQuotas } from '../../lib/quotas';
@@ -51,6 +59,7 @@ export default function RecipesScreen() {
   const quotas = useQuotas(token);
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [total, setTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -107,6 +116,8 @@ export default function RecipesScreen() {
           setRecipes((prev) => [...prev, ...newRecipes]);
         } else {
           setRecipes(newRecipes);
+          const found = Number(data.count);
+          setTotal(data.source !== 'error' && Number.isFinite(found) && found >= 0 ? found : null);
         }
 
         setHasMore(pageNum < (data.pages || 1));
@@ -355,36 +366,97 @@ export default function RecipesScreen() {
     }
   }, []);
 
-  const SORT_LABELS: Record<string, string> = { date: 'En Yeni', popular: 'En Popüler', rating: 'En Yüksek Puan' };
+  const SORT_LABELS: Record<string, string> = Object.fromEntries(SORT_OPTIONS.map((o) => [o.value, o.label]));
 
-  const activeChips: { id: string; label: string; type: string; value?: string; color: string }[] = [];
-  if (filters.query) activeChips.push({ id: 'query', label: `"${filters.query}"`, type: 'query', color: '#6b7280' });
-  filters.mealType?.forEach((v) => activeChips.push({ id: `mealType-${v}`, label: v, type: 'mealType', value: v, color: '#1d4ed8' }));
-  filters.cuisine?.forEach((v) => activeChips.push({ id: `cuisine-${v}`, label: v, type: 'cuisine', value: v, color: '#c2410c' }));
-  filters.diet?.forEach((v) => activeChips.push({ id: `diet-${v}`, label: v, type: 'diet', value: v, color: '#15803d' }));
-  filters.difficulty?.forEach((v) => activeChips.push({ id: `difficulty-${v}`, label: v, type: 'difficulty', value: v, color: '#6b7280' }));
-  if (filters.sort) activeChips.push({ id: 'sort', label: SORT_LABELS[filters.sort] || filters.sort, type: 'sort', color: '#7c3aed' });
+  const activeChips: { id: string; label: string; type: string; value?: string }[] = [];
+  if (filters.query) activeChips.push({ id: 'query', label: `“${filters.query}”`, type: 'query' });
+  filters.mealType?.forEach((v) => activeChips.push({ id: `mealType-${v}`, label: v, type: 'mealType', value: v }));
+  filters.cuisine?.forEach((v) => activeChips.push({ id: `cuisine-${v}`, label: v, type: 'cuisine', value: v }));
+  filters.diet?.forEach((v) => activeChips.push({ id: `diet-${v}`, label: v, type: 'diet', value: v }));
+  filters.difficulty?.forEach((v) => activeChips.push({ id: `difficulty-${v}`, label: v, type: 'difficulty', value: v }));
+  filters.collection?.forEach((v) => activeChips.push({ id: `collection-${v}`, label: v, type: 'collection', value: v }));
+  if (filters.sort) activeChips.push({ id: 'sort', label: SORT_LABELS[filters.sort] || filters.sort, type: 'sort' });
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.searchRow}>
-        <View style={styles.searchBarWrapper}>
-          <SearchBar
-            value={query}
-            onChangeText={setQuery}
-            onSubmit={handleSearch}
-            placeholder="Tarif veya malzeme ara..."
-          />
-        </View>
+  // Two photo tiles per row on phones; tablets keep their wider grid.
+  const { width } = useWindowDimensions();
+  const { columns: baseColumns } = useResponsive();
+  const columns = Math.max(2, baseColumns);
+  const GAP = 14;
+  const SIDE = 20;
+  const tileWidth = Math.floor((width - SIDE * 2 - GAP * (columns - 1)) / columns);
+  const mealTypes = (terms?.meal_type || []).slice(0, 10);
+  const activeMeal = filters.mealType?.length === 1 ? filters.mealType[0] : null;
+  const searchedFor = (filters.query || '').trim();
+  const countLabel = total !== null ? `${total.toLocaleString('tr-TR')} tarif` : null;
+
+  const aiCard = (
+    <Pressable
+      style={({ pressed }) => [styles.aiCard, pressed && { opacity: 0.92 }]}
+      accessibilityRole="button"
+      onPress={() => { if (searchedFor || query.trim()) void handleGenerateAI(); else setQuickPromptVisible(true); }}>
+      <View style={styles.aiCardHeader}>
+        <View style={styles.aiCardIcon}><Ionicons name="sparkles" size={18} color={colors.ink} /></View>
+        <Text style={styles.aiCardKicker}>AI Şef</Text>
+      </View>
+      <Text style={styles.aiCardTitle}>AI ile Tarif Oluştur</Text>
+      <Text style={styles.aiCardDesc}>
+        {searchedFor || query.trim()
+          ? `“${searchedFor || query.trim()}” için sana özel bir tarif hazırlayalım.`
+          : 'Tarif adını ya da elindeki malzemeleri yaz; AI Şef senin için yazsın.'}
+      </Text>
+    </Pressable>
+  );
+
+  const header = (
+    <View style={styles.head}>
+      <View style={styles.topRow}>
+        <TouchableOpacity style={styles.circle} onPress={() => router.navigate('/')} accessibilityRole="button" accessibilityLabel="Keşfet'e dön">
+          <Ionicons name="chevron-back" size={21} color={colors.ink} />
+        </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.filterButton, activeFilterCount > 0 && styles.filterButtonActive]}
+          style={[styles.circle, activeFilterCount > 0 && styles.circleActive]}
           onPress={() => setFilterVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel={activeFilterCount > 0 ? `Filtreler, ${activeFilterCount} etkin` : 'Filtrele ve sırala'}
         >
-          <Ionicons name="options" size={20} color={activeFilterCount > 0 ? '#ffffff' : '#1a1a1a'} />
-          {activeFilterCount > 0 && <Text style={styles.filterCount}>{activeFilterCount}</Text>}
+          <Ionicons name="options-outline" size={20} color={activeFilterCount > 0 ? '#ffffff' : colors.ink} />
+          {activeFilterCount > 0 && <View style={styles.filterCount}><Text style={styles.filterCountText}>{activeFilterCount}</Text></View>}
         </TouchableOpacity>
       </View>
 
+      <Text style={styles.kicker}>Tarifler{countLabel ? ` · ${countLabel}` : ''}</Text>
+      <AccentText style={styles.title}>{searchedFor ? 'Aradığın *tarifler*' : 'Tüm *tarifler*'}</AccentText>
+      <Text style={styles.subtitle}>Tarif adı ya da malzeme yaz, mutfağa ve öğüne göre daralt.</Text>
+
+      <View style={styles.searchRow}>
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          onSubmit={handleSearch}
+          placeholder="Tarif veya malzeme ara..."
+        />
+      </View>
+
+      {mealTypes.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.meals} style={styles.mealsScroll}>
+          <Pressable onPress={() => setFilters((prev) => ({ ...prev, mealType: undefined }))}
+            style={[styles.meal, !filters.mealType?.length && styles.mealActive]}
+            accessibilityRole="tab" accessibilityState={{ selected: !filters.mealType?.length }}>
+            <Text style={[styles.mealText, !filters.mealType?.length && styles.mealTextActive]}>Tümü</Text>
+          </Pressable>
+          {mealTypes.map((meal) => {
+            const selected = activeMeal === meal.value;
+            return (
+              <Pressable key={meal.value}
+                onPress={() => setFilters((prev) => ({ ...prev, mealType: selected ? undefined : [meal.value] }))}
+                style={[styles.meal, selected && styles.mealActive]}
+                accessibilityRole="tab" accessibilityState={{ selected }}>
+                <Text style={[styles.mealText, selected && styles.mealTextActive]}>{meal.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
 
       {activeChips.length > 0 ? (
         <View style={styles.activeFiltersRow}>
@@ -392,11 +464,13 @@ export default function RecipesScreen() {
             {activeChips.map((chip) => (
               <TouchableOpacity
                 key={chip.id}
-                style={[styles.activeChip, { backgroundColor: chip.color + '15', borderColor: chip.color + '40' }]}
+                style={styles.activeChip}
                 onPress={() => removeFilter(chip.type, chip.value)}
+                accessibilityRole="button"
+                accessibilityLabel={`${chip.label} filtresini kaldır`}
               >
-                <Text style={[styles.activeChipText, { color: chip.color }]}>{chip.label}</Text>
-                <Ionicons name="close-circle" size={14} color={chip.color} />
+                <Text style={styles.activeChipText}>{chip.label}</Text>
+                <Ionicons name="close" size={14} color={colors.textMuted} />
               </TouchableOpacity>
             ))}
             {activeChips.length > 1 && (
@@ -409,49 +483,57 @@ export default function RecipesScreen() {
             )}
           </ScrollView>
         </View>
-      ) : (
-        <View style={styles.allRecipesRow}>
-          <Ionicons name="list-outline" size={14} color="#999999" />
-          <Text style={styles.allRecipesText}>Tüm tarifler listeleniyor</Text>
-        </View>
-      )}
+      ) : null}
+      {!loading && activeChips.length > 0 && countLabel ? (
+        <Text style={styles.resultLine}>{total === 0 ? 'Eşleşen tarif yok' : `${countLabel} bulundu`}</Text>
+      ) : null}
+    </View>
+  );
 
-      {loading ? (
-        <LoadingSpinner fullScreen />
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {loading && recipes.length === 0 ? (
+        <View style={{ flex: 1 }}>
+          {header}
+          <LoadingSpinner />
+        </View>
       ) : (
         <ResponsiveGrid
           data={recipes}
+          minColumns={2}
+          gap={GAP}
           keyExtractor={(item) => (item as Recipe).id.toString()}
-          renderItem={({ item }) => <RecipeCard recipe={item as Recipe} />}
-          contentContainerStyle={{ paddingBottom: tabSpace }}
+          renderItem={({ item }) => (
+            <View style={{ width: tileWidth }}>
+              <RecipeCard recipe={item as Recipe} variant="tile" />
+            </View>
+          )}
+          ListHeaderComponent={header}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: SIDE, paddingTop: 0, paddingBottom: tabSpace }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#e74c3c" />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brand} />
           }
           onEndReached={onEndReached}
           onEndReachedThreshold={0.5}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
+              <View style={styles.emptyArt}>
+                {['domates', 'yumurta', 'fesleğen'].map((name) => <LokmaIngredientIcon key={name} name={name} size={30} />)}
+              </View>
               <Text style={styles.emptyText}>Tarif bulunamadı.</Text>
-              <Text style={styles.emptySubtext}>Farklı filtreler deneyin.</Text>
-              {(filters.query || query) ? (
-                <View>
-                  <TouchableOpacity
-                    style={styles.aiCard}
-                    onPress={() => { void handleGenerateAI(); }}>
-                  <View style={styles.aiCardHeader}>
-                    <Ionicons name="sparkles" size={20} color="#ffffff" />
-                    <Text style={styles.aiCardTitle}>AI ile Tarif Oluştur</Text>
-                  </View>
-                  <Text style={styles.aiCardDesc}>
-                    "{filters.query || query}" için yapay zeka ile özel bir tarif hazırlayalım.
-                  </Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
+              <Text style={styles.emptySubtext}>Farklı bir kelime ya da daha az filtre dene.</Text>
+              {(filters.query || query) ? aiCard : null}
             </View>
           }
           ListFooterComponent={
-            loadingMore ? <LoadingSpinner /> : null
+            loadingMore ? <LoadingSpinner /> : (!hasMore && recipes.length > 0 ? (
+              <View style={styles.footer}>
+                <Text style={styles.footerLine}>Aradığın tam olarak bu değil mi?</Text>
+                {aiCard}
+              </View>
+            ) : null)
           }
         />
       )}
@@ -462,6 +544,7 @@ export default function RecipesScreen() {
         filters={filters}
         onFiltersChange={handleFiltersChange}
         terms={terms ?? undefined}
+        resultCount={loading ? null : total}
       />
 
       {/* One global + shortcut. An explicit user-submitted prompt starts AI. */}
@@ -470,15 +553,15 @@ export default function RecipesScreen() {
           <View style={styles.quickCard}>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Pencereyi kapat"
               style={styles.quickClose} onPress={() => setQuickPromptVisible(false)}>
-              <Ionicons name="close" size={20} color="#98887c" />
+              <Ionicons name="close" size={20} color={colors.textMuted} />
             </TouchableOpacity>
-            <Ionicons name="sparkles" size={28} color="#db4c3f" />
+            <View style={styles.quickIcon}><Ionicons name="sparkles" size={22} color={colors.brand} /></View>
             <Text style={styles.quickTitle}>Hızlı tarif oluştur</Text>
             <Text style={styles.quickDesc}>Tarif adını veya elindeki malzemeleri yaz. AI Şef senin için hazırlasın.</Text>
             <TextInput value={quickPromptText} onChangeText={setQuickPromptText}
               accessibilityLabel="Tarif adı veya malzemeler" multiline
               placeholder="Örn. Fırında tavuk veya patates, biber, peynir..."
-              placeholderTextColor="#ac9c91" style={styles.quickInput} />
+              placeholderTextColor={colors.textFaint} style={styles.quickInput} />
             <TouchableOpacity accessibilityRole="button" style={styles.quickAction}
               disabled={!reviewDraft && !quickPromptText.trim()} onPress={() => {
                 const prompt = quickPromptText.trim();
@@ -521,179 +604,85 @@ export default function RecipesScreen() {
           router.push(`/recipe/${reviewExistingSlug || reviewExistingId}`);
         }}
       />
-            {/* AI Loading Modal */}
+      {/* AI Loading Modal */}
       <Modal visible={aiModalVisible} transparent animationType="fade">
         <View style={styles.aiModalOverlay}>
           <View style={styles.aiModalCard}>
-            <ActivityIndicator color="#e74c3c" size="large" />
+            <ActivityIndicator color={colors.brand} size="large" />
             <Text style={styles.aiModalTitle}>{reviewSaving ? 'Tarif Yayımlanıyor...' : 'Tarif Hazırlanıyor...'}</Text>
             <Text style={styles.aiModalMessage}>{aiLoadingMessage}</Text>
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
+  container: { flex: 1, backgroundColor: colors.canvas },
+  head: { paddingBottom: 18 },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6, marginBottom: 14 },
+  circle: {
+    width: 42, height: 42, borderRadius: 21, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.lineStrong,
   },
-  searchRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  searchBarWrapper: {
-    flex: 1,
-  },
-  filterButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    flexDirection: 'row',
-    gap: 4,
-  },
-  filterButtonActive: {
-    backgroundColor: '#e74c3c',
-    borderColor: '#e74c3c',
-  },
+  circleActive: { backgroundColor: colors.ink, borderColor: colors.ink },
   filterCount: {
-    fontSize: 11,
-    color: '#ffffff',
-    fontWeight: '700',
+    position: 'absolute', top: -3, right: -3, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9,
+    backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.canvas,
   },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 16,
+  filterCountText: { fontFamily: fonts.bodyBold, fontSize: 10, color: '#fff' },
+  kicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', color: colors.brand },
+  title: { fontFamily: fonts.headingBold, fontSize: 34, lineHeight: 39, letterSpacing: -1.1, color: colors.ink, marginTop: 8 },
+  subtitle: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22, color: colors.textMuted, marginTop: 6 },
+  searchRow: { marginTop: 18 },
+  mealsScroll: { marginHorizontal: -20, marginTop: 14 },
+  meals: { gap: 8, paddingHorizontal: 20 },
+  meal: {
+    height: 38, paddingHorizontal: 15, borderRadius: radius.pill, justifyContent: 'center',
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line,
   },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666666',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999999',
-    marginBottom: 20,
-  },
-  aiCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 14,
-    padding: 20,
-    width: '100%',
-    gap: 8,
-  },
-  aiCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  aiCardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  aiCardDesc: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.75)',
-    lineHeight: 20,
-  },
-  quickCard: { backgroundColor: '#fffbf7', borderRadius: 28, padding: 23, width: '100%', gap: 13 },
-  quickClose: { alignSelf: 'flex-end' },
-  quickTitle: { fontSize: 23, fontWeight: '900', color: '#1f303a' },
-  quickDesc: { fontSize: 13, lineHeight: 19, color: '#8f8177' },
-  quickInput: { minHeight: 98, borderWidth: 1, borderRadius: 16, borderColor: '#ecd9cc', backgroundColor: '#fff', padding: 13, fontSize: 14, textAlignVertical: 'top', color: '#202f3f' },
-  quickAction: { minHeight: 51, backgroundColor: '#db4c3f', borderRadius: 14, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 8 },
-  quickActionText: { fontSize: 14, fontWeight: '900', color: '#fff' },
-  quickPantry: { color: '#b35744', fontSize: 12, fontWeight: '800', textAlign: 'center', paddingTop: 4 },
-  quickToast: { position: 'absolute', bottom: 90, left: 20, right: 20, zIndex: 20, borderRadius: 14, backgroundColor: '#274538', padding: 13 },
-  quickToastText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  aiModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  aiModalCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 32,
-    alignItems: 'center',
-    gap: 12,
-    width: '100%',
-  },
-  aiModalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1a1a1a',
-  },
-  aiModalMessage: {
-    fontSize: 14,
-    color: '#666666',
-    textAlign: 'center',
-  },
-  activeFiltersRow: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  activeFiltersContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
-    flexDirection: 'row',
-  },
+  mealActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  mealText: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.text },
+  mealTextActive: { color: '#fff' },
+  activeFiltersRow: { marginHorizontal: -20, marginTop: 12 },
+  activeFiltersContent: { paddingHorizontal: 20, gap: 8, flexDirection: 'row' },
   activeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 16,
-    borderWidth: 1,
+    flexDirection: 'row', alignItems: 'center', gap: 5, height: 32, paddingLeft: 12, paddingRight: 9,
+    borderRadius: radius.pill, backgroundColor: colors.brandSoft, borderWidth: 1, borderColor: '#f6d6cc',
   },
-  activeChipText: {
-    fontSize: 12,
-    fontWeight: '600',
+  activeChipText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.ink },
+  clearAllChip: { height: 32, paddingHorizontal: 10, justifyContent: 'center' },
+  clearAllChipText: { fontFamily: fonts.bodySemi, fontSize: 12, color: colors.brand },
+  resultLine: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted, marginTop: 12 },
+  emptyContainer: { alignItems: 'center', paddingTop: 30, paddingBottom: 20, gap: 4 },
+  emptyArt: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  emptyText: { fontFamily: fonts.heading, fontSize: 18, color: colors.ink },
+  emptySubtext: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted, marginBottom: 18, textAlign: 'center' },
+  footer: { paddingTop: 26, gap: 12 },
+  footerLine: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted, textAlign: 'center' },
+  aiCard: { backgroundColor: colors.ink, borderRadius: radius.xl, padding: 20, width: '100%', gap: 6 },
+  aiCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  aiCardIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  aiCardKicker: { fontFamily: fonts.bodySemi, fontSize: 10, letterSpacing: 1.8, textTransform: 'uppercase', color: '#f3b8ad' },
+  aiCardTitle: { fontFamily: fonts.headingBold, fontSize: 20, color: '#ffffff' },
+  aiCardDesc: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: 'rgba(255,255,255,0.72)' },
+  quickCard: { backgroundColor: colors.canvas, borderRadius: 28, padding: 23, width: '100%', gap: 12 },
+  quickClose: { alignSelf: 'flex-end' },
+  quickIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
+  quickTitle: { fontFamily: fonts.headingBold, fontSize: 24, letterSpacing: -0.6, color: colors.ink },
+  quickDesc: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.textMuted },
+  quickInput: {
+    minHeight: 98, borderWidth: 1, borderRadius: radius.lg, borderColor: colors.line, backgroundColor: colors.surface,
+    padding: 14, fontFamily: fonts.body, fontSize: 15, textAlignVertical: 'top', color: colors.ink,
   },
-  clearAllChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
-  },
-  clearAllChipText: {
-    fontSize: 12,
-    color: '#666666',
-    fontWeight: '600',
-  },
-  allRecipesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  allRecipesText: {
-    fontSize: 12,
-    color: '#999999',
-  },
+  quickAction: { minHeight: 52, backgroundColor: colors.brand, borderRadius: radius.pill, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 8 },
+  quickActionText: { fontFamily: fonts.bodySemi, fontSize: 15, color: '#fff' },
+  quickPantry: { fontFamily: fonts.bodySemi, color: colors.brand, fontSize: 13, textAlign: 'center', paddingTop: 4 },
+  quickToast: { position: 'absolute', bottom: 104, left: 20, right: 20, zIndex: 20, borderRadius: radius.lg, backgroundColor: colors.ink, padding: 14, ...shadow.floating },
+  quickToastText: { fontFamily: fonts.bodySemi, color: '#fff', fontSize: 12, lineHeight: 17 },
+  aiModalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', alignItems: 'center', padding: 28 },
+  aiModalCard: { backgroundColor: colors.canvas, borderRadius: radius.xl, padding: 32, alignItems: 'center', gap: 12, width: '100%' },
+  aiModalTitle: { fontFamily: fonts.headingBold, fontSize: 19, color: colors.ink },
+  aiModalMessage: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted, textAlign: 'center' },
 });
