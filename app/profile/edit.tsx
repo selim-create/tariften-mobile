@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { updateAvatar, updateProfile } from '../../lib/api';
+import { colors, fonts, radius } from '../../constants/theme';
 
 const DIET_OPTIONS = [
   { value: '', label: 'Seçiniz' },
@@ -44,8 +45,6 @@ export default function ProfileEditScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showDietPicker, setShowDietPicker] = useState(false);
-  const [showExperiencePicker, setShowExperiencePicker] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -118,39 +117,59 @@ export default function ProfileEditScreen() {
     return (
       <View style={styles.centered}>
         <Text style={styles.centeredText}>Giriş yapmanız gerekiyor.</Text>
+        <TouchableOpacity style={styles.centeredButton} onPress={() => router.push('/login')} accessibilityRole="button">
+          <Text style={styles.saveButtonText}>Giriş Yap</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
-  const currentAvatar =
-    avatarUri ||
-    user.avatar_url ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(user.user_display_name || 'U')}&background=db4c3f&color=fff&size=160`;
+  const currentAvatar = avatarUri || user.avatar_url || null;
+  const initial = (user.user_display_name || user.user_email || 'T').trim().charAt(0).toLocaleUpperCase('tr-TR');
 
-  const selectedDietLabel = DIET_OPTIONS.find((o) => o.value === diet)?.label || 'Seçiniz';
-  const selectedExperienceLabel = EXPERIENCE_OPTIONS.find((o) => o.value === experience)?.label || 'Seçiniz';
+  const chips = (options: { value: string; label: string }[], value: string, onChange: (v: string) => void) => (
+    <View style={styles.chips}>
+      {options.filter(option => option.value).map(option => {
+        const selected = value === option.value;
+        return (
+          <TouchableOpacity key={option.value} onPress={() => onChange(selected ? '' : option.value)}
+            style={[styles.chip, selected && styles.chipActive]}
+            accessibilityRole="radio" accessibilityState={{ checked: selected }}>
+            {selected ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
+            <Text style={[styles.chipText, selected && styles.chipTextActive]}>{option.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled">
       {/* Avatar */}
       <View style={styles.avatarSection}>
-        <View style={styles.avatarWrapper}>
-          <Image source={{ uri: currentAvatar }} style={styles.avatar} contentFit="cover" />
-          <TouchableOpacity style={styles.avatarEditButton} onPress={handlePickAvatar}>
-            <Ionicons name="camera-outline" size={16} color="#555555" />
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.avatarHint}>Fotoğraf değiştirmek için tıklayın</Text>
+        <TouchableOpacity style={styles.avatarWrapper} onPress={handlePickAvatar}
+          accessibilityRole="button" accessibilityLabel="Profil fotoğrafını değiştir">
+          {currentAvatar
+            ? <Image source={{ uri: currentAvatar }} style={styles.avatar} contentFit="cover" />
+            : <View style={[styles.avatar, styles.monogram]}><Text style={styles.monogramText}>{initial}</Text></View>}
+          <View style={styles.avatarEditButton}>
+            <Ionicons name="camera-outline" size={16} color={colors.ink} />
+          </View>
+        </TouchableOpacity>
+        <Text style={styles.avatarHint}>Fotoğrafı değiştirmek için dokun</Text>
       </View>
 
       {/* Kişisel Bilgiler */}
       <View style={styles.section}>
+        <Text style={styles.kicker}>Hesap</Text>
         <Text style={styles.sectionTitle}>Kişisel Bilgiler</Text>
 
         <Text style={styles.label}>Kullanıcı Adı</Text>
         <View style={styles.readonlyInput}>
           <Text style={styles.readonlyPrefix}>@</Text>
           <Text style={styles.readonlyText}>{user.user_login || user.user_nicename}</Text>
+          <Ionicons name="lock-closed-outline" size={14} color={colors.textFaint} style={{ marginLeft: 'auto' }} />
         </View>
 
         <Text style={styles.label}>Ad Soyad</Text>
@@ -159,7 +178,7 @@ export default function ProfileEditScreen() {
           value={fullname}
           onChangeText={setFullname}
           placeholder="Ad Soyad"
-          placeholderTextColor="#aaaaaa"
+          placeholderTextColor={colors.textFaint}
         />
 
         <Text style={styles.label}>E-posta</Text>
@@ -168,7 +187,7 @@ export default function ProfileEditScreen() {
           value={email}
           onChangeText={setEmail}
           placeholder="E-posta"
-          placeholderTextColor="#aaaaaa"
+          placeholderTextColor={colors.textFaint}
           keyboardType="email-address"
           autoCapitalize="none"
         />
@@ -179,7 +198,7 @@ export default function ProfileEditScreen() {
           value={bio}
           onChangeText={setBio}
           placeholder="Kendinizden bahsedin..."
-          placeholderTextColor="#aaaaaa"
+          placeholderTextColor={colors.textFaint}
           multiline
           numberOfLines={4}
           textAlignVertical="top"
@@ -188,61 +207,19 @@ export default function ProfileEditScreen() {
 
       {/* Mutfak Tercihleri */}
       <View style={styles.section}>
+        <Text style={styles.kicker}>Mutfak</Text>
         <Text style={styles.sectionTitle}>Mutfak Tercihleri</Text>
 
         <Text style={styles.label}>Beslenme Tipi</Text>
-        <TouchableOpacity style={styles.picker} onPress={() => setShowDietPicker(!showDietPicker)}>
-          <Text style={[styles.pickerText, !diet && styles.pickerPlaceholder]}>{selectedDietLabel}</Text>
-          <Ionicons name={showDietPicker ? 'chevron-up' : 'chevron-down'} size={16} color="#666666" />
-        </TouchableOpacity>
-        {showDietPicker && (
-          <View style={styles.pickerOptions}>
-            {DIET_OPTIONS.map((option) => (
-              <TouchableOpacity
-                key={option.value}
-                style={[styles.pickerOption, diet === option.value && styles.pickerOptionActive]}
-                onPress={() => {
-                  setDiet(option.value);
-                  setShowDietPicker(false);
-                }}
-              >
-                <Text style={[styles.pickerOptionText, diet === option.value && styles.pickerOptionTextActive]}>
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+        {chips(DIET_OPTIONS, diet, setDiet)}
 
-        <Text style={styles.label}>Mutfak Deneyimi</Text>
-        <TouchableOpacity style={styles.picker} onPress={() => setShowExperiencePicker(!showExperiencePicker)}>
-          <Text style={[styles.pickerText, !experience && styles.pickerPlaceholder]}>{selectedExperienceLabel}</Text>
-          <Ionicons name={showExperiencePicker ? 'chevron-up' : 'chevron-down'} size={16} color="#666666" />
-        </TouchableOpacity>
-        {showExperiencePicker && (
-          <View style={styles.pickerOptions}>
-            {EXPERIENCE_OPTIONS.map((option) => (
-              <TouchableOpacity
-                key={option.value}
-                style={[styles.pickerOption, experience === option.value && styles.pickerOptionActive]}
-                onPress={() => {
-                  setExperience(option.value);
-                  setShowExperiencePicker(false);
-                }}
-              >
-                <Text
-                  style={[styles.pickerOptionText, experience === option.value && styles.pickerOptionTextActive]}
-                >
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+        <Text style={[styles.label, { marginTop: 16 }]}>Mutfak Deneyimi</Text>
+        {chips(EXPERIENCE_OPTIONS, experience, setExperience)}
       </View>
 
       {/* Şifre Değiştirme */}
       <View style={styles.section}>
+        <Text style={styles.kicker}>Güvenlik</Text>
         <Text style={styles.sectionTitle}>Şifre Değiştirme</Text>
 
         <Text style={styles.label}>Yeni Şifre</Text>
@@ -251,7 +228,7 @@ export default function ProfileEditScreen() {
           value={newPassword}
           onChangeText={setNewPassword}
           placeholder="Yeni şifre (opsiyonel)"
-          placeholderTextColor="#aaaaaa"
+          placeholderTextColor={colors.textFaint}
           secureTextEntry
         />
 
@@ -261,13 +238,14 @@ export default function ProfileEditScreen() {
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           placeholder="Şifreyi tekrar girin"
-          placeholderTextColor="#aaaaaa"
+          placeholderTextColor={colors.textFaint}
           secureTextEntry
         />
       </View>
 
       {/* Kaydet */}
-      <TouchableOpacity style={[styles.saveButton, loading && styles.saveButtonDisabled]} onPress={handleSave} disabled={loading}>
+      <TouchableOpacity style={[styles.saveButton, loading && styles.saveButtonDisabled]} onPress={handleSave} disabled={loading}
+        accessibilityRole="button">
         <Text style={styles.saveButtonText}>{loading ? 'Kaydediliyor...' : 'Kaydet'}</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -275,160 +253,48 @@ export default function ProfileEditScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  content: {
-    paddingBottom: 40,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  centeredText: {
-    fontSize: 15,
-    color: '#666666',
-  },
-  avatarSection: {
-    alignItems: 'center',
-    paddingVertical: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  avatarWrapper: {
-    position: 'relative',
-    marginBottom: 8,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 3,
-    borderColor: '#ffffff',
-  },
+  container: { flex: 1, backgroundColor: colors.canvas },
+  content: { paddingHorizontal: 20, paddingBottom: 48 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.canvas, gap: 14, padding: 24 },
+  centeredText: { fontFamily: fonts.heading, fontSize: 17, color: colors.ink },
+  centeredButton: { height: 48, paddingHorizontal: 24, borderRadius: radius.pill, backgroundColor: colors.brand, justifyContent: 'center' },
+  avatarSection: { alignItems: 'center', paddingTop: 12, paddingBottom: 20 },
+  avatarWrapper: { position: 'relative', marginBottom: 10 },
+  avatar: { width: 104, height: 104, borderRadius: 52, backgroundColor: colors.cream },
+  monogram: { backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  monogramText: { fontFamily: fonts.headingBold, fontSize: 40, color: '#fff' },
   avatarEditButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    borderRadius: 16,
-    padding: 6,
+    position: 'absolute', bottom: 2, right: 0, width: 34, height: 34, borderRadius: 17, backgroundColor: colors.surface,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.canvas,
   },
-  avatarHint: {
-    fontSize: 12,
-    color: '#999999',
-  },
+  avatarHint: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted },
   section: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    padding: 18, marginBottom: 14, borderRadius: radius.xl, backgroundColor: colors.surface,
+    borderWidth: 1, borderColor: colors.line,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#555555',
-    marginBottom: 6,
-  },
+  kicker: { fontFamily: fonts.bodySemi, fontSize: 10, letterSpacing: 1.8, textTransform: 'uppercase', color: colors.brand },
+  sectionTitle: { fontFamily: fonts.headingBold, fontSize: 19, color: colors.ink, marginTop: 2, marginBottom: 16 },
+  label: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.text, marginBottom: 7 },
   input: {
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: '#1a1a1a',
-    backgroundColor: '#fafafa',
-    marginBottom: 14,
+    borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: 14, minHeight: 50,
+    fontFamily: fonts.body, fontSize: 15, color: colors.ink, backgroundColor: colors.canvas, marginBottom: 14,
   },
-  textArea: {
-    height: 90,
-    paddingTop: 10,
-  },
+  textArea: { height: 104, paddingTop: 12 },
   readonlyInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: '#f5f5f5',
-    marginBottom: 14,
+    flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.line, borderRadius: radius.md,
+    paddingHorizontal: 14, minHeight: 50, backgroundColor: colors.cream, marginBottom: 14,
   },
-  readonlyPrefix: {
-    fontSize: 15,
-    color: '#999999',
-    marginRight: 2,
+  readonlyPrefix: { fontFamily: fonts.body, fontSize: 15, color: colors.textMuted, marginRight: 2 },
+  readonlyText: { fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.textMuted },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, height: 38, paddingHorizontal: 14, borderRadius: radius.pill,
+    borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas,
   },
-  readonlyText: {
-    fontSize: 15,
-    color: '#999999',
-  },
-  picker: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: '#fafafa',
-    marginBottom: 6,
-  },
-  pickerText: {
-    fontSize: 15,
-    color: '#1a1a1a',
-  },
-  pickerPlaceholder: {
-    color: '#aaaaaa',
-  },
-  pickerOptions: {
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginBottom: 14,
-  },
-  pickerOption: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: '#ffffff',
-  },
-  pickerOptionActive: {
-    backgroundColor: '#fff0ee',
-  },
-  pickerOptionText: {
-    fontSize: 15,
-    color: '#1a1a1a',
-  },
-  pickerOptionTextActive: {
-    color: '#e74c3c',
-    fontWeight: '600',
-  },
-  saveButton: {
-    margin: 16,
-    backgroundColor: '#e74c3c',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
+  chipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  chipText: { fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.text },
+  chipTextActive: { color: '#fff' },
+  saveButton: { marginTop: 8, backgroundColor: colors.brand, borderRadius: radius.pill, height: 54, alignItems: 'center', justifyContent: 'center' },
+  saveButtonDisabled: { opacity: 0.6 },
+  saveButtonText: { fontFamily: fonts.bodySemi, color: '#ffffff', fontSize: 16 },
 });

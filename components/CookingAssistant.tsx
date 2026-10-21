@@ -32,6 +32,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useAuth } from '../context/AuthContext';
 import { CHIRP3_VOICES, getVoiceStatus, synthesizeRecipeStep, VoiceStatus } from '../lib/chirp3-voice';
 import { VOICE_RATE_PRESETS, chooseTurkishVoiceId, getTurkishVoices } from '../lib/tts-voices';
+import { fonts } from '../constants/theme';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -885,7 +886,7 @@ export default function CookingAssistant({
       <SafeAreaProvider>
         <StatusBar barStyle="light-content" backgroundColor="#0b111b" />
         <SafeAreaView style={styles.container}>
-          <LinearGradient colors={['#151d2a', '#0a1019', '#090d16']} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
+          <LinearGradient colors={['#251e1a', '#17120f', '#14100d']} style={StyleSheet.absoluteFillObject} pointerEvents="none" />
 
         {/* ── HEADER ── */}
         <View style={styles.header}>
@@ -1186,7 +1187,7 @@ export default function CookingAssistant({
                     <Ionicons
                       name={selectedVoiceId === null ? 'radio-button-on' : 'radio-button-off'}
                       size={19}
-                      color={selectedVoiceId === null ? '#db4c3f' : '#94a3b8'}
+                      color={selectedVoiceId === null ? '#db4c3f' : '#b3a79e'}
                     />
                     <View style={styles.voiceItemText}>
                       <Text style={styles.voiceName}>Otomatik seçim</Text>
@@ -1217,7 +1218,7 @@ export default function CookingAssistant({
                       <Ionicons
                         name={selectedVoiceId === voice.identifier ? 'radio-button-on' : 'radio-button-off'}
                         size={19}
-                        color={selectedVoiceId === voice.identifier ? '#db4c3f' : '#94a3b8'}
+                        color={selectedVoiceId === voice.identifier ? '#db4c3f' : '#b3a79e'}
                       />
                       <View style={styles.voiceItemText}>
                         <Text style={styles.voiceName} numberOfLines={2}>{voice.name}</Text>
@@ -1416,60 +1417,60 @@ export default function CookingAssistant({
 const styles = StyleSheet.create({
   brandLogo: { width: 34, height: 34, borderRadius: 10, marginRight: -3 },
   micActive: { backgroundColor: 'rgba(219,76,63,0.32)', borderColor: 'rgba(219,76,63,0.65)' },
-  micErrorText: { paddingHorizontal: 14, paddingVertical: 5, fontSize: 11, color: '#ffd8d5', backgroundColor: '#441c1e' },
-  micListeningText: { paddingHorizontal: 14, paddingVertical: 4, fontSize: 10, color: '#b6efc8', backgroundColor: 'rgba(24,95,60,0.18)', fontWeight: '800' },
+  micErrorText: { paddingHorizontal: 14, paddingVertical: 5, fontFamily: fonts.body, fontSize: 11, color: '#ffd8d5', backgroundColor: '#441c1e' },
+  micListeningText: { paddingHorizontal: 14, paddingVertical: 4, fontSize: 10, color: '#b6efc8', backgroundColor: 'rgba(24,95,60,0.18)', fontFamily: fonts.bodyBold },
   micDiagnostics: { backgroundColor: 'rgba(24,95,60,0.10)', paddingHorizontal: 14, paddingVertical: 5 },
-  micDiagnosticsText: { fontSize: 11, color: '#e7efe9', lineHeight: 15 },
-  micDiagnosticsSubtext: { fontSize: 10, color: '#b6c9c2', lineHeight: 14 },
+  micDiagnosticsText: { fontFamily: fonts.body, fontSize: 11, color: '#e7efe9', lineHeight: 15 },
+  micDiagnosticsSubtext: { fontFamily: fonts.body, fontSize: 10, color: '#b6c9c2', lineHeight: 14 },
   assistantNotice: { marginHorizontal: 16, marginTop: 5, marginBottom: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: 'rgba(219,76,63,0.16)' },
-  assistantNoticeText: { fontSize: 12, fontWeight: '700', textAlign: 'center', color: '#f5e8e5' },
+  assistantNoticeText: { fontSize: 12, fontFamily: fonts.bodySemi, textAlign: 'center', color: '#f5e8e5' },
   mainContentCompact: { paddingTop: 9, paddingBottom: 10 },
   readingCardCompact: { minHeight: 175, paddingVertical: 16, paddingHorizontal: 18, marginBottom: 11 },
-  stepContentCompact: { fontSize: 17.5, lineHeight: 25, marginVertical: 12 },
+  stepContentCompact: { fontSize: 19, lineHeight: 27, marginVertical: 12 },
   timerFocusCard: {
     minHeight: 255, borderRadius: 25, borderWidth: 1,
-    backgroundColor: '#1c2532', borderColor: 'rgba(219,76,63,0.45)',
+    backgroundColor: '#26201b', borderColor: 'rgba(219,76,63,0.45)',
     padding: 21, marginBottom: 16, justifyContent: 'space-between',
   },
   timerFocusCompact: { minHeight: 190, paddingVertical: 13, paddingHorizontal: 18 },
-  timerFocusEyebrow: { fontSize: 10, fontWeight: '900', color: '#df8278', letterSpacing: 2.5 },
-  timerFocusDigits: { fontSize: 76, fontWeight: '900', color: '#ffffff', fontVariant: ['tabular-nums'], letterSpacing: -3, textAlign: 'center' },
+  timerFocusEyebrow: { fontSize: 10, fontFamily: fonts.bodyBold, color: '#df8278', letterSpacing: 2.5 },
+  timerFocusDigits: { fontSize: 76, fontFamily: fonts.headingBold, color: '#ffffff', fontVariant: ['tabular-nums'], letterSpacing: -3, textAlign: 'center' },
   timerFocusDigitsCompact: { fontSize: 56 },
-  timerStepPreview: { color: '#b9c3cf', fontSize: 12, lineHeight: 17, textAlign: 'center', marginBottom: 11 },
+  timerStepPreview: { color: '#c6bab1', fontFamily: fonts.body, fontSize: 12, lineHeight: 17, textAlign: 'center', marginBottom: 11 },
   timerActionRow: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
-  timerFocusButton: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 42, backgroundColor: '#db4c3f', borderRadius: 12, paddingHorizontal: 18 },
-  timerFocusButtonSecondary: { minHeight: 42, backgroundColor: 'rgba(255,255,255,0.09)', borderRadius: 12, paddingHorizontal: 18, justifyContent: 'center' },
-  timerFocusButtonText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+  timerFocusButton: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 44, backgroundColor: '#db4c3f', borderRadius: 22, paddingHorizontal: 20 },
+  timerFocusButtonSecondary: { minHeight: 44, backgroundColor: 'rgba(255,255,255,0.09)', borderRadius: 22, paddingHorizontal: 20, justifyContent: 'center' },
+  timerFocusButtonText: { color: '#ffffff', fontSize: 13, fontFamily: fonts.bodyBold },
 
   // Premium cooking canvas
   phaseDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#db4c3f' },
-  stepCountLabel: { color: '#e9b9aa', fontSize: 12, fontWeight: '800', letterSpacing: 1.5 },
+  stepCountLabel: { color: '#e9b9aa', fontSize: 12, fontFamily: fonts.bodyBold, letterSpacing: 1.5 },
   readingCard: {
     width: '100%', minHeight: 285, justifyContent: 'space-between', overflow: 'hidden',
-    borderRadius: 30, backgroundColor: '#1b2330', borderWidth: 1,
+    borderRadius: 30, backgroundColor: '#26201b', borderWidth: 1,
     borderColor: 'rgba(249,187,158,0.18)', paddingHorizontal: 26, paddingVertical: 27, marginBottom: 24,
   },
   readingCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 38 },
-  readingEyebrow: { fontSize: 10, color: '#db4c3f', fontWeight: '800', letterSpacing: 3 },
-  readingWatermark: { position: 'absolute', top: -27, right: -12, fontSize: 88, fontWeight: '900', color: 'rgba(255,255,255,0.035)' },
+  readingEyebrow: { fontSize: 10, color: '#db4c3f', fontFamily: fonts.bodyBold, letterSpacing: 3 },
+  readingWatermark: { position: 'absolute', top: -27, right: -12, fontSize: 88, fontFamily: fonts.headingBold, color: 'rgba(255,255,255,0.035)' },
   readingCardFooter: {
     flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.09)', paddingTop: 17, marginTop: 20,
   },
   voiceStatusDot: { width: 6, height: 6, backgroundColor: '#db4c3f', borderRadius: 3 },
-  readingVoiceText: { color: '#d3bac0', fontSize: 10, fontWeight: '800', letterSpacing: 1.1, flex: 1 },
+  readingVoiceText: { color: '#d3bac0', fontSize: 10, fontFamily: fonts.bodyBold, letterSpacing: 1.1, flex: 1 },
   progressHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  progressLabel: { color: '#9fa9b9', fontSize: 9, fontWeight: '800', letterSpacing: 2 },
-  progressFraction: { color: '#f8ded0', fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+  progressLabel: { color: '#a99d94', fontSize: 9, fontFamily: fonts.bodyBold, letterSpacing: 2 },
+  progressFraction: { color: '#f8ded0', fontSize: 12, fontFamily: fonts.bodyBold, letterSpacing: 1 },
 
   container: {
-    flex: 1, backgroundColor: '#090d16',
+    flex: 1, backgroundColor: '#14100d',
   },
 
   // HEADER
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingVertical: 17, backgroundColor: 'rgba(9,14,23,0.38)',
+    paddingHorizontal: 20, paddingVertical: 17, backgroundColor: 'rgba(20,16,13,0.4)',
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.09)',
   },
   headerLeft: {
@@ -1479,7 +1480,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backButton: {
-    width: 44, height: 44, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.065)',
+    width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.065)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
     justifyContent: 'center', alignItems: 'center',
   },
@@ -1499,10 +1500,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#ef4444',
   },
   liveText: {
-    fontSize: 9, fontWeight: '800', color: '#db4c3f', letterSpacing: 2.1,
+    fontSize: 9, fontFamily: fonts.bodyBold, color: '#db4c3f', letterSpacing: 2.1,
   },
   headerTitle: {
-    fontSize: 16, fontWeight: '700', color: '#f9f2eb', maxWidth: 220, letterSpacing: -0.3,
+    fontSize: 16, fontFamily: fonts.bodySemi, color: '#fbf6f1', maxWidth: 220, letterSpacing: -0.3,
   },
   headerRight: {
     flexDirection: 'row',
@@ -1510,7 +1511,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerIconBtn: {
-    width: 44, height: 44, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.055)',
+    width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.055)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.075)', justifyContent: 'center', alignItems: 'center',
   },
   listeningBadge: {
@@ -1532,7 +1533,7 @@ const styles = StyleSheet.create({
   },
   listeningText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.bodySemi,
     color: 'rgba(255,255,255,0.9)',
   },
 
@@ -1542,7 +1543,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     color: '#fecaca',
     backgroundColor: '#7f1d1d',
-    fontSize: 13,
+    fontFamily: fonts.body, fontSize: 13,
   },
   mainWrapper: {
     flex: 1,
@@ -1559,8 +1560,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   lastCommandText: {
-    fontSize: 12,
-    color: 'rgba(156,163,175,1)',
+    fontFamily: fonts.body, fontSize: 12,
+    color: '#b3a79e',
   },
   mainContent: {
     flexGrow: 1, justifyContent: 'center', alignItems: 'stretch',
@@ -1573,11 +1574,11 @@ const styles = StyleSheet.create({
     flex: 1, height: 1, backgroundColor: 'rgba(242,135,109,0.20)',
   },
   stepCounterText: {
-    fontSize: 11, fontWeight: '800', color: '#db4c3f', letterSpacing: 2.2,
+    fontSize: 11, fontFamily: fonts.bodyBold, color: '#db4c3f', letterSpacing: 2.2,
   },
   stepContent: {
-    fontSize: 23, fontWeight: '700', color: '#fff7ed', textAlign: 'left',
-    lineHeight: 35, letterSpacing: -0.65, marginVertical: 27,
+    fontFamily: fonts.heading, fontSize: 25, color: '#fff7ed', textAlign: 'left',
+    lineHeight: 36, letterSpacing: -0.5, marginVertical: 27,
   },
 
   // TIMER
@@ -1585,7 +1586,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#26201b',
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 30,
@@ -1599,7 +1600,7 @@ const styles = StyleSheet.create({
   },
   timerDisplay: {
     fontSize: 26,
-    fontWeight: '800',
+    fontFamily: fonts.headingBold,
     color: '#ffffff',
     letterSpacing: 2,
   },
@@ -1612,8 +1613,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   timerHint: {
-    fontSize: 10,
-    color: 'rgba(107,114,128,1)',
+    fontFamily: fonts.body, fontSize: 10,
+    color: '#8f837a',
     marginLeft: 4,
   },
 
@@ -1625,10 +1626,10 @@ const styles = StyleSheet.create({
   quickBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(255,255,255,0.055)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.13)',
-    paddingHorizontal: 15, paddingVertical: 12, borderRadius: 14, minHeight: 42,
+    paddingHorizontal: 16, paddingVertical: 12, borderRadius: 21, minHeight: 42,
   },
   quickBtnText: {
-    fontSize: 12, fontWeight: '700', color: '#dce1e7',
+    fontSize: 12, fontFamily: fonts.bodySemi, color: '#e8dfd8',
   },
   quickBtnSOS: {
     backgroundColor: 'rgba(238,121,94,0.08)', borderColor: 'rgba(240,137,109,0.27)',
@@ -1640,7 +1641,7 @@ const styles = StyleSheet.create({
   // FOOTER
   footer: {
     borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.09)',
-    paddingHorizontal: 20, paddingTop: 18, paddingBottom: 20, backgroundColor: '#0c131e',
+    paddingHorizontal: 20, paddingTop: 18, paddingBottom: 20, backgroundColor: '#1a1512',
   },
   progressBarBg: {
     height: 5, backgroundColor: 'rgba(255,255,255,0.09)',
@@ -1654,7 +1655,7 @@ const styles = StyleSheet.create({
   },
   navBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 5, height: 56, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 18,
+    gap: 5, height: 56, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 28,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
   },
   navBtnDisabled: {
@@ -1662,7 +1663,7 @@ const styles = StyleSheet.create({
   },
   navBtnText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bodySemi,
     color: 'rgba(255,255,255,0.8)',
   },
   navBtnTextDisabled: {
@@ -1670,15 +1671,15 @@ const styles = StyleSheet.create({
   },
   nextBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, height: 56, backgroundColor: '#f6eee5', borderRadius: 18,
+    gap: 6, height: 56, backgroundColor: '#f6eee5', borderRadius: 28,
   },
   nextBtnText: {
-    fontSize: 14, fontWeight: '800', color: '#0e1725',
+    fontSize: 14, fontFamily: fonts.bodyBold, color: '#1f1a17',
   },
   micFAB: {
-    width: 73, height: 73, borderRadius: 23,
+    width: 73, height: 73, borderRadius: 37,
     justifyContent: 'center', alignItems: 'center', gap: 2,
-    marginTop: -9, borderWidth: 3, borderColor: '#0c131e', overflow: 'hidden',
+    marginTop: -9, borderWidth: 3, borderColor: '#1a1512', overflow: 'hidden',
   },
   micRing: {
     position: 'absolute',
@@ -1691,26 +1692,26 @@ const styles = StyleSheet.create({
     borderRadius: 38,
   },
   micFABText: {
-    fontSize: 10, fontWeight: '800', color: '#fff8f1', letterSpacing: 0.2, textAlign: 'center', maxWidth: 58,
+    fontSize: 10, fontFamily: fonts.bodyBold, color: '#fff8f1', letterSpacing: 0.2, textAlign: 'center', maxWidth: 58,
   },
-  voicePreparingText: { color: '#cdd5df', fontSize: 11, textAlign: 'center', paddingVertical: 3 },
+  voicePreparingText: { color: '#d5cac2', fontFamily: fonts.body, fontSize: 11, textAlign: 'center', paddingVertical: 3 },
 
   // LOCAL VOICE SELECTOR
   voiceDescription: {
     color: '#ffffff',
-    fontSize: 14,
+    fontFamily: fonts.body, fontSize: 14,
     lineHeight: 21,
     marginBottom: 8,
   },
   voiceHint: {
-    color: '#94a3b8',
-    fontSize: 12,
+    color: '#b3a79e',
+    fontFamily: fonts.body, fontSize: 12,
     lineHeight: 18,
     marginBottom: 12,
   },
   voiceSectionTitle: {
     color: '#db4c3f',
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     fontSize: 11,
     letterSpacing: 1,
     marginTop: 12,
@@ -1728,16 +1729,16 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
-    borderRadius: 12,
+    borderRadius: 20,
   },
   voiceRateText: {
     color: '#ffffff',
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bodySemi,
   },
   voiceRateSubtext: {
-    color: '#cbd5e1',
-    fontSize: 10,
+    color: '#d6ccc4',
+    fontFamily: fonts.body, fontSize: 10,
     paddingTop: 3,
   },
   voiceItem: {
@@ -1769,18 +1770,18 @@ const styles = StyleSheet.create({
   voiceName: {
     color: '#ffffff',
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bodySemi,
   },
   voiceMeta: {
-    color: '#94a3b8',
-    fontSize: 11,
+    color: '#b3a79e',
+    fontFamily: fonts.body, fontSize: 11,
     marginTop: 2,
   },
   voicePreviewButton: {
     minHeight: 44,
     minWidth: 66,
-    borderRadius: 11,
-    backgroundColor: '#334155',
+    borderRadius: 22,
+    backgroundColor: '#3a312b',
     flexDirection: 'row',
     gap: 3,
     alignItems: 'center',
@@ -1789,17 +1790,17 @@ const styles = StyleSheet.create({
   voicePreviewText: {
     color: '#ffffff',
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.bodySemi,
   },
   voiceNotice: {
     borderRadius: 12,
     padding: 10,
-    backgroundColor: '#334155',
+    backgroundColor: '#3a312b',
     marginBottom: 10,
   },
   voiceRetryText: {
-    color: '#93c5fd',
-    fontWeight: '700',
+    color: '#f3b8ad',
+    fontFamily: fonts.bodySemi,
     fontSize: 13,
   },
   voiceCloseButton: {
@@ -1817,8 +1818,8 @@ const styles = StyleSheet.create({
   voiceStopButton: {
     minHeight: 46,
     flex: 1,
-    borderRadius: 12,
-    backgroundColor: '#334155',
+    borderRadius: 23,
+    backgroundColor: '#3a312b',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1827,19 +1828,19 @@ const styles = StyleSheet.create({
   voiceStopText: {
     color: '#ffffff',
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bodySemi,
   },
   voiceDoneButton: {
     minHeight: 46,
     flex: 1.5,
-    borderRadius: 12,
+    borderRadius: 23,
     backgroundColor: '#db4c3f',
     alignItems: 'center',
     justifyContent: 'center',
   },
   voiceDoneText: {
     color: '#ffffff',
-    fontWeight: '800',
+    fontFamily: fonts.bodyBold,
     fontSize: 13,
   },
 
@@ -1852,7 +1853,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   modalCard: {
-    width: '100%', maxWidth: 420, backgroundColor: '#1b2431', borderRadius: 28,
+    width: '100%', maxWidth: 420, backgroundColor: '#221c18', borderRadius: 28,
     borderWidth: 1, borderColor: 'rgba(249,184,149,0.18)', overflow: 'hidden', maxHeight: '85%',
   },
   modalHeader: {
@@ -1868,8 +1869,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   modalHeaderText: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 18,
+    fontFamily: fonts.headingBold,
     color: '#ffffff',
   },
   modalBody: {
@@ -1880,8 +1881,8 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(239,68,68,0.2)',
   },
   helpHeader: {
-    backgroundColor: 'rgba(96,165,250,0.08)',
-    borderBottomColor: 'rgba(96,165,250,0.2)',
+    backgroundColor: 'rgba(243,184,173,0.08)',
+    borderBottomColor: 'rgba(243,184,173,0.2)',
   },
 
   // SOS
@@ -1900,12 +1901,12 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   sosEmoji: {
-    fontSize: 22,
+    fontFamily: fonts.body, fontSize: 22,
     marginBottom: 6,
   },
   sosItemLabel: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.bodySemi,
     color: '#ffffff',
   },
   sosSolution: {
@@ -1922,13 +1923,13 @@ const styles = StyleSheet.create({
   },
   sosSolutionTitle: {
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: fonts.heading,
     color: '#ffffff',
     marginBottom: 10,
   },
   sosSolutionText: {
-    fontSize: 14,
-    color: 'rgba(209,213,219,1)',
+    fontFamily: fonts.body, fontSize: 14,
+    color: '#ddd3cb',
     lineHeight: 22,
     textAlign: 'center',
     backgroundColor: 'rgba(255,255,255,0.05)',
@@ -1940,16 +1941,16 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   sosSolutionBack: {
-    fontSize: 13,
-    color: 'rgba(107,114,128,1)',
+    fontFamily: fonts.body, fontSize: 13,
+    color: '#8f837a',
     textDecorationLine: 'underline',
   },
 
   // HELP
   helpCategory: {
     fontSize: 10,
-    fontWeight: '800',
-    color: 'rgba(107,114,128,1)',
+    fontFamily: fonts.bodyBold,
+    color: '#8f837a',
     letterSpacing: 2,
     textTransform: 'uppercase',
     marginBottom: 8,
@@ -1964,13 +1965,13 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   helpCmd: {
-    fontSize: 12,
-    color: 'rgba(209,213,219,1)',
+    fontFamily: fonts.body, fontSize: 12,
+    color: '#ddd3cb',
     flex: 1,
   },
   helpDesc: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: fonts.bodySemi,
     color: '#ffffff',
   },
 
@@ -1993,13 +1994,13 @@ const styles = StyleSheet.create({
   },
   alarmTitle: {
     fontSize: 34,
-    fontWeight: '800',
+    fontFamily: fonts.headingBold,
     color: '#ffffff',
     marginBottom: 10,
   },
   alarmSubtitle: {
-    fontSize: 16,
-    color: 'rgba(156,163,175,1)',
+    fontFamily: fonts.body, fontSize: 16,
+    color: '#b3a79e',
     marginBottom: 32,
     textAlign: 'center',
   },
@@ -2015,18 +2016,18 @@ const styles = StyleSheet.create({
   },
   alarmButtonText: {
     fontSize: 17,
-    fontWeight: '700',
-    color: '#0f172a',
+    fontFamily: fonts.heading,
+    color: '#1f1a17',
   },
   alarmHint: {
-    fontSize: 12,
-    color: 'rgba(107,114,128,1)',
+    fontFamily: fonts.body, fontSize: 12,
+    color: '#8f837a',
     textAlign: 'center',
   },
 
   // FINISH
   finishCard: {
-    width: '100%', maxWidth: 360, backgroundColor: '#1d2531', borderRadius: 28,
+    width: '100%', maxWidth: 360, backgroundColor: '#221c18', borderRadius: 28,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', overflow: 'hidden',
     alignItems: 'center', paddingHorizontal: 24, paddingTop: 32, paddingBottom: 24,
   },
@@ -2047,17 +2048,17 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   finishMedalEmoji: {
-    fontSize: 40,
+    fontFamily: fonts.body, fontSize: 40,
   },
   finishTitle: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 25,
+    fontFamily: fonts.headingBold,
     color: '#ffffff',
     marginBottom: 8,
   },
   finishSubtitle: {
-    fontSize: 14,
-    color: 'rgba(156,163,175,1)',
+    fontFamily: fonts.body, fontSize: 14,
+    color: '#b3a79e',
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 28,
@@ -2066,25 +2067,25 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: '#ffffff',
     paddingVertical: 13,
-    borderRadius: 12,
+    borderRadius: 24,
     alignItems: 'center',
     marginBottom: 10,
   },
   finishHomeBtnText: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#0f172a',
+    fontFamily: fonts.bodySemi,
+    color: '#1f1a17',
   },
   finishCloseBtn: {
     width: '100%',
     backgroundColor: 'rgba(255,255,255,0.05)',
     paddingVertical: 13,
-    borderRadius: 12,
+    borderRadius: 24,
     alignItems: 'center',
   },
   finishCloseBtnText: {
     fontSize: 15,
-    fontWeight: '500',
-    color: 'rgba(156,163,175,1)',
+    fontFamily: fonts.bodyMedium,
+    color: '#b3a79e',
   },
 });

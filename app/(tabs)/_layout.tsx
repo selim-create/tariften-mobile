@@ -18,7 +18,7 @@ const hiddenTabs: { name: string; title: string; ownHeader?: boolean }[] = [
   { name: 'recipes', title: 'Tarifler', ownHeader: true },
   { name: 'pantry', title: 'Dolap', ownHeader: true },
   { name: 'menus', title: 'Menüler', ownHeader: true },
-  { name: 'profile', title: 'Profil' },
+  { name: 'profile', title: 'Profil', ownHeader: true },
 ];
 
 export default function TabLayout() {

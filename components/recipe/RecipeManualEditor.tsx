@@ -19,8 +19,10 @@ import { prepareManualRecipePhoto, uploadManualRecipePhoto } from '../../lib/man
 import LokmaIngredientIcon from '../LokmaIngredientIcon';
 import RecipePicker from './RecipePicker';
 import { RECIPE_UNITS, canTypeRecipeAmount } from '../../lib/recipe-measurements';
+import { AccentText } from '../ui/ScreenTitle';
+import { colors, fonts, radius, shadow } from '../../constants/theme';
 
-const RED = '#df5043', INK = '#1a283e';
+const RED = colors.brand, INK = colors.ink;
 type CategoryKey = 'cuisine' | 'meal_type' | 'difficulty' | 'diet';
 const CATEGORY_LABELS: Record<CategoryKey, string> = {
   cuisine: 'Mutfak', meal_type: 'Öğün', difficulty: 'Zorluk', diet: 'Beslenme',
@@ -272,7 +274,7 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
       <Text style={styles.label}>{label}</Text>
       <TextInput ref={opts.inputRef} style={[styles.input, opts.multiline && styles.multiline, opts.error && styles.inputError]}
         value={value} onChangeText={onChange}
-        placeholder={opts.placeholder} placeholderTextColor="#aaa09a"
+        placeholder={opts.placeholder} placeholderTextColor={colors.textFaint}
         keyboardType={opts.numeric ? 'number-pad' : 'default'}
         multiline={opts.multiline} textAlignVertical="top"
         editable={!busy} accessibilityLabel={label} />
@@ -294,12 +296,12 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
     <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.scroll}>
       <View style={styles.hero}>
-        <Text style={styles.kicker}>TARİFTEN MUTFAK STÜDYOSU</Text>
-        <Text style={styles.heading}>{editing ? 'Tarifini düzenle.' : 'Kendi tarifini oluştur.'}</Text>
+        <Text style={styles.kicker}>{editing ? 'Tarifini düzenle' : 'Mutfak stüdyosu'}</Text>
+        <AccentText style={styles.heading}>{editing ? 'Tarifini *güncelle.*' : 'Kendi tarifini *yaz.*'}</AccentText>
         <Text style={styles.subtitle}>{subtitle}</Text>
         {editing && reviewStatus?.status === 'pending' ? (
           <View style={styles.reviewPending} accessibilityRole="alert">
-            <Ionicons name="time-outline" size={20} color="#ad6c38" />
+            <Ionicons name="time-outline" size={20} color={colors.warning} />
             <View style={styles.col}>
               <Text style={styles.reviewPendingTitle}>Değişikliklerin onay bekliyor</Text>
               <Text style={styles.reviewPendingCopy}>Tarifinin yayındaki hâli korunuyor. Yönetici kararından sonra yeniden düzenleyebilirsin.</Text>
@@ -319,9 +321,10 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
         {editing && reviewStatus?.status === 'approved' ? (
           <Text style={styles.reviewApproved}>Son düzenlemen yönetici tarafından onaylandı.</Text>
         ) : null}
-        <View style={styles.stages}>
-          {stages.map((text, index) => <View key={text} style={[styles.stepPill, index === stage && styles.stepActive]}>
-            <Text style={[styles.stepText, index === stage && styles.stepActiveText]}>{index + 1} · {text}</Text>
+        <View style={styles.stages} accessibilityLabel={`Adım ${stage + 1} / ${stages.length}: ${stages[stage]}`}>
+          {stages.map((text, index) => <View key={text} style={styles.stepSlot}>
+            <View style={[styles.stepBar, index <= stage && styles.stepBarDone]} />
+            <Text style={[styles.stepText, index === stage && styles.stepActiveText]} numberOfLines={1}>{index + 1} · {text}</Text>
           </View>)}
         </View>
       </View>
@@ -361,7 +364,7 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
           accessibilityRole="button" accessibilityLabel="Tarif fotoğrafı seç veya değiştir">
           {(photoPreview || draft.image && typeof draft.image === 'string') ?
             <Image source={{ uri: photoPreview || String(draft.image) }} style={styles.photo} contentFit="cover" /> :
-            <View style={styles.photoEmpty}><Ionicons name="camera-outline" size={28} color="#d75e4c" />
+            <View style={styles.photoEmpty}><Ionicons name="camera-outline" size={28} color={RED} />
               <Text style={styles.photoEmptyText}>Galeriden fotoğraf seç</Text></View>}
           <View style={styles.photoBadge}><Ionicons name="camera" size={14} color={RED} /><Text style={styles.photoBadgeText}>Fotoğrafı {photoPreview || draft.image ? 'değiştir' : 'ekle'}</Text></View>
         </TouchableOpacity>
@@ -387,7 +390,7 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
             <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Malzeme ${index+1} sil`}
               disabled={draft.ingredients.length < 2} onPress={() =>
                 setField('ingredients', draft.ingredients.filter((_, i) => i !== index))}>
-              <Ionicons name="trash-outline" size={19} color="#b18b78" />
+              <Ionicons name="trash-outline" size={18} color={colors.textFaint} />
             </TouchableOpacity>
           </View>
           {input('Malzeme adı', item.name, text => ingredientEdit(index, 'name', text), { placeholder: 'Örn. Domates' })}
@@ -408,7 +411,7 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
         </View>)}
         <TouchableOpacity style={styles.add} onPress={() => draft.ingredients.length < 40 &&
           setField('ingredients', [...draft.ingredients, EMPTY_INGREDIENT()])}>
-          <Ionicons name="add-circle-outline" size={18} color={RED} /><Text style={styles.addText}>Malzeme ekle</Text>
+          <Ionicons name="add" size={18} color={RED} /><Text style={styles.addText}>Malzeme ekle</Text>
         </TouchableOpacity>
         <View style={styles.divider} />
         <Text style={styles.section}>Adım adım yapılış</Text>
@@ -419,7 +422,7 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
             <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Adım ${index+1} sil`}
               disabled={draft.steps.length < 2}
               onPress={() => setField('steps', draft.steps.filter((_, i) => i !== index))}>
-              <Ionicons name="trash-outline" size={19} color="#b18b78" />
+              <Ionicons name="trash-outline" size={18} color={colors.textFaint} />
             </TouchableOpacity></View>
           {input('Hazırlanış', step,
             text => setField('steps', draft.steps.map((value, i) => i === index ? text : value)),
@@ -427,14 +430,14 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
         </View>)}
         <TouchableOpacity style={styles.add} onPress={() => draft.steps.length < 40 &&
           setField('steps', [...draft.steps, ''])}>
-          <Ionicons name="add-circle-outline" size={18} color={RED} /><Text style={styles.addText}>Yeni adım ekle</Text>
+          <Ionicons name="add" size={18} color={RED} /><Text style={styles.addText}>Yeni adım ekle</Text>
         </TouchableOpacity>
         {input('Şefin ipucu (isteğe bağlı)', draft.chef_tip, text => setField('chef_tip', text),
           { multiline: true, placeholder: 'Bu tarifi yaparken öğrendiğin küçük bir sır...' })}
       </View> : null}
 
       {stage === 2 ? <View style={styles.card}>
-        <View style={styles.ready}><Ionicons name="checkmark-circle" size={26} color="#329268" />
+        <View style={styles.ready}><Ionicons name="checkmark-circle" size={26} color={colors.success} />
           <View style={styles.col}><Text style={styles.section}>Son kez birlikte bakalım</Text>
             <Text style={styles.hint}>Tarifin yalnızca sen onaylayınca kaydedilir.</Text></View></View>
         {photoPreview || typeof draft.image === 'string' && draft.image ?
@@ -481,78 +484,101 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
 }
 
 const styles = StyleSheet.create({
-  root:{ flex:1, backgroundColor:'#fffbf7' }, loading:{ flex:1, backgroundColor:'#fffbf7',justifyContent:'center',alignItems:'center',padding:24,gap:20 },
-  scroll:{ padding:15, paddingTop:18, paddingBottom:35, gap:14 },
-  hero:{ borderRadius:23,backgroundColor:'#fff',borderWidth:1,borderColor:'#f0e2d8',padding:20,gap:8 },
-  kicker:{color:RED,fontSize:10,fontWeight:'900',letterSpacing:1.2},
-  heading:{fontSize:26,lineHeight:33,fontWeight:'900',color:INK,letterSpacing:-0.4},
-  subtitle:{fontSize:13,color:'#918077',lineHeight:20},
-  stages:{flexDirection:'row',flexWrap:'wrap',gap:6,marginTop:12},
-  stepPill:{paddingHorizontal:9,paddingVertical:7,borderRadius:10,backgroundColor:'#faf4ee',borderWidth:1,borderColor:'#f1e4dc'},
-  stepActive:{backgroundColor:'#fceae5',borderColor:'#e7b8aa'},
-  stepText:{fontSize:10,color:'#977e6f',fontWeight:'700'},
-  stepActiveText:{color:RED,fontWeight:'900'},
-  card:{backgroundColor:'#fff',borderRadius:22,borderWidth:1,borderColor:'#eee2da',padding:15,gap:13},
-  cardTop:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},
-  section:{fontSize:18,fontWeight:'900',color:INK,letterSpacing:-0.3},
-  hint:{fontSize:11,color:'#99887a',lineHeight:17},
-  field:{gap:6,flexShrink:1},
-  label:{fontSize:11,fontWeight:'800',color:'#59647a'},
-  input:{borderRadius:13,borderColor:'#ecdcd1',borderWidth:1,backgroundColor:'#fffcfa',paddingHorizontal:13,paddingVertical:11,minHeight:44,fontSize:14,color:INK},
-  multiline:{minHeight:85},
-  inputError:{borderColor:'#e2654a',borderWidth:1.5},
-  servingsCard:{borderRadius:18,padding:13,backgroundColor:'#fff9f2',borderWidth:1,borderColor:'#f1e1cc',gap:9},
-  servingsTitle:{fontSize:16,color:INK,fontWeight:'900'},
-  servingsRow:{flexDirection:'row',flexWrap:'wrap',gap:7},
-  servingChip:{paddingVertical:10,paddingHorizontal:11,borderWidth:1,borderColor:'#ead8ca',borderRadius:10,backgroundColor:'#fff'},
-  chipSelected:{borderColor:RED,backgroundColor:'#fff0eb'},
-  chipText:{fontSize:12,fontWeight:'700',color:'#7b645a'},
-  selectedText:{color:RED},
-  twoColumns:{flexDirection:'row',gap:10},
-  categoryGrid:{flexDirection:'row',flexWrap:'wrap',gap:10},
-  categoryGridItem:{width:'48%',minWidth:0},
-  col:{flex:1,minWidth:0},
-  photoHeader:{gap:5,marginTop:6},
-  photoCard:{borderRadius:18,overflow:'hidden',backgroundColor:'#fff8f3',borderWidth:1,borderColor:'#efddd0',height:190},
-  photo:{width:'100%',height:'100%'},
-  photoEmpty:{flex:1,justifyContent:'center',alignItems:'center',gap:8},
-  photoEmptyText:{color:'#bc6a57',fontSize:13,fontWeight:'800'},
-  photoBadge:{position:'absolute',right:10,bottom:10,borderRadius:12,padding:9,backgroundColor:'#fff',flexDirection:'row',gap:6,alignItems:'center'},
-  photoBadgeText:{color:RED,fontWeight:'800',fontSize:11},
-  categories:{paddingVertical:3,gap:7},
-  category:{borderRadius:11,borderWidth:1,borderColor:'#ecddd1',paddingVertical:8,paddingHorizontal:12,backgroundColor:'#fff9f3'},
-  categoryActive:{borderColor:RED,backgroundColor:'#ffede6'},
-  categoryText:{fontSize:11,color:'#665448',fontWeight:'700'},
-  counter:{fontSize:11,color:'#bb7766',fontWeight:'800'},
-  ingredientCard:{padding:11,borderRadius:16,borderWidth:1,borderColor:'#f0e3d8',gap:9,backgroundColor:'#fffcfa'},
-  ingredientHeader:{flexDirection:'row',gap:9,alignItems:'center'},
-  ingredientNumber:{flex:1,fontSize:12,color:INK,fontWeight:'900'},
-  unknown:{fontSize:10,color:'#bd8747'},
-  stepNumber:{fontSize:12,color:RED,fontWeight:'900',backgroundColor:'#ffede5',overflow:'hidden',minWidth:27,height:27,textAlign:'center',textAlignVertical:'center',lineHeight:27,borderRadius:9},
-  add:{borderRadius:13,borderWidth:1,borderColor:'#ecd3c9',borderStyle:'dashed',minHeight:42,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8},
-  addText:{fontSize:12,color:RED,fontWeight:'900'},
-  divider:{height:1,backgroundColor:'#f0e3db',marginVertical:6},
-  ready:{flexDirection:'row',gap:10,alignItems:'center'},
-  photoReview:{width:'100%',height:175,borderRadius:16},
-  reviewTitle:{fontSize:20,fontWeight:'900',color:INK},
-  reviewExcerpt:{fontSize:13,lineHeight:21,color:'#86796e'},
-  reviewStats:{flexDirection:'row',flexWrap:'wrap',gap:7},
-  stat:{color:'#b06455',fontWeight:'800',fontSize:11,backgroundColor:'#fff3ee',paddingHorizontal:9,paddingVertical:6,borderRadius:10},
-  reviewRow:{minHeight:39,flexDirection:'row',alignItems:'center',gap:9,paddingVertical:5},
-  reviewCopy:{flex:1,color:'#364255',lineHeight:19,fontSize:12},
-  reviewBack:{paddingVertical:10},
-  publishNote:{fontSize:12,lineHeight:18,color:'#7e766e',backgroundColor:'#fff8ed',padding:12,borderRadius:12},
-  reviewPending:{backgroundColor:'#fff7e9',borderWidth:1,borderColor:'#ecd7b9',borderRadius:14,padding:12,flexDirection:'row',alignItems:'flex-start',gap:10,marginTop:10},
-  reviewPendingTitle:{fontSize:12,color:'#85552e',fontWeight:'900'},
-  reviewPendingCopy:{fontSize:11,color:'#946d50',lineHeight:17,marginTop:3},
-  reviewApproved:{fontSize:11,color:'#318467',fontWeight:'800',marginTop:7},
-  footer:{paddingHorizontal:15,paddingTop:10,backgroundColor:'#fff',borderTopWidth:1,borderColor:'#f1e3d9',gap:8},
-  footerButtons:{flexDirection:'row',gap:9},
-  action:{backgroundColor:RED,flex:1,minHeight:49,borderRadius:13,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:8,paddingHorizontal:13},
-  actionText:{color:'#fff',fontSize:13,fontWeight:'900'},
-  disabled:{opacity:0.5},
-  secondary:{borderRadius:13,backgroundColor:'#f6f1ed',paddingHorizontal:15,minHeight:49,flexDirection:'row',alignItems:'center',gap:5},
-  secondaryText:{fontSize:12,fontWeight:'800',color:INK},
-  error:{color:'#b53d30',fontSize:12,lineHeight:17,fontWeight:'700',textAlign:'center'},
-  empty:{color:INK,fontSize:15,fontWeight:'700'},
+  root: { flex: 1, backgroundColor: colors.canvas },
+  loading: { flex: 1, backgroundColor: colors.canvas, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 20 },
+  scroll: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 36, gap: 16 },
+  hero: { paddingTop: 4, gap: 8 },
+  kicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', color: RED },
+  heading: { fontFamily: fonts.headingBold, fontSize: 31, lineHeight: 37, letterSpacing: -0.9, color: INK },
+  subtitle: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22, color: colors.textMuted },
+  stages: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  stepSlot: { flex: 1, gap: 7, minWidth: 0 },
+  stepBar: { height: 4, borderRadius: 2, backgroundColor: colors.creamDeep },
+  stepBarDone: { backgroundColor: RED },
+  stepText: { fontFamily: fonts.bodyMedium, fontSize: 11, color: colors.textFaint },
+  stepActiveText: { fontFamily: fonts.bodySemi, color: INK },
+  card: { backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.line, padding: 18, gap: 14, ...shadow.card },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  section: { fontFamily: fonts.headingBold, fontSize: 20, color: INK, letterSpacing: -0.3 },
+  hint: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted, lineHeight: 19 },
+  field: { gap: 6, flexShrink: 1 },
+  label: { fontFamily: fonts.bodySemi, fontSize: 10, letterSpacing: 1.4, textTransform: 'uppercase', color: colors.textMuted },
+  input: {
+    borderRadius: radius.md, borderColor: colors.line, borderWidth: 1, backgroundColor: colors.canvas,
+    paddingHorizontal: 14, paddingVertical: 12, minHeight: 50, fontFamily: fonts.body, fontSize: 15, color: INK,
+  },
+  multiline: { minHeight: 92, lineHeight: 22 },
+  inputError: { borderColor: '#e2654a', borderWidth: 1.5 },
+  servingsCard: { borderRadius: radius.lg, padding: 14, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, gap: 10 },
+  servingsTitle: { fontFamily: fonts.heading, fontSize: 17, color: INK },
+  servingsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  servingChip: { height: 38, justifyContent: 'center', paddingHorizontal: 14, borderWidth: 1, borderColor: colors.line, borderRadius: radius.pill, backgroundColor: colors.surface },
+  chipSelected: { borderColor: INK, backgroundColor: INK },
+  chipText: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.text },
+  selectedText: { color: '#fff' },
+  twoColumns: { flexDirection: 'row', gap: 10 },
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  categoryGridItem: { width: '48%', minWidth: 0 },
+  col: { flex: 1, minWidth: 0 },
+  photoHeader: { gap: 4, marginTop: 6 },
+  photoCard: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.cream, height: 200 },
+  photo: { width: '100%', height: '100%' },
+  photoEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.lineStrong, borderRadius: radius.lg },
+  photoEmptyText: { fontFamily: fonts.bodySemi, color: INK, fontSize: 14 },
+  photoBadge: {
+    position: 'absolute', right: 10, bottom: 10, borderRadius: radius.pill, height: 34, paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.95)', flexDirection: 'row', gap: 6, alignItems: 'center',
+  },
+  photoBadgeText: { fontFamily: fonts.bodySemi, color: INK, fontSize: 12 },
+  categories: { paddingVertical: 3, gap: 7 },
+  category: { borderRadius: radius.pill, borderWidth: 1, borderColor: colors.line, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: colors.surface },
+  categoryActive: { borderColor: INK, backgroundColor: INK },
+  categoryText: { fontFamily: fonts.bodySemi, fontSize: 12, color: colors.text },
+  counter: { fontFamily: fonts.bodySemi, fontSize: 12, color: colors.textMuted, backgroundColor: colors.cream, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, overflow: 'hidden' },
+  ingredientCard: { padding: 12, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, gap: 10, backgroundColor: colors.canvas },
+  ingredientHeader: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  ingredientNumber: { flex: 1, fontFamily: fonts.bodySemi, fontSize: 13, color: INK },
+  unknown: { fontFamily: fonts.body, fontSize: 11, color: colors.warning },
+  stepNumber: {
+    fontFamily: fonts.bodyBold, fontSize: 12, color: '#fff', backgroundColor: INK, overflow: 'hidden', minWidth: 28, height: 28,
+    textAlign: 'center', textAlignVertical: 'center', lineHeight: 28, borderRadius: 14,
+  },
+  add: {
+    borderRadius: radius.pill, borderWidth: 1, borderColor: colors.lineStrong, borderStyle: 'dashed', minHeight: 46,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+  },
+  addText: { fontFamily: fonts.bodySemi, fontSize: 14, color: RED },
+  divider: { height: 1, backgroundColor: colors.line, marginVertical: 6 },
+  ready: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  photoReview: { width: '100%', height: 190, borderRadius: radius.lg },
+  reviewTitle: { fontFamily: fonts.headingBold, fontSize: 24, lineHeight: 30, letterSpacing: -0.5, color: INK },
+  reviewExcerpt: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22, color: colors.textMuted },
+  reviewStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  stat: { fontFamily: fonts.bodySemi, color: INK, fontSize: 12, backgroundColor: colors.brandSoft, paddingHorizontal: 11, paddingVertical: 7, borderRadius: radius.pill, overflow: 'hidden' },
+  reviewRow: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
+  reviewCopy: { flex: 1, fontFamily: fonts.body, color: colors.text, lineHeight: 21, fontSize: 14 },
+  reviewBack: { paddingVertical: 10 },
+  publishNote: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: colors.text, backgroundColor: colors.successSoft, padding: 14, borderRadius: radius.md, overflow: 'hidden' },
+  reviewPending: {
+    backgroundColor: colors.warningSoft, borderWidth: 1, borderColor: '#f1dcb3', borderRadius: radius.md, padding: 13,
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 10,
+  },
+  reviewPendingTitle: { fontFamily: fonts.bodySemi, fontSize: 13, color: '#85552e' },
+  reviewPendingCopy: { fontFamily: fonts.body, fontSize: 12, color: '#8a6446', lineHeight: 18, marginTop: 3 },
+  reviewApproved: { fontFamily: fonts.bodySemi, fontSize: 12, color: colors.success, marginTop: 7 },
+  footer: { paddingHorizontal: 20, paddingTop: 12, backgroundColor: colors.canvas, borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.lineStrong, gap: 8 },
+  footerButtons: { flexDirection: 'row', gap: 10 },
+  action: {
+    backgroundColor: RED, flex: 1, minHeight: 54, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
+    flexDirection: 'row', gap: 8, paddingHorizontal: 16,
+  },
+  actionText: { fontFamily: fonts.bodySemi, color: '#fff', fontSize: 15 },
+  disabled: { opacity: 0.5 },
+  secondary: {
+    borderRadius: radius.pill, borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface,
+    paddingHorizontal: 18, minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 6,
+  },
+  secondaryText: { fontFamily: fonts.bodySemi, fontSize: 15, color: INK },
+  error: { fontFamily: fonts.bodySemi, color: '#b53d30', fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  empty: { fontFamily: fonts.heading, color: INK, fontSize: 17 },
 });

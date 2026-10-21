@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { colors, fonts, radius, shadow } from '../../constants/theme';
 
 type Props = {
   visible: boolean;
@@ -24,9 +25,9 @@ export default function SimilarRecipeChoice({
         <View style={styles.panel}>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Pencereyi kapat"
             style={styles.close} disabled={saving} onPress={onClose}>
-            <Ionicons name="close" size={19} color="#826e63" />
+            <Ionicons name="close" size={19} color={colors.ink} />
           </TouchableOpacity>
-          <Text style={styles.kicker}>TARİFTEN · BENZER TARİF</Text>
+          <Text style={styles.kicker}>Benzer tarif</Text>
           <Text accessibilityRole="header" style={styles.title}>Benzer bir tarif zaten var.</Text>
           <Text style={styles.message}><Text style={styles.recipeName}>{title}</Text> tarifine benzeyen bir içerik yayında. Mevcut tarifi görüntüleyebilir veya kendi tarifini ayrıca yayımlayabilirsin.</Text>
           <TouchableOpacity accessibilityRole="button" style={styles.primary} onPress={onViewExisting}>
@@ -35,7 +36,7 @@ export default function SimilarRecipeChoice({
           </TouchableOpacity>
           <TouchableOpacity accessibilityRole="button" disabled={saving || uncertain}
             style={[styles.secondary, (saving || uncertain) && styles.disabled]} onPress={onCreate}>
-            {saving ? <ActivityIndicator color="#b44537" /> : <Ionicons name="checkmark" color="#86574d" size={17} />}
+            {saving ? <ActivityIndicator color={colors.brand} /> : <Ionicons name="add" color={colors.ink} size={18} />}
             <Text style={styles.secondaryText}>{saving ? 'Yeni tarif yayımlanıyor…' : 'Yine de yeni tarif oluştur'}</Text>
           </TouchableOpacity>
           {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
@@ -49,22 +50,24 @@ export default function SimilarRecipeChoice({
   );
 }
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(29,39,46,.64)', alignItems: 'center', justifyContent: 'center', padding: 20 },
-  panel: { backgroundColor: '#fffaf6', width: '100%', maxWidth: 420, padding: 25, borderRadius: 26,
-    borderWidth: 1, borderColor: '#edddd0', gap: 13 },
-  close: { position: 'absolute', top: 17, right: 17, height: 36, width: 36, alignItems: 'center',
-    justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#eedecf', zIndex: 2 },
-  kicker: { color: '#be4d3f', fontWeight: '900', fontSize: 10, letterSpacing: 1.7, marginTop: 12 },
-  title: { fontSize: 24, lineHeight: 30, fontWeight: '900', color: '#25383f', marginRight: 20 },
-  message: { color: '#7c7069', fontSize: 14, lineHeight: 22, marginBottom: 8 },
-  recipeName: { color: '#273b41', fontWeight: '900' },
-  primary: { minHeight: 52, borderRadius: 15, backgroundColor: '#db4c3f', flexDirection: 'row',
-    alignItems: 'center', justifyContent: 'center', gap: 10 },
-  primaryText: { fontSize: 14, fontWeight: '900', color: '#fff' },
-  secondary: { minHeight: 52, borderRadius: 15, borderWidth: 1, borderColor: '#ead8ce',
-    backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  secondaryText: { color: '#755851', fontWeight: '800', fontSize: 13 },
-  disabled: { opacity: .6 },
-  error: { backgroundColor: '#fff0e8', padding: 11, borderRadius: 12, color: '#ad4537', fontSize: 12 },
-  footer: { textAlign: 'center', color: '#9a897f', fontSize: 11, lineHeight: 16 },
+  backdrop: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  panel: { backgroundColor: colors.canvas, width: '100%', maxWidth: 420, padding: 24, borderRadius: radius.xl, gap: 12, ...shadow.floating },
+  close: {
+    position: 'absolute', top: 16, right: 16, height: 38, width: 38, alignItems: 'center', justifyContent: 'center',
+    borderRadius: 19, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.lineStrong, zIndex: 2,
+  },
+  kicker: { fontFamily: fonts.bodySemi, color: colors.brand, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', marginTop: 8 },
+  title: { fontFamily: fonts.headingBold, fontSize: 25, lineHeight: 31, letterSpacing: -0.6, color: colors.ink, marginRight: 30 },
+  message: { fontFamily: fonts.body, color: colors.textMuted, fontSize: 15, lineHeight: 22, marginBottom: 8 },
+  recipeName: { fontFamily: fonts.bodySemi, color: colors.ink },
+  primary: { minHeight: 52, borderRadius: radius.pill, backgroundColor: colors.brand, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  primaryText: { fontFamily: fonts.bodySemi, fontSize: 15, color: '#fff' },
+  secondary: {
+    minHeight: 52, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+  },
+  secondaryText: { fontFamily: fonts.bodySemi, color: colors.ink, fontSize: 15 },
+  disabled: { opacity: 0.55 },
+  error: { fontFamily: fonts.body, backgroundColor: colors.brandSoft, padding: 12, borderRadius: radius.md, color: '#ad4537', fontSize: 13, lineHeight: 18, overflow: 'hidden' },
+  footer: { fontFamily: fonts.body, textAlign: 'center', color: colors.textFaint, fontSize: 12, lineHeight: 17 },
 });
