@@ -14,9 +14,13 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuth } from '../context/AuthContext';
 import { useResponsive } from '../hooks/useResponsive';
+import LokmaIngredientIcon from '../components/LokmaIngredientIcon';
+import { AccentText } from '../components/ui/ScreenTitle';
+import { colors, fonts, radius, shadow } from '../constants/theme';
 
 const DIET_OPTIONS = [
   { label: 'Hepçil', value: 'none' },
@@ -113,6 +117,18 @@ export default function RegisterScreen() {
     }
   };
 
+  const chip = (selected: boolean, label: string, onPress: () => void) => (
+    <TouchableOpacity
+      key={label}
+      style={[styles.chip, selected && styles.chipSelected]}
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+    >
+      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+    </TouchableOpacity>
+  );
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -124,30 +140,41 @@ export default function RegisterScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={[styles.formContainer, isTablet && styles.formContainerTablet]}>
-        <View style={styles.logo}>
-          <Text style={styles.logoText}>tariften</Text>
-          <Text style={styles.logoSubtitle}>Hesap oluşturun</Text>
+        <View style={styles.hero}>
+          <View style={styles.art} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            {['domates', 'fesleğen', 'zeytinyağı'].map(name => (
+              <View key={name} style={styles.artDot}><LokmaIngredientIcon name={name} size={22} /></View>
+            ))}
+          </View>
+          <Text style={styles.kicker}>Standart Üye ol</Text>
+          <AccentText style={styles.title}>{'Defterini *aç.*'}</AccentText>
+          <Text style={styles.subtitle}>Aktardığın videolar, yazdığın tarifler ve kurduğun sofralar tek defterde toplansın.</Text>
         </View>
 
         {/* Social Buttons */}
         <View style={styles.socialRow}>
-          <TouchableOpacity style={styles.socialButton} onPress={handleGoogleSignIn}>
-            <Text style={styles.socialButtonText}>🔵 Google</Text>
-          </TouchableOpacity>
           {Platform.OS === 'ios' ? (
-            <TouchableOpacity style={styles.socialButton} onPress={handleAppleSignIn}>
-              <Text style={styles.socialButtonText}>🍎 Apple</Text>
+            <TouchableOpacity style={[styles.socialButton, styles.appleButton]} onPress={handleAppleSignIn}
+              accessibilityRole="button" accessibilityLabel="Apple ile devam et">
+              <Ionicons name="logo-apple" size={18} color="#ffffff" />
+              <Text style={[styles.socialButtonText, styles.appleButtonText]}>Apple</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={[styles.socialButton, styles.socialButtonDisabled]} disabled>
-              <Text style={[styles.socialButtonText, styles.socialButtonTextDisabled]}>🍎 Apple</Text>
+              <Ionicons name="logo-apple" size={18} color={colors.textFaint} />
+              <Text style={[styles.socialButtonText, styles.socialButtonTextDisabled]}>Apple</Text>
             </TouchableOpacity>
           )}
+          <TouchableOpacity style={styles.socialButton} onPress={handleGoogleSignIn}
+            accessibilityRole="button" accessibilityLabel="Google ile devam et">
+            <Ionicons name="logo-google" size={17} color={colors.ink} />
+            <Text style={styles.socialButtonText}>Google</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.divider}>
           <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>veya e-posta</Text>
+          <Text style={styles.dividerText}>veya e-posta ile</Text>
           <View style={styles.dividerLine} />
         </View>
 
@@ -161,9 +188,10 @@ export default function RegisterScreen() {
                 value={formData.fullname}
                 onChangeText={(v) => setFormData((p) => ({ ...p, fullname: v }))}
                 placeholder="Adınız Soyadınız"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.textFaint}
                 autoCapitalize="words"
                 returnKeyType="next"
+                accessibilityLabel="Ad Soyad"
               />
             </View>
             <View style={[styles.inputGroup, styles.flex1]}>
@@ -173,10 +201,11 @@ export default function RegisterScreen() {
                 value={formData.username}
                 onChangeText={(v) => setFormData((p) => ({ ...p, username: v }))}
                 placeholder="kullanici_adi"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.textFaint}
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="next"
+                accessibilityLabel="Kullanıcı adı"
               />
             </View>
           </View>
@@ -189,11 +218,12 @@ export default function RegisterScreen() {
               value={formData.email}
               onChangeText={(v) => setFormData((p) => ({ ...p, email: v }))}
               placeholder="ornek@email.com"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.textFaint}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="next"
+              accessibilityLabel="E-posta"
             />
           </View>
 
@@ -206,56 +236,35 @@ export default function RegisterScreen() {
                 value={formData.password}
                 onChangeText={(v) => setFormData((p) => ({ ...p, password: v }))}
                 placeholder="En az 6 karakter"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.textFaint}
                 secureTextEntry={!showPassword}
                 returnKeyType="next"
+                accessibilityLabel="Şifre"
               />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
-                <Text style={styles.eyeIcon}>{showPassword ? '🙈' : '👁'}</Text>
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}
+                accessibilityRole="button" accessibilityLabel={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}>
+                <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Diyet + Mutfak Deneyimi */}
-          <View style={styles.row}>
-            <View style={[styles.inputGroup, styles.flex1]}>
+          <View style={styles.optional}>
+            <Text style={styles.optionalTitle}>Biraz da mutfağını tanıyalım</Text>
+            <Text style={styles.optionalText}>İsteğe bağlı; önerileri sana göre ayarlamak için.</Text>
+            <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Diyet (opsiyonel)</Text>
-              <View style={styles.selectContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {DIET_OPTIONS.map((opt) => (
-                    <TouchableOpacity
-                      key={opt.value}
-                      style={[styles.chip, formData.diet === opt.value && styles.chipSelected]}
-                      onPress={() =>
-                        setFormData((p) => ({ ...p, diet: p.diet === opt.value ? '' : opt.value }))
-                      }
-                    >
-                      <Text style={[styles.chipText, formData.diet === opt.value && styles.chipTextSelected]}>
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+              <View style={styles.chipRow}>
+                {DIET_OPTIONS.map((opt) => chip(formData.diet === opt.value, opt.label, () =>
+                  setFormData((p) => ({ ...p, diet: p.diet === opt.value ? '' : opt.value }))))}
               </View>
             </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Mutfak Deneyimi (opsiyonel)</Text>
-            <View style={styles.chipRow}>
-              {LEVEL_OPTIONS.map((opt) => (
-                <TouchableOpacity
-                  key={opt.value}
-                  style={[styles.chip, formData.level === opt.value && styles.chipSelected]}
-                  onPress={() =>
-                    setFormData((p) => ({ ...p, level: p.level === opt.value ? '' : opt.value }))
-                  }
-                >
-                  <Text style={[styles.chipText, formData.level === opt.value && styles.chipTextSelected]}>
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Mutfak Deneyimi (opsiyonel)</Text>
+              <View style={styles.chipRow}>
+                {LEVEL_OPTIONS.map((opt) => chip(formData.level === opt.value, opt.label, () =>
+                  setFormData((p) => ({ ...p, level: p.level === opt.value ? '' : opt.value }))))}
+              </View>
             </View>
           </View>
 
@@ -263,11 +272,15 @@ export default function RegisterScreen() {
             style={[styles.registerButton, loading && styles.buttonDisabled]}
             onPress={handleRegister}
             disabled={loading}
+            accessibilityRole="button"
           >
             {loading ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <Text style={styles.registerButtonText}>Hesap Oluştur</Text>
+              <>
+                <Text style={styles.registerButtonText}>Hesap Oluştur</Text>
+                <Ionicons name="arrow-forward" size={18} color="#ffffff" />
+              </>
             )}
           </TouchableOpacity>
 
@@ -286,6 +299,7 @@ export default function RegisterScreen() {
           <TouchableOpacity
             style={styles.loginLink}
             onPress={() => router.replace('/login')}
+            accessibilityRole="button"
           >
             <Text style={styles.loginLinkText}>
               Zaten hesabın var mı?{' '}
@@ -301,16 +315,17 @@ export default function RegisterScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalIcon}>
-              <Text style={styles.modalIconText}>✅</Text>
+              <Ionicons name="checkmark" size={30} color="#ffffff" />
             </View>
-            <Text style={styles.modalTitle}>Kayıt Başarılı!</Text>
-            <Text style={styles.modalMessage}>Hesabınız oluşturuldu. Giriş yapabilirsiniz.</Text>
+            <AccentText style={styles.modalTitle}>{'Defterin *hazır!*'}</AccentText>
+            <Text style={styles.modalMessage}>Kayıt Başarılı! Hesabınız oluşturuldu. Giriş yapabilirsiniz.</Text>
             <TouchableOpacity
               style={styles.modalButton}
               onPress={() => {
                 setShowModal(false);
                 router.replace('/login');
               }}
+              accessibilityRole="button"
             >
               <Text style={styles.modalButtonText}>Giriş Yap</Text>
             </TouchableOpacity>
@@ -322,255 +337,80 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
+  container: { flex: 1, backgroundColor: colors.canvas },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32 },
+  scrollContentTablet: { alignItems: 'center' },
+  formContainer: { width: '100%' },
+  formContainerTablet: { maxWidth: 520 },
+  hero: { marginBottom: 26 },
+  art: { flexDirection: 'row', marginBottom: 18 },
+  artDot: {
+    width: 42, height: 42, borderRadius: 21, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: colors.canvas, marginRight: -8,
   },
-  scrollContent: {
-    flexGrow: 1,
-    padding: 24,
-    paddingTop: 16,
-  },
-  scrollContentTablet: {
-    alignItems: 'center',
-  },
-  formContainer: {
-    width: '100%',
-  },
-  formContainerTablet: {
-    maxWidth: 480,
-  },
-  logo: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  logoText: {
-    fontSize: 36,
-    fontWeight: '900',
-    color: '#e74c3c',
-    letterSpacing: -1,
-  },
-  logoSubtitle: {
-    fontSize: 16,
-    color: '#666666',
-    marginTop: 4,
-  },
-  socialRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
+  kicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', color: colors.brand },
+  title: { fontFamily: fonts.headingBold, fontSize: 36, lineHeight: 41, letterSpacing: -1.2, color: colors.ink, marginTop: 10 },
+  subtitle: { fontFamily: fonts.body, fontSize: 16, lineHeight: 23, color: colors.textMuted, marginTop: 10 },
+  socialRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   socialButton: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: '#e5e5e5',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: '#f9f9f9',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 4,
+    flex: 1, height: 52, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
-  socialButtonDisabled: {
-    opacity: 0.5,
-  },
-  socialButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  socialButtonTextDisabled: {
-    color: '#999',
-  },
-  soonBadge: {
-    fontSize: 10,
-    color: '#999',
-    marginLeft: 4,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 8,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e5e5e5',
-  },
-  dividerText: {
-    fontSize: 12,
-    color: '#999',
-  },
-  form: {
-    gap: 16,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  flex1: {
-    flex: 1,
-  },
-  inputGroup: {
-    gap: 6,
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#666666',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
+  appleButton: { backgroundColor: colors.ink, borderColor: colors.ink },
+  appleButtonText: { color: '#ffffff' },
+  socialButtonDisabled: { opacity: 0.5 },
+  socialButtonText: { fontFamily: fonts.bodySemi, fontSize: 15, color: colors.ink },
+  socialButtonTextDisabled: { color: colors.textFaint },
+  divider: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 10 },
+  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.lineStrong },
+  dividerText: { fontFamily: fonts.body, fontSize: 12, color: colors.textFaint },
+  form: { gap: 16 },
+  row: { flexDirection: 'row', gap: 10 },
+  flex1: { flex: 1 },
+  inputGroup: { gap: 7 },
+  inputLabel: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.text },
   input: {
-    borderWidth: 1.5,
-    borderColor: '#e5e5e5',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: '#1a1a1a',
-    backgroundColor: '#f9f9f9',
+    height: 52, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: 14,
+    fontFamily: fonts.body, fontSize: 15, color: colors.ink, backgroundColor: colors.surface,
   },
   passwordContainer: {
-    flexDirection: 'row',
-    borderWidth: 1.5,
-    borderColor: '#e5e5e5',
-    borderRadius: 12,
-    backgroundColor: '#f9f9f9',
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', height: 52, borderWidth: 1, borderColor: colors.line,
+    borderRadius: radius.md, backgroundColor: colors.surface,
   },
-  passwordInput: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: '#1a1a1a',
+  passwordInput: { flex: 1, height: '100%', paddingHorizontal: 14, fontFamily: fonts.body, fontSize: 15, color: colors.ink },
+  eyeButton: { width: 48, height: '100%', alignItems: 'center', justifyContent: 'center' },
+  optional: {
+    gap: 14, padding: 16, borderRadius: radius.xl, backgroundColor: '#f8f1ea', marginTop: 4,
   },
-  eyeButton: {
-    paddingHorizontal: 14,
-  },
-  eyeIcon: {
-    fontSize: 18,
-  },
-  selectContainer: {
-    borderWidth: 1.5,
-    borderColor: '#e5e5e5',
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    backgroundColor: '#f9f9f9',
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
+  optionalTitle: { fontFamily: fonts.heading, fontSize: 16, color: colors.ink },
+  optionalText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.textMuted, marginTop: -10 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
-    borderWidth: 1.5,
-    borderColor: '#e5e5e5',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 6,
-    backgroundColor: '#f9f9f9',
+    height: 38, paddingHorizontal: 15, borderRadius: radius.pill, justifyContent: 'center',
+    borderWidth: 1, borderColor: '#eadfd5', backgroundColor: colors.surface,
   },
-  chipSelected: {
-    borderColor: '#e74c3c',
-    backgroundColor: '#fef2f2',
-  },
-  chipText: {
-    fontSize: 13,
-    color: '#666666',
-  },
-  chipTextSelected: {
-    color: '#e74c3c',
-    fontWeight: '600',
-  },
+  chipSelected: { backgroundColor: colors.ink, borderColor: colors.ink },
+  chipText: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.text },
+  chipTextSelected: { color: '#ffffff' },
   registerButton: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
+    height: 54, borderRadius: radius.pill, backgroundColor: colors.brand, marginTop: 6,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  registerButtonText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  loginLink: {
-    alignItems: 'center',
-    paddingVertical: 8,
-    marginBottom: 20,
-  },
-  loginLinkText: {
-    fontSize: 14,
-    color: '#666666',
-  },
-  loginLinkBold: {
-    color: '#e74c3c',
-    fontWeight: '700',
-  },
-  legalText: {
-    fontSize: 11,
-    color: '#999999',
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  legalLink: {
-    color: '#e74c3c',
-    textDecorationLine: 'underline',
-  },
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
+  buttonDisabled: { opacity: 0.6 },
+  registerButtonText: { fontFamily: fonts.bodySemi, color: '#ffffff', fontSize: 16 },
+  legalText: { fontFamily: fonts.body, fontSize: 12, lineHeight: 18, color: colors.textFaint, textAlign: 'center' },
+  legalLink: { fontFamily: fonts.bodySemi, color: colors.textMuted, textDecorationLine: 'underline' },
+  loginLink: { alignItems: 'center', paddingVertical: 10 },
+  loginLinkText: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted },
+  loginLinkBold: { fontFamily: fonts.bodySemi, color: colors.brand },
+  modalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', alignItems: 'center', padding: 28 },
   modalCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 32,
-    alignItems: 'center',
-    width: '100%',
-    maxWidth: 340,
+    width: '100%', maxWidth: 400, alignItems: 'center', padding: 28, borderRadius: radius.xl,
+    backgroundColor: colors.canvas, ...shadow.floating,
   },
-  modalIcon: {
-    marginBottom: 16,
-  },
-  modalIconText: {
-    fontSize: 56,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  modalMessage: {
-    fontSize: 14,
-    color: '#666666',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  modalButton: {
-    backgroundColor: '#e74c3c',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 40,
-    alignItems: 'center',
-    width: '100%',
-  },
-  modalButtonText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
+  modalIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  modalTitle: { fontFamily: fonts.headingBold, fontSize: 26, letterSpacing: -0.6, color: colors.ink, textAlign: 'center' },
+  modalMessage: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22, color: colors.textMuted, textAlign: 'center', marginTop: 8, marginBottom: 22 },
+  modalButton: { alignSelf: 'stretch', height: 52, borderRadius: radius.pill, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  modalButtonText: { fontFamily: fonts.bodySemi, color: '#ffffff', fontSize: 16 },
 });

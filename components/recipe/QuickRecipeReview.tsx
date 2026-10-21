@@ -8,6 +8,8 @@ import type { QuickRecipeDraft } from '../../lib/quick-recipe-review';
 import { validateQuickRecipe } from '../../lib/quick-recipe-review';
 import { RECIPE_UNITS, canTypeRecipeAmount } from '../../lib/recipe-measurements';
 import RecipePicker from './RecipePicker';
+import { AccentText } from '../ui/ScreenTitle';
+import { colors, fonts, radius, shadow } from '../../constants/theme';
 
 type Props = {
   visible: boolean;
@@ -33,7 +35,7 @@ function FormField({ label, value, onChange, numeric, multiline, placeholder }: 
     <TextInput accessibilityLabel={label} value={value} onChangeText={onChange}
       keyboardType={numeric ? 'number-pad' : 'default'}
       multiline={multiline} textAlignVertical={multiline ? 'top' : 'center'}
-      placeholder={placeholder} placeholderTextColor="#b3a599"
+      placeholder={placeholder} placeholderTextColor={colors.textFaint}
       style={[styles.input, multiline && styles.longInput]} />
   </View>;
 }
@@ -50,8 +52,8 @@ export default function QuickRecipeReview({
         <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.header}>
             <View style={styles.headerCopy}>
-              <Text style={styles.kicker}>TARİFTEN · AI ŞEF</Text>
-              <Text accessibilityRole="header" style={styles.title}>Tarifin hazır. Son dokunuş sende.</Text>
+              <Text style={styles.kicker}>AI Şef</Text>
+              <AccentText style={styles.title}>{'Tarifin hazır. Son dokunuş *sende.*'}</AccentText>
               <Text style={styles.subtitle}>Malzemeleri ve adımları kontrol et. Tarif henüz yayımlanmadı.</Text>
             </View>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Tarif önizlemesini kapat"
@@ -145,33 +147,51 @@ export default function QuickRecipeReview({
   );
 }
 const styles = StyleSheet.create({
-  flex: { flex: 1 }, page: { flex: 1, backgroundColor: '#fffaf6' },
-  header: { backgroundColor: '#fff', paddingHorizontal: 20, paddingTop: 15, paddingBottom: 18,
-    borderBottomColor: '#f0e4d8', borderBottomWidth: 1, flexDirection: 'row', gap: 9 },
-  headerCopy: { flex: 1 }, kicker: { color: '#b84b40', letterSpacing: 2, fontSize: 10, fontWeight: '900' },
-  title: { fontSize: 23, lineHeight: 28, fontWeight: '900', color: '#20333a', marginTop: 8 },
-  subtitle: { fontSize: 12, lineHeight: 18, color: '#82736a', marginTop: 8 },
-  close: { borderWidth: 1, borderColor: '#edddd0', borderRadius: 15, padding: 9, alignSelf: 'flex-start' },
-  closeText: { fontWeight: '800', color: '#866c5e', fontSize: 11 },
-  body: { paddingHorizontal: 20, paddingVertical: 22, gap: 18, paddingBottom: 45 },
-  field: { gap: 7, flex: 1 }, label: { color: '#77675f', fontSize: 11, fontWeight: '800' },
-  input: { borderRadius: 13, borderWidth: 1, borderColor: '#e9ded4', backgroundColor: '#fff',
-    minHeight: 46, padding: 12, color: '#27383d', fontSize: 14 },
-  longInput: { minHeight: 90 },
-  twoCol: { flexDirection: 'row', gap: 11 }, col: { flex: 1, minWidth: 0 },
-  hint: { color: '#8b7c72', fontSize: 11, lineHeight: 17 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 },
-  sectionTitle: { color: '#22343a', fontSize: 20, fontWeight: '900' },
-  addText: { color: '#c35041', fontWeight: '900', fontSize: 11 },
-  card: { backgroundColor: '#fff', borderColor: '#eee0d5', borderWidth: 1, borderRadius: 18, padding: 13, gap: 12 },
-  removeText: { alignSelf: 'flex-end', color: '#c04e41', fontSize: 11, fontWeight: '800' },
-  notice: { backgroundColor: '#fff1d9', borderRadius: 15, padding: 13 },
-  noticeText: { fontSize: 12, lineHeight: 18, color: '#835c2e' },
-  footer: { backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f0e4d8',
-    paddingHorizontal: 17, paddingVertical: 13, gap: 10 },
+  flex: { flex: 1 },
+  page: { flex: 1, backgroundColor: colors.canvas },
+  header: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 18, flexDirection: 'row', gap: 12 },
+  headerCopy: { flex: 1 },
+  kicker: { fontFamily: fonts.bodySemi, color: colors.brand, letterSpacing: 2.2, fontSize: 11, textTransform: 'uppercase' },
+  title: { fontFamily: fonts.headingBold, fontSize: 27, lineHeight: 33, letterSpacing: -0.7, color: colors.ink, marginTop: 8 },
+  subtitle: { fontFamily: fonts.body, fontSize: 14, lineHeight: 21, color: colors.textMuted, marginTop: 8 },
+  close: {
+    height: 38, paddingHorizontal: 14, borderRadius: radius.pill, justifyContent: 'center', alignSelf: 'flex-start',
+    backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.lineStrong,
+  },
+  closeText: { fontFamily: fonts.bodySemi, color: colors.ink, fontSize: 13 },
+  body: { paddingHorizontal: 20, paddingTop: 6, gap: 16, paddingBottom: 45 },
+  field: { gap: 6, flex: 1 },
+  label: { fontFamily: fonts.bodySemi, color: colors.textMuted, fontSize: 10, letterSpacing: 1.4, textTransform: 'uppercase' },
+  input: {
+    borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface,
+    minHeight: 50, paddingHorizontal: 14, paddingVertical: 12, fontFamily: fonts.body, color: colors.ink, fontSize: 15,
+  },
+  longInput: { minHeight: 92, lineHeight: 22 },
+  twoCol: { flexDirection: 'row', gap: 10 },
+  col: { flex: 1, minWidth: 0 },
+  hint: { fontFamily: fonts.body, color: colors.textMuted, fontSize: 12, lineHeight: 18 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10 },
+  sectionTitle: { fontFamily: fonts.headingBold, color: colors.ink, fontSize: 21, letterSpacing: -0.4 },
+  addText: {
+    fontFamily: fonts.bodySemi, color: colors.brand, fontSize: 13, backgroundColor: colors.brandSoft,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, overflow: 'hidden',
+  },
+  card: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: radius.lg, padding: 14, gap: 12, ...shadow.card },
+  removeText: { fontFamily: fonts.bodySemi, alignSelf: 'flex-end', color: '#c0564b', fontSize: 12 },
+  notice: { backgroundColor: colors.warningSoft, borderRadius: radius.md, padding: 13 },
+  noticeText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: '#835c2e' },
+  footer: {
+    backgroundColor: colors.canvas, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.lineStrong,
+    paddingHorizontal: 20, paddingVertical: 12, gap: 10,
+  },
   footerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  secondary: { padding: 12, borderRadius: 12 }, secondaryText: { fontSize: 11, fontWeight: '800', color: '#7b675c' },
-  primary: { flex: 1, borderRadius: 15, minHeight: 50, backgroundColor: '#db4c3f', justifyContent: 'center', alignItems: 'center' },
-  primaryText: { color: '#fff', fontSize: 13, fontWeight: '900' }, disabled: { opacity: 0.5 },
-  error: { color: '#b7473b', backgroundColor: '#fff0e8', borderRadius: 12, padding: 10, fontSize: 11, fontWeight: '700' },
+  secondary: {
+    height: 52, paddingHorizontal: 16, borderRadius: radius.pill, justifyContent: 'center',
+    borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface,
+  },
+  secondaryText: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.ink },
+  primary: { flex: 1, borderRadius: radius.pill, minHeight: 52, backgroundColor: colors.brand, justifyContent: 'center', alignItems: 'center' },
+  primaryText: { fontFamily: fonts.bodySemi, color: '#fff', fontSize: 15 },
+  disabled: { opacity: 0.5 },
+  error: { fontFamily: fonts.bodySemi, color: '#b7473b', backgroundColor: colors.brandSoft, borderRadius: radius.md, padding: 11, fontSize: 12, lineHeight: 17, overflow: 'hidden' },
 });

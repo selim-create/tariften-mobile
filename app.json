@@ -7,11 +7,6 @@
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#fcfbf9"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tariften.app",
@@ -22,12 +17,17 @@
         "NSMicrophoneUsageDescription": "Pişirme rehberinde eller serbest sesli komutları algılamak için mikrofon erişimi gereklidir.",
         "NSSpeechRecognitionUsageDescription": "Pişirme rehberinde konuşulan Türkçe komutları tanımak için konuşma tanıma erişimi gereklidir.",
         "ITSAppUsesNonExemptEncryption": false
+      },
+      "icon": {
+        "light": "./assets/icon.png",
+        "dark": "./assets/icon-dark.png",
+        "tinted": "./assets/icon-tinted.png"
       }
     },
     "android": {
       "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
-        "backgroundColor": "#DB4C3F",
+        "backgroundColor": "#D84C40",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -64,6 +64,29 @@
         {
           "microphonePermission": "Tariften pişirme rehberinde eller serbest sesli komutlar için mikrofon erişimi gereklidir.",
           "speechRecognitionPermission": "Tariften pişirme rehberinde sonraki, önceki ve oku komutlarını algılamak için konuşma tanıma izni gereklidir."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#fcfbf9"
+        }
+      ],
+      [
+        "expo-share-intent",
+        {
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+            "NSExtensionActivationSupportsWebPageWithMaxCount": 1,
+            "NSExtensionActivationSupportsText": true
+          },
+          "iosShareExtensionName": "Tariften'e Aktar",
+          "androidIntentFilters": [
+            "text/*"
+          ]
         }
       ]
     ],

@@ -10,6 +10,8 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, fonts, radius } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import { addComment, deleteComment, getComments, toggleCommentLike } from '../lib/api';
 import { Comment } from '../lib/types';
@@ -121,7 +123,7 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
           <Image source={{ uri: item.author.avatar }} style={styles.avatar} contentFit="cover" />
         ) : (
           <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitial}>{item.author.name?.charAt(0)?.toUpperCase()}</Text>
+            <Text style={styles.avatarInitial}>{item.author.name?.charAt(0)?.toLocaleUpperCase('tr-TR')}</Text>
           </View>
         )}
         <View style={styles.commentMeta}>
@@ -137,8 +139,10 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
         )}
       </View>
       <Text style={styles.commentContent}>{item.content}</Text>
-      <TouchableOpacity style={styles.likeButton} onPress={() => handleLike(item.id)}>
-        <Text style={styles.likeText}>👍 {item.likes || 0}</Text>
+      <TouchableOpacity style={styles.likeButton} onPress={() => handleLike(item.id)}
+        accessibilityRole="button" accessibilityLabel={`Yorumu beğen, ${item.likes || 0} beğeni`}>
+        <Ionicons name="heart-outline" size={14} color={colors.brand} />
+        <Text style={styles.likeText}>{item.likes || 0}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -146,14 +150,18 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color="#e74c3c" />
+        <ActivityIndicator size="small" color={colors.brand} />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Yorumlar ({comments.length})</Text>
+      <Text style={styles.kicker}>Pişirenler ne diyor</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.sectionTitle}>Yorumlar</Text>
+        <View style={styles.countPill}><Text style={styles.countText}>{comments.length}</Text></View>
+      </View>
       {!!loadError && (
         <View style={styles.errorBox} accessibilityRole="alert">
           <Text style={styles.errorText}>{loadError}</Text>
@@ -176,7 +184,7 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
             value={newComment}
             onChangeText={setNewComment}
             placeholder="Yorumunuzu yazın..."
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textFaint}
             multiline
             maxLength={500}
           />
@@ -204,7 +212,10 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
           </TouchableOpacity>
         </View>
       ) : (
-        <Text style={styles.loginPrompt}>Yorum yapmak için giriş yapın.</Text>
+        <View style={styles.loginBox}>
+          <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.textMuted} />
+          <Text style={styles.loginPrompt}>Yorum yapmak için giriş yapın.</Text>
+        </View>
       )}
 
       <FlatList
@@ -223,161 +234,69 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingVertical: 16,
-  },
-  loadingContainer: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 16,
-  },
+  container: { paddingVertical: 16 },
+  loadingContainer: { padding: 20, alignItems: 'center' },
+  kicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', color: colors.brand },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, marginBottom: 16 },
+  sectionTitle: { fontFamily: fonts.headingBold, fontSize: 24, letterSpacing: -0.5, color: colors.ink },
+  countPill: { minWidth: 28, height: 28, paddingHorizontal: 9, borderRadius: radius.pill, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
+  countText: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.ink },
   lokmaReactionRow: {
     flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center',
     alignItems: 'center', alignContent: 'center', gap: 8,
     width: '100%', paddingVertical: 4, marginTop: 2,
   },
   lokmaReactionButton: {
-    width: 40, height: 40, borderRadius: 13,
+    width: 42, height: 42, borderRadius: 21,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#fff4eb', borderWidth: 1, borderColor: '#f2e4d8',
+    backgroundColor: colors.brandSoft, borderWidth: 1, borderColor: '#f6ddd2',
   },
   lokmaReactionEmoji: {
     fontSize: 21, lineHeight: 28, width: 32, textAlign: 'center',
     textAlignVertical: 'center', includeFontPadding: false,
   },
   inputContainer: {
-    marginBottom: 16,
-    gap: 8,
+    marginBottom: 18, gap: 10, padding: 14, borderRadius: radius.lg,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#1a1a1a',
-    minHeight: 80,
-    textAlignVertical: 'top',
+    borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.canvas,
+    paddingHorizontal: 14, paddingVertical: 12, fontFamily: fonts.body, fontSize: 15, color: colors.ink,
+    minHeight: 84, textAlignVertical: 'top',
   },
-  submitButton: {
-    backgroundColor: '#e74c3c',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
+  submitButton: { backgroundColor: colors.brand, borderRadius: radius.pill, height: 48, alignItems: 'center', justifyContent: 'center' },
+  submitButtonDisabled: { opacity: 0.45 },
+  submitButtonText: { fontFamily: fonts.bodySemi, color: '#ffffff', fontSize: 15 },
+  loginBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, marginBottom: 16,
+    borderRadius: radius.lg, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.lineStrong,
   },
-  submitButtonDisabled: {
-    opacity: 0.5,
-  },
-  submitButtonText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  loginPrompt: {
-    fontSize: 14,
-    color: '#666666',
-    marginBottom: 16,
-    fontStyle: 'italic',
-  },
-  commentItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  commentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    marginRight: 10,
-  },
+  loginPrompt: { flex: 1, fontFamily: fonts.body, fontSize: 14, color: colors.textMuted },
+  commentItem: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.line },
+  commentHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  avatar: { width: 38, height: 38, borderRadius: 19, marginRight: 10 },
   avatarPlaceholder: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#e74c3c',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
+    width: 38, height: 38, borderRadius: 19, backgroundColor: colors.brand,
+    justifyContent: 'center', alignItems: 'center', marginRight: 10,
   },
-  avatarInitial: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  commentMeta: {
-    flex: 1,
-  },
-  commentAuthor: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  commentDate: {
-    fontSize: 11,
-    color: '#999999',
-  },
-  deleteButton: {
-    padding: 4,
-  },
-  deleteText: {
-    fontSize: 12,
-    color: '#e74c3c',
-  },
-  commentContent: {
-    fontSize: 14,
-    color: '#1a1a1a',
-    lineHeight: 20,
-    marginBottom: 8,
-  },
+  avatarInitial: { fontFamily: fonts.headingBold, color: '#ffffff', fontSize: 16 },
+  commentMeta: { flex: 1 },
+  commentAuthor: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.ink },
+  commentDate: { fontFamily: fonts.body, fontSize: 12, color: colors.textFaint, marginTop: 1 },
+  deleteButton: { paddingVertical: 6, paddingHorizontal: 10 },
+  deleteText: { fontFamily: fonts.bodySemi, fontSize: 12, color: colors.brand },
+  commentContent: { fontFamily: fonts.body, fontSize: 15, color: colors.text, lineHeight: 22, marginBottom: 10 },
   likeButton: {
-    alignSelf: 'flex-start',
+    alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5,
+    height: 30, paddingHorizontal: 11, borderRadius: radius.pill, backgroundColor: colors.brandSoft,
   },
-  likeText: {
-    fontSize: 13,
-    color: '#666666',
-  },
+  likeText: { fontFamily: fonts.bodySemi, fontSize: 12, color: colors.ink },
   errorBox: {
-    backgroundColor: '#fff7ed',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#fed7aa',
-    padding: 14,
-    marginBottom: 12,
-    gap: 10,
+    backgroundColor: colors.warningSoft, borderRadius: radius.lg, borderWidth: 1, borderColor: '#fed7aa',
+    padding: 14, marginBottom: 12, gap: 10,
   },
-  errorText: {
-    fontSize: 13,
-    lineHeight: 19,
-    color: '#92400e',
-  },
-  retryButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: 9,
-    paddingHorizontal: 15,
-    borderRadius: 8,
-    backgroundColor: '#292524',
-  },
-  retryText: {
-    fontWeight: '700',
-    fontSize: 13,
-    color: '#ffffff',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#999999',
-    textAlign: 'center',
-    paddingVertical: 20,
-    fontStyle: 'italic',
-  },
+  errorText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: '#92400e' },
+  retryButton: { alignSelf: 'flex-start', height: 38, justifyContent: 'center', paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: colors.ink },
+  retryText: { fontFamily: fonts.bodySemi, fontSize: 13, color: '#ffffff' },
+  emptyText: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted, textAlign: 'center', paddingVertical: 20 },
 });

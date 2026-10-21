@@ -13,6 +13,9 @@ export type VideoJob = {
   message: string;
   requires_approval: true;
   preview?: unknown;
+  error_code?: string;
+  retryable?: boolean;
+  refunded?: boolean;
 };
 
 export function isYouTubeVideoLink(value: string): boolean {
@@ -36,8 +39,41 @@ export function isInstagramReelLink(value: string): boolean {
   } catch { return false; }
 }
 
+/** Canonical public TikTok video URL (short vm./vt. links are expanded on the device first). */
+export function isTikTokVideoLink(value: string): boolean {
+  try {
+    const u = new URL(value.trim());
+    return u.protocol === 'https:' && !u.username && !u.password && !u.port
+      && ['tiktok.com', 'www.tiktok.com', 'm.tiktok.com'].includes(u.hostname.toLowerCase())
+      && /^\/@[A-Za-z0-9._]{2,32}\/video\/[0-9]{15,24}\/?$/.test(u.pathname);
+  } catch { return false; }
+}
+
+/** vm./vt.tiktok.com links: Core cannot canonicalize them without following a redirect. */
+export function isTikTokShortLink(value: string): boolean {
+  try {
+    const u = new URL(value.trim());
+    return u.protocol === 'https:' && ['vm.tiktok.com', 'vt.tiktok.com'].includes(u.hostname.toLowerCase());
+  } catch { return false; }
+}
+
+/** A /p/ URL can be photo, video or carousel; Core proves playable media before any paid call. */
+export function isInstagramPostLink(value: string): boolean {
+  try {
+    const u = new URL(value.trim());
+    return u.protocol === 'https:' && !u.username && !u.password && !u.port
+      && ['instagram.com', 'www.instagram.com'].includes(u.hostname.toLowerCase())
+      && /^\/p\/[A-Za-z0-9_-]{5,64}\/?$/.test(u.pathname);
+  } catch { return false; }
+}
+
+/** Social platforms where the user confirms media-processing rights (same rule as Core and web). */
+export function needsRightsConfirmation(value: string): boolean {
+  return isInstagramReelLink(value) || isInstagramPostLink(value) || isTikTokVideoLink(value);
+}
+
 export function isVideoRecipeLink(value: string): boolean {
-  return isYouTubeVideoLink(value) || isInstagramReelLink(value);
+  return isYouTubeVideoLink(value) || isInstagramReelLink(value) || isInstagramPostLink(value) || isTikTokVideoLink(value);
 }
 
 export function parseVideoJob(value: unknown): VideoJob {

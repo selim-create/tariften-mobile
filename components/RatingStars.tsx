@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { colors } from '../constants/theme';
 
 interface RatingStarsProps {
   rating: number;
@@ -22,7 +23,7 @@ export default function RatingStars({
       {Array.from({ length: maxStars }, (_, i) => {
         const filled = i < Math.round(rating);
         const icon = filled ? 'star' : 'star-outline';
-        const color = filled ? '#f59e0b' : '#cccccc';
+        const color = filled ? colors.brand : colors.lineStrong;
 
         if (interactive && onRate) {
           return (

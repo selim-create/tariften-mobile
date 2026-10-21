@@ -63,6 +63,8 @@ jobs:
         run: node --test scripts/check-mobile-redesign-foundation.test.cjs
       - name: Recipes, menus and blog archives; social source card
         run: node --test scripts/check-mobile-archive-screens.test.cjs
+      - name: Paylaş → Tariften, icon set, splash and safe iOS rebuild
+        run: node --test scripts/check-share-to-tariften.test.cjs
       - name: Verify mobile membership, servings and profile navigation parity
         run: node --test scripts/check-mobile-content-parity.test.cjs
       - name: Guard Expo Router URI parsing compatibility

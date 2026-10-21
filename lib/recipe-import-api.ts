@@ -137,9 +137,61 @@ export async function previewRecipeSocial(
  * Real native-video beta: Core owns the job, quota and payment; this client
  * never invokes Cloud Run or Gemini and never retries a provider call.
  */
-import { isInstagramReelLink, parseVideoJob, type VideoJob } from './video-recipe-import';
+import { needsRightsConfirmation, parseVideoJob, type VideoJob } from './video-recipe-import';
 
 const VIDEO_BASE = 'https://api.tariften.com/wp-json/tariften/v1/ai/recipe-social/video';
+
+/** Thrown when Core reports that this video already has a published recipe. */
+export class VideoAlreadyPublished extends Error {
+  constructor(public readonly slug: string) { super('Bu videonun tarifi zaten yayında.'); }
+}
+
+export type VideoSourceState =
+  | { status: 'published'; slug: string }
+  | { status: 'pending' }
+  | { status: 'existing'; job: VideoJob }
+  | { status: 'new'; canStart: boolean }
+  | { status: 'unsupported' };
+
+/**
+ * Free, authenticated look-up before any paid analysis: an already published
+ * recipe opens directly, the user's earlier job resumes, and a new analysis
+ * starts only when Core says it can.
+ */
+export async function resolveVideoSource(token: string, sourceUrl: string, signal?: AbortSignal): Promise<VideoSourceState> {
+  if (!token) throw new Error('Video aktarmak için giriş yapmalısın.');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  const onAbort = () => controller.abort();
+  signal?.addEventListener('abort', onAbort, { once: true });
+  try {
+    const response = await fetch(VIDEO_BASE + '/resolve', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source_url: sourceUrl.trim() }),
+      signal: controller.signal,
+    });
+    const payload: unknown = await response.json().catch(() => null);
+    const data = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload as Record<string, unknown> : {};
+    if (!response.ok) {
+      if (data.code === 'rest_no_route') throw new Error('Video analizi sunucuda henüz etkinleştirilmedi.');
+      if (response.status === 422) return { status: 'unsupported' };
+      throw new Error(typeof data.message === 'string' && data.message ? data.message : 'Video kaydı doğrulanamadı; yeni analiz başlatılmadı.');
+    }
+    if (data.status === 'published' && typeof data.recipe_slug === 'string' && data.recipe_slug) return { status: 'published', slug: data.recipe_slug };
+    if (data.status === 'pending') return { status: 'pending' };
+    if (data.status === 'existing') return { status: 'existing', job: parseVideoJob(data.job) };
+    if (data.status === 'new') return { status: 'new', canStart: data.can_start === true };
+    throw new Error('Video kaydı doğrulanamadı; yeni analiz başlatılmadı.');
+  } catch (cause) {
+    if (controller.signal.aborted) throw new Error('Tariften sunucusu geç yanıt verdi. Henüz analiz başlatılmadı; tekrar deneyebilirsin.');
+    if (cause instanceof TypeError) throw new Error('Tariften sunucusuna ulaşılamadı. Henüz analiz başlatılmadı.');
+    throw cause;
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', onAbort);
+  }
+}
 async function videoRequest(
   token: string, url: string, options: RequestInit, signal?: AbortSignal,
 ): Promise<VideoJob> {
@@ -162,6 +214,12 @@ async function videoRequest(
       }
       throw new Error(error.message || 'Video analizi sunucusundan yanıt alınamadı.');
     }
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)
+        && (payload as { status?: unknown }).status === 'published'
+        && typeof (payload as { recipe_slug?: unknown }).recipe_slug === 'string') {
+      // The same video was already turned into a public recipe: open it, never pay twice.
+      throw new VideoAlreadyPublished((payload as { recipe_slug: string }).recipe_slug);
+    }
     return parseVideoJob(payload);
   } catch (cause) {
     if (controller.signal.aborted) {
@@ -180,13 +238,13 @@ export function startVideoRecipeJob(
   token: string, sourceUrl: string, requestId: string, signal?: AbortSignal, rightsConfirmed = false,
 ): Promise<VideoJob> {
   if (!/^[A-Za-z0-9-]{16,80}$/.test(requestId)) throw new Error('Video iş kimliği geçersiz.');
-  const instagram = isInstagramReelLink(sourceUrl);
-  if (instagram && rightsConfirmed !== true) {
-    throw new Error('Instagram videosunu analiz etmek için kullanım iznini onaylamalısın.');
+  const social = needsRightsConfirmation(sourceUrl);
+  if (social && rightsConfirmed !== true) {
+    throw new Error('Bu videoyu analiz etmek için kullanım iznini onaylamalısın.');
   }
   return videoRequest(token, VIDEO_BASE + '/start', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(instagram
+    body: JSON.stringify(social
       ? { source_url: sourceUrl.trim(), request_id: requestId, rights_confirmed: true }
       : { source_url: sourceUrl.trim(), request_id: requestId }),
   }, signal);

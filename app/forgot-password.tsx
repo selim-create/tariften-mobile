@@ -12,7 +12,10 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { forgotPassword } from '../lib/api';
+import { AccentText } from '../components/ui/ScreenTitle';
+import { colors, fonts, radius, shadow } from '../constants/theme';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -43,62 +46,68 @@ export default function ForgotPasswordScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.logo}>
-          <Text style={styles.logoText}>tariften</Text>
-        </View>
-
         {!isSent ? (
-          <View style={styles.card}>
-            <Text style={styles.title}>Şifreni mi Unuttun?</Text>
+          <View>
+            <View style={styles.badge}><Ionicons name="key-outline" size={22} color={colors.brand} /></View>
+            <Text style={styles.kicker}>Şifre sıfırlama</Text>
+            <AccentText style={styles.title}>{'Şifreni mi *unuttun?*'}</AccentText>
             <Text style={styles.description}>
               Kayıtlı e-posta adresini gir, sana sıfırlama bağlantısı gönderelim.
             </Text>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>E-posta</Text>
-              <TextInput
-                style={styles.input}
-                value={email}
-                onChangeText={setEmail}
-                placeholder="ornek@email.com"
-                placeholderTextColor="#999"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={handleSubmit}
-              />
+            <View style={styles.card}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>E-posta</Text>
+                <TextInput
+                  style={styles.input}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="ornek@email.com"
+                  placeholderTextColor={colors.textFaint}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  onSubmitEditing={handleSubmit}
+                  accessibilityLabel="E-posta"
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.submitButton, (!email.trim() || loading) && styles.buttonDisabled]}
+                onPress={handleSubmit}
+                disabled={!email.trim() || loading}
+                accessibilityRole="button"
+              >
+                {loading ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <>
+                    <Text style={styles.submitButtonText}>Bağlantı Gönder</Text>
+                    <Ionicons name="arrow-forward" size={18} color="#ffffff" />
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={[styles.submitButton, (!email.trim() || loading) && styles.buttonDisabled]}
-              onPress={handleSubmit}
-              disabled={!email.trim() || loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <Text style={styles.submitButtonText}>Bağlantı Gönder</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.backLink} onPress={() => router.back()}>
-              <Text style={styles.backLinkText}>← Giriş sayfasına dön</Text>
+            <TouchableOpacity style={styles.backLink} onPress={() => router.back()} accessibilityRole="button">
+              <Ionicons name="arrow-back" size={16} color={colors.ink} />
+              <Text style={styles.backLinkText}>Giriş sayfasına dön</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.card}>
-            <View style={styles.successIcon}>
-              <Text style={styles.successIconText}>✅</Text>
-            </View>
-            <Text style={styles.title}>E-posta Gönderildi!</Text>
+          <View>
+            <View style={[styles.badge, styles.badgeSuccess]}><Ionicons name="mail-open-outline" size={22} color={colors.success} /></View>
+            <Text style={[styles.kicker, { color: colors.success }]}>E-posta Gönderildi!</Text>
+            <AccentText style={styles.title}>{'Gelen kutuna *bak.*'}</AccentText>
             <Text style={styles.description}>
-              {email} adresine bir sıfırlama bağlantısı gönderdik. Gelen kutunuzu kontrol edin.
+              <Text style={styles.emailText}>{email}</Text> adresine bir sıfırlama bağlantısı gönderdik. Gelen kutunuzu kontrol edin.
             </Text>
 
             <TouchableOpacity
               style={styles.returnButton}
               onPress={() => router.replace('/login')}
+              accessibilityRole="button"
             >
               <Text style={styles.returnButtonText}>Giriş Sayfasına Dön</Text>
             </TouchableOpacity>
@@ -110,100 +119,38 @@ export default function ForgotPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
+  container: { flex: 1, backgroundColor: colors.canvas },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 32 },
+  badge: {
+    width: 52, height: 52, borderRadius: 26, backgroundColor: colors.brandSoft,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 18,
   },
-  scrollContent: {
-    flexGrow: 1,
-    padding: 24,
-    justifyContent: 'center',
-  },
-  logo: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  logoText: {
-    fontSize: 40,
-    fontWeight: '900',
-    color: '#e74c3c',
-    letterSpacing: -1,
-  },
+  badgeSuccess: { backgroundColor: colors.successSoft },
+  kicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', color: colors.brand },
+  title: { fontFamily: fonts.headingBold, fontSize: 34, lineHeight: 39, letterSpacing: -1.1, color: colors.ink, marginTop: 10 },
+  description: { fontFamily: fonts.body, fontSize: 16, lineHeight: 23, color: colors.textMuted, marginTop: 10 },
+  emailText: { fontFamily: fonts.bodySemi, color: colors.ink },
   card: {
-    gap: 16,
+    marginTop: 24, padding: 18, gap: 16, borderRadius: radius.xl, backgroundColor: colors.surface,
+    borderWidth: 1, borderColor: colors.line, ...shadow.card,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#1a1a1a',
-    textAlign: 'center',
-  },
-  description: {
-    fontSize: 14,
-    color: '#666666',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  inputGroup: {
-    gap: 6,
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#666666',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
+  inputGroup: { gap: 7 },
+  inputLabel: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.text },
   input: {
-    borderWidth: 1.5,
-    borderColor: '#e5e5e5',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: '#1a1a1a',
-    backgroundColor: '#f9f9f9',
+    height: 52, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: 16,
+    fontFamily: fonts.body, fontSize: 15, color: colors.ink, backgroundColor: colors.canvas,
   },
   submitButton: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 4,
+    height: 54, borderRadius: radius.pill, backgroundColor: colors.brand,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  backLink: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  backLinkText: {
-    fontSize: 14,
-    color: '#666666',
-  },
-  successIcon: {
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  successIconText: {
-    fontSize: 64,
-  },
+  buttonDisabled: { opacity: 0.5 },
+  submitButtonText: { fontFamily: fonts.bodySemi, color: '#ffffff', fontSize: 16 },
+  backLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 18 },
+  backLinkText: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.ink },
   returnButton: {
-    backgroundColor: '#db4c3f',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 4,
+    height: 54, borderRadius: radius.pill, backgroundColor: colors.ink, marginTop: 26,
+    alignItems: 'center', justifyContent: 'center',
   },
-  returnButtonText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
+  returnButtonText: { fontFamily: fonts.bodySemi, color: '#ffffff', fontSize: 16 },
 });
