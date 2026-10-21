@@ -70,33 +70,10 @@ export default function RootLayout() {
             headerTintColor: '#e74c3c',
           }}
         />
-        <Stack.Screen
-          name="menu/[slug]"
-          options={{
-            headerShown: true,
-            headerTitle: '',
-            headerBackTitle: 'Geri',
-            headerTintColor: '#e74c3c',
-          }}
-        />
-        <Stack.Screen
-          name="blog/index"
-          options={{
-            headerShown: true,
-            headerTitle: 'Blog',
-            headerBackTitle: 'Geri',
-            headerTintColor: '#e74c3c',
-          }}
-        />
-        <Stack.Screen
-          name="blog/[slug]"
-          options={{
-            headerShown: true,
-            headerTitle: '',
-            headerBackTitle: 'Blog',
-            headerTintColor: '#e74c3c',
-          }}
-        />
+        {/* Menus and the blog draw their own editorial headers with safe-area back buttons. */}
+        <Stack.Screen name="menu/[slug]" options={{ headerShown: false }} />
+        <Stack.Screen name="blog/index" options={{ headerShown: false }} />
+        <Stack.Screen name="blog/[slug]" options={{ headerShown: false }} />
         <Stack.Screen
           name="login"
           options={{

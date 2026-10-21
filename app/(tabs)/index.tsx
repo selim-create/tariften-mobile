@@ -134,6 +134,7 @@ export default function HomeScreen() {
   const [cuisines, setCuisines] = useState<{ cover: string | null; count: number }[]>([]);
   const [blog, setBlog] = useState<BlogPost[]>([]);
   const [menus, setMenus] = useState<Menu[]>([]);
+  const [recipeTotal, setRecipeTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
@@ -152,13 +153,16 @@ export default function HomeScreen() {
 
   const load = useCallback(async () => {
     try {
-      const [pop, ed, blogData, menuData, ...cuisineData] = await Promise.all([
+      const [all, pop, ed, blogData, menuData, ...cuisineData] = await Promise.all([
+        getRecipes({}),
         getRecipes({ collection: ['Popüler'] }),
         getRecipes({ collection: ['Editörün Seçimi'] }),
         getBlogPosts({ perPage: 3 }),
         getMenus({ collection: 'vitrin' }),
         ...CUISINES.map(c => getRecipes({ cuisine: [c.param] })),
       ]);
+      const total = Number(all.count);
+      setRecipeTotal(all.source !== 'error' && Number.isFinite(total) && total > 0 ? total : null);
       setPopular((pop.data || []).slice(0, 5));
       setEditors((ed.data || []).slice(0, 4));
       setBlog(blogData.data || []);
@@ -235,6 +239,23 @@ export default function HomeScreen() {
             <View key={icon} style={styles.importIcon}><Ionicons name={icon} size={18} color={colors.ink} /></View>
           ))}
         </View>
+      </Pressable>
+
+      {/* The whole archive, one tap away (the old Tarifler tab). */}
+      <Pressable onPress={() => router.push('/recipes')} style={({ pressed }) => [styles.browse, pressed && { opacity: 0.9 }]}
+        accessibilityRole="link" accessibilityLabel="Tüm tarifleri gör">
+        <View style={styles.browseArt}>
+          {['makarna', 'domates', 'çikolata'].map((icon, i) => (
+            <View key={icon} style={[styles.browseDot, { marginLeft: i ? -10 : 0 }]}><LokmaIngredientIcon name={icon} size={22} /></View>
+          ))}
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.browseTitle}>Tüm tarifler</Text>
+          <Text style={styles.browseLine} numberOfLines={1}>
+            {recipeTotal ? `${recipeTotal.toLocaleString('tr-TR')} tarif · ` : ''}ara ve filtrele
+          </Text>
+        </View>
+        <View style={styles.browseGo}><Ionicons name="arrow-forward" size={17} color="#fff" /></View>
       </Pressable>
 
       {popular.length > 0 && (
@@ -383,6 +404,18 @@ const styles = StyleSheet.create({
   importLine: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: 'rgba(255,255,255,0.7)', marginTop: 6 },
   importIcons: { gap: 6 },
   importIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  browse: {
+    flexDirection: 'row', alignItems: 'center', gap: 14, marginHorizontal: 20, marginTop: 12, padding: 14, paddingRight: 12,
+    borderRadius: radius.xl, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, ...shadow.card,
+  },
+  browseArt: { flexDirection: 'row' },
+  browseDot: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: colors.surface,
+  },
+  browseTitle: { fontFamily: fonts.heading, fontSize: 17, color: colors.ink },
+  browseLine: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted, marginTop: 1 },
+  browseGo: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
   section: { marginTop: 34 },
   heading: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, paddingHorizontal: 20, marginBottom: 16 },
   sectionTitle: { fontFamily: fonts.headingBold, fontSize: 25, lineHeight: 30, letterSpacing: -0.6, color: colors.ink },
