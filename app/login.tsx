@@ -25,6 +25,12 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  // Return to where sign-in was asked for (e.g. a shared link waiting in
+  // Tarif Aktar); open the app's home only when there is nowhere to return.
+  const finish = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -35,7 +41,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login(email.trim(), password);
-      router.replace('/(tabs)');
+      finish();
     } catch (error: unknown) {
       const rawMessage = error instanceof Error ? error.message : '';
       const cleanMessage = rawMessage.replace(/<[^>]*>/g, '').trim();
@@ -70,7 +76,7 @@ export default function LoginScreen() {
           ? `${credential.fullName.givenName || ''} ${credential.fullName.familyName || ''}`.trim()
           : undefined;
         await loginWithApple(credential.identityToken, fullName);
-        router.replace('/(tabs)');
+        finish();
       }
     } catch (error: any) {
       if (error.code !== 'ERR_REQUEST_CANCELED') {

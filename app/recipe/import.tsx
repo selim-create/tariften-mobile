@@ -3,7 +3,7 @@ import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
   Switch, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { randomUUID } from 'expo-crypto';
@@ -16,14 +16,32 @@ import {
   buildApprovedRecipe, editorFromPreview, importReviewNotes, publishValidation,
   validateRecipeSource,
 } from '../../lib/recipe-import';
-import { previewRecipeSocial, previewRecipeText, startVideoRecipeJob, getVideoRecipeJob } from '../../lib/recipe-import-api';
-import { isInstagramReelLink, isVideoRecipeLink, videoEditorFromJob } from '../../lib/video-recipe-import';
+import {
+  previewRecipeSocial, previewRecipeText, resolveVideoSource, startVideoRecipeJob, getVideoRecipeJob, VideoAlreadyPublished,
+} from '../../lib/recipe-import-api';
+import {
+  isInstagramReelLink, isTikTokShortLink, isVideoRecipeLink, needsRightsConfirmation, videoEditorFromJob,
+} from '../../lib/video-recipe-import';
+import { canonicalShareLink, expandShortLink } from '../../lib/share-link';
 import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
+import { AccentText } from '../../components/ui/ScreenTitle';
+import { colors, fonts, radius, shadow } from '../../constants/theme';
 
 type Busy = 'preview' | 'publish' | null;
 type Stage = 'source' | 'review';
-const BG = '#fffbf7';
-const BRAND = '#db4c3f';
+const BG = colors.canvas;
+const BRAND = colors.brand;
+
+/** Which platform a pasted or shared link belongs to (label only). */
+function linkPlatform(link: string): { name: string; icon: React.ComponentProps<typeof Ionicons>['name'] } | null {
+  const value = link.trim();
+  if (!value) return null;
+  if (isInstagramReelLink(value) || /^https:\/\/(www\.)?instagram\.com\/p\//i.test(value)) return { name: 'Instagram videosu', icon: 'logo-instagram' };
+  if (/^https:\/\/(www\.|m\.|vm\.|vt\.)?tiktok\.com\//i.test(value)) return { name: 'TikTok videosu', icon: 'logo-tiktok' };
+  if (/^https:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\//i.test(value)) return { name: 'YouTube videosu', icon: 'logo-youtube' };
+  if (/^https:\/\/\S+\.\S+/i.test(value)) return { name: 'Tarif sayfası', icon: 'globe-outline' };
+  return null;
+}
 
 function EditorLabel({ children }: { children: string }) {
   return <Text style={styles.fieldLabel}>{children}</Text>;
@@ -37,21 +55,25 @@ function SmallField({ value, onChangeText, placeholder, multiline = false, keybo
 }) {
   return <TextInput
     value={value} onChangeText={onChangeText} placeholder={placeholder}
-    placeholderTextColor="#a79a91" multiline={multiline}
+    placeholderTextColor={colors.textFaint} multiline={multiline}
     keyboardType={keyboardType || 'default'}
     textAlignVertical={multiline ? 'top' : 'center'}
     style={[styles.input, multiline && styles.multiInput]}
   />;
 }
 
-export default function RecipeTextImportScreen({ initialMethod = 'text' }: { initialMethod?: 'social' | 'text' } = {}) {
+export default function RecipeTextImportScreen({ initialMethod = 'text', initialUrl }: { initialMethod?: 'social' | 'text'; initialUrl?: string } = {}) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
   const quotas = useQuotas(token);
-  const [source, setSource] = useState('');
-  const [importMethod, setImportMethod] = useState<'social' | 'text'>(initialMethod);
-  const [socialUrl, setSocialUrl] = useState('');
+  // A link or recipe text can arrive from "Paylaş → Tariften" (/share) or a deep link.
+  const params = useLocalSearchParams<{ url?: string; text?: string }>();
+  const sharedText = typeof params.text === 'string' ? params.text.slice(0, 20000) : '';
+  const sharedUrl = (initialUrl || (typeof params.url === 'string' ? params.url : '')).trim().slice(0, 2048);
+  const [source, setSource] = useState(sharedText);
+  const [importMethod, setImportMethod] = useState<'social' | 'text'>(sharedText && !sharedUrl ? 'text' : initialMethod);
+  const [socialUrl, setSocialUrl] = useState(sharedUrl);
   const [instagramRightsConfirmed, setInstagramRightsConfirmed] = useState(true);
   const [stage, setStage] = useState<Stage>('source');
   const scrollRef = useRef<ScrollView>(null);
@@ -196,7 +218,20 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      let job = await startVideoRecipeJob(token, url, requestId, controller.signal, instagramRightsConfirmed);
+      // Free look-up first: an already published recipe opens, the user's own
+      // earlier job resumes, and a paid analysis starts only when Core allows.
+      const state = await resolveVideoSource(token, url, controller.signal);
+      if (state.status === 'published') { router.push(`/recipe/${encodeURIComponent(state.slug)}`); return; }
+      if (state.status === 'pending') throw new Error('Bu video için yayın işlemi sürüyor. Biraz sonra tekrar bak.');
+      if (state.status === 'unsupported') throw new Error('Bu paylaşımın videosuna erişilemiyor. Fotoğraflar video olarak işlenmez.');
+      const existing = state.status === 'existing' ? state.job : null;
+      const retry = !!existing && existing.status === 'failed' && existing.retryable === true;
+      if (!existing && !(state.status === 'new' && state.canStart)) {
+        throw new Error('Şu anda yeni video analizi başlatılamıyor. Biraz sonra tekrar dene.');
+      }
+      let job = existing && !retry
+        ? existing
+        : await startVideoRecipeJob(token, url, requestId, controller.signal, instagramRightsConfirmed);
       for (let n = 0; n < 100 && !controller.signal.aborted; n++) {
         setVideoStatus(job.status);
         if (job.status === 'needs_review') {
@@ -226,6 +261,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
         setError('Video hâlâ işleniyor olabilir. Aynı bağlantıyla tekrar kontrol edebilirsin; yeni ücretli işlem oluşturulmaz.');
       }
     } catch (cause) {
+      if (cause instanceof VideoAlreadyPublished) { router.push(`/recipe/${encodeURIComponent(cause.slug)}`); return; }
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Video analiz durumu alınamadı.');
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
@@ -238,10 +274,26 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
   const requestSocialPreview = async () => {
     if (!token) { router.push('/login'); return; }
     if (requestLock.current) return;
-    const link = socialUrl.trim();
+    let link = socialUrl.trim();
+    if (isTikTokShortLink(link)) {
+      // vm./vt.tiktok.com: open the short link on the device to learn the video's address.
+      setBusy('preview');
+      setError('');
+      try {
+        link = await expandShortLink(link);
+        setSocialUrl(link);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'TikTok bağlantısı açılamadı.');
+        return;
+      } finally {
+        setBusy(null);
+      }
+    }
+    const canonical = canonicalShareLink(link);
+    if (canonical && isVideoRecipeLink(canonical)) link = canonical;
     if (isVideoRecipeLink(link)) {
-      if (isInstagramReelLink(link) && !instagramRightsConfirmed) {
-        setError('Instagram videosunu analiz etmek için gerekli kullanım iznine sahip olduğunu onayla.');
+      if (needsRightsConfirmation(link) && !instagramRightsConfirmed) {
+        setError('Bu videoyu analiz etmek için gerekli kullanım iznine sahip olduğunu onayla.');
         return;
       }
       await requestVideoPreview(link); return;
@@ -357,7 +409,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
             {[ingredient.amount, ingredient.unit].filter(Boolean).join(' ') || 'Miktar belirtilmemiş'}
           </Text>
         </View>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={17} color="#a39589" />
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={17} color={colors.textFaint} />
       </TouchableOpacity>
       {open && <View style={styles.itemEdit}>
         <EditorLabel>Malzemenin adı</EditorLabel>
@@ -394,7 +446,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
           <Text style={styles.stepContent} numberOfLines={open ? undefined : 3}>{step.content || 'Yeni hazırlanış adımı'}</Text>
           <Text style={styles.itemNote}>{videoReview ? 'Videodan önerildi · kontrol et' : step.editorial_rewrite ? 'Editoryal öneri · kontrol et' : 'Kaynakla karşılaştırıldı'}</Text>
         </View>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={17} color="#a39589" />
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={17} color={colors.textFaint} />
       </TouchableOpacity>
       {open && <View style={styles.itemEdit}>
         <EditorLabel>Hazırlanış adımı</EditorLabel>
@@ -410,6 +462,8 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
   };
 
   const notes = preview ? importReviewNotes(preview.warnings, preview.needs_confirmation) : videoWarnings;
+  const detected = linkPlatform(socialUrl);
+  const askRights = needsRightsConfirmation(socialUrl) || isTikTokShortLink(socialUrl);
   return <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     {usageNotice ? <View style={styles.usageToast} accessibilityRole="alert">
       <Ionicons name="checkmark-circle" size={16} color="#ffffff" />
@@ -419,51 +473,67 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
       contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       {stage === 'source' ? <>
         <View style={styles.hero}>
-          <Text style={styles.kicker}>TARİFTEN MUTFAK STÜDYOSU</Text>
-          <Text style={styles.heading}>Tarif Aktar</Text>
-          <Text style={styles.subtitle}>Bağlantı veya tarif notlarını ekle; son kararı sen ver.</Text>
+          <Text style={styles.kicker}>{importMethod === 'social' ? 'Reels · TikTok · Shorts' : 'Mutfak notların'}</Text>
+          <AccentText style={styles.heading}>{importMethod === 'social' ? 'Videoyu *tarife* çevir.' : 'Notlarını *tarife* çevir.'}</AccentText>
+          <Text style={styles.subtitle}>
+            {importMethod === 'social'
+              ? 'Bağlantıyı yapıştır ya da videoda Paylaş → Tariften\'e Aktar\'a dokun. Malzemeler ve adımlar hazırlanır; son kararı sen verirsin.'
+              : 'Elinin alıştığı ölçüler, aileden kalan küçük sırlar… Yaz, düzenleyelim; son kararı sen ver.'}
+          </Text>
           <View style={styles.stageRow}>
-            <Text style={styles.stageActive}>1 · Notların</Text>
-            <Ionicons name="arrow-forward" size={15} color="#ad9c8f" />
+            <Text style={styles.stageActive}>1 · {importMethod === 'social' ? 'Bağlantın' : 'Notların'}</Text>
+            <Ionicons name="arrow-forward" size={14} color={colors.textFaint} />
             <Text style={styles.stageInactive}>2 · Tarifini kontrol et</Text>
           </View>
         </View>
+
+        <View style={styles.socialTabs} accessibilityRole="tablist">
+          <TouchableOpacity accessibilityRole="tab" accessibilityState={{ selected: importMethod === 'social' }}
+            disabled={!!busy} onPress={() => { setImportMethod('social'); setError(''); }}
+            style={[styles.socialTab, importMethod === 'social' && styles.socialTabActive]}>
+            <Ionicons name="link-outline" size={16} color={importMethod === 'social' ? '#fff' : colors.text} />
+            <Text style={[styles.socialTabText, importMethod === 'social' && styles.socialTabTextActive]}>Bağlantıyla</Text>
+          </TouchableOpacity>
+          <TouchableOpacity accessibilityRole="tab" accessibilityState={{ selected: importMethod === 'text' }}
+            disabled={!!busy} onPress={() => { setImportMethod('text'); setError(''); }}
+            style={[styles.socialTab, importMethod === 'text' && styles.socialTabActive]}>
+            <Ionicons name="document-text-outline" size={16} color={importMethod === 'text' ? '#fff' : colors.text} />
+            <Text style={[styles.socialTabText, importMethod === 'text' && styles.socialTabTextActive]}>Tarif metni</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.card}>
-          <Text style={styles.cardHeading}>{importMethod === 'social' ? 'Sosyal medya paylaşımı' : 'Senin mutfak notların'}</Text>
-          <Text style={styles.subtitle}>{importMethod === 'social' ? 'Reels, TikTok, Shorts ve gönderi bağlantısı.' : 'Elinin alıştığı ölçüler, aileden kalan küçük sırlar...'}</Text>
-          <View style={styles.socialTabs} accessibilityRole="tablist">
-            <TouchableOpacity accessibilityRole="tab" accessibilityState={{ selected: importMethod === 'social' }}
-              disabled={!!busy} onPress={() => { setImportMethod('social'); setError(''); }}
-              style={[styles.socialTab, importMethod === 'social' && styles.socialTabActive]}>
-              <Ionicons name="link-outline" size={15} color={BRAND} />
-              <Text style={styles.socialTabText}>Bağlantıyla</Text>
-            </TouchableOpacity>
-            <TouchableOpacity accessibilityRole="tab" accessibilityState={{ selected: importMethod === 'text' }}
-              disabled={!!busy} onPress={() => { setImportMethod('text'); setError(''); }}
-              style={[styles.socialTab, importMethod === 'text' && styles.socialTabActive]}>
-              <Ionicons name="document-text-outline" size={15} color={BRAND} />
-              <Text style={styles.socialTabText}>Tarif metni</Text>
-            </TouchableOpacity>
-          </View>
           {importMethod === 'text' ? <>
           <EditorLabel>TARİFİNİ ANLAT</EditorLabel>
           <TextInput value={source} onChangeText={updateSource}
             placeholder="Örneğin: Önce soğanı rendele, üzerine domatesi ekle..."
-            placeholderTextColor="#a59b95" multiline textAlignVertical="top" editable={!busy}
+            placeholderTextColor={colors.textFaint} multiline textAlignVertical="top" editable={!busy}
             style={styles.sourceInput} maxLength={20000} />
           <Text style={styles.small}>Notların yalnızca sen istersen yapay zekâyla düzenlenir. {source.length} karakter</Text>
           <Text style={styles.small}>Yalnızca sen başlattığında düzenlenir. Görsel oluşturulmaz.</Text>
           </> : <>
+            <View style={styles.platformRow}>
+              {(['logo-instagram', 'logo-tiktok', 'logo-youtube'] as const).map(icon => (
+                <View key={icon} style={styles.platformDot}><Ionicons name={icon} size={17} color={colors.ink} /></View>
+              ))}
+              <Text style={styles.platformLine}>Instagram, TikTok, YouTube ve tarif siteleri</Text>
+            </View>
             <EditorLabel>PAYLAŞIM BAĞLANTISI</EditorLabel>
             <TextInput value={socialUrl}
               onChangeText={url => { abortRef.current?.abort(); videoRequestRef.current = null; setInstagramRightsConfirmed(true); setSocialUrl(url); setPreview(null); setVideoReview(false); setVideoWarnings([]); setVideoStatus(''); setEditor(null); setError(''); }}
               placeholder="https://www.instagram.com/reel/…"
-              placeholderTextColor="#a59b95" autoCapitalize="none" autoCorrect={false}
-              keyboardType="url" editable={!busy} maxLength={2048} style={styles.input} />
+              placeholderTextColor={colors.textFaint} autoCapitalize="none" autoCorrect={false}
+              keyboardType="url" editable={!busy} maxLength={2048} style={[styles.input, styles.linkInput]} />
+            {detected ? (
+              <View style={styles.detected}>
+                <Ionicons name={detected.icon} size={14} color={colors.success} />
+                <Text style={styles.detectedText}>{detected.name}</Text>
+              </View>
+            ) : null}
             <Text style={styles.socialHelp}>
-              Instagram Reels veya YouTube videosunda özellik etkinse görüntü ve ses incelenir. Diğer desteklenen paylaşımlarda erişilebilen açıklama kullanılır.
+              Instagram Reels, TikTok ve YouTube videolarında görüntü ve ses incelenir. Diğer bağlantılarda sayfadaki tarif metni kullanılır.
             </Text>
-            {isInstagramReelLink(socialUrl) ? (
+            {askRights ? (
                <TouchableOpacity onPress={() => setInstagramRightsConfirmed(value => !value)}
                  disabled={!!busy} accessibilityRole="checkbox"
                  accessibilityState={{ checked: instagramRightsConfirmed }}
@@ -474,7 +544,12 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
                  </Text>
                </TouchableOpacity>
              ) : null}
-             {videoStatus && !videoReview ? <Text style={styles.socialHelp} accessibilityRole="text">{busy === 'preview' ? (videoStatus === 'queued' ? 'Video analiz sırasına alındı…' : 'Video inceleniyor…') : 'Analiz durumunu aynı bağlantıyla yeniden kontrol edebilirsin.'}</Text> : null}
+             {videoStatus && !videoReview ? (
+               <View style={styles.statusRow}>
+                 {busy === 'preview' ? <ActivityIndicator size="small" color={BRAND} /> : <Ionicons name="time-outline" size={16} color={colors.textMuted} />}
+                 <Text style={styles.statusText} accessibilityRole="text">{busy === 'preview' ? (videoStatus === 'queued' ? 'Video analiz sırasına alındı…' : 'Video inceleniyor… Genellikle 1–2 dakika sürer.') : 'Analiz durumunu aynı bağlantıyla yeniden kontrol edebilirsin.'}</Text>
+               </View>
+             ) : null}
             {preview?.provenance.origin_type === 'social_creator_description' ? (
               <View style={styles.socialSourceBox}>
                 <Text style={styles.socialSourceTitle}>Kaynak açıklaması</Text>
@@ -482,18 +557,33 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
               </View>
             ) : null}
           </>}
-
         </View>
+
+        {importMethod === 'social' ? (
+          <View style={styles.howTo}>
+            <Text style={styles.howTitle}>Nasıl çalışır?</Text>
+            {[
+              { icon: 'share-outline' as const, text: 'Videoda Paylaş\'a dokun, Tariften\'e Aktar\'ı seç ya da bağlantıyı buraya yapıştır.' },
+              { icon: 'sparkles-outline' as const, text: 'Video izlenir; malzemeler, ölçüler ve adımlar çıkarılır.' },
+              { icon: 'create-outline' as const, text: 'Taslağı kontrol eder, istersen düzenler, sonra yayımlarsın.' },
+            ].map((step, i) => (
+              <View key={step.icon} style={styles.howRow}>
+                <View style={styles.howNumber}><Text style={styles.howNumberText}>{i + 1}</Text></View>
+                <Text style={styles.howText}>{step.text}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </> : editor && (preview || videoReview) ? <>
         <View style={styles.reviewHero}>
-          <View style={styles.reviewStep}><Ionicons name="checkmark" size={15} color="#25845e" />
+          <View style={styles.reviewStep}><Ionicons name="checkmark-circle" size={16} color={colors.success} />
             <Text style={styles.reviewStepText}>NOTLARIN DÜZENLENDİ</Text></View>
-          <Text style={styles.heading}>Şimdi birlikte gözden geçirelim.</Text>
+          <AccentText style={styles.heading}>{'Şimdi birlikte *gözden geçirelim.*'}</AccentText>
           <View style={styles.reviewOverview}>
-            <View style={styles.reviewOverviewItem}><Ionicons name="basket-outline" size={16} color="#b36d59" />
+            <View style={styles.reviewOverviewItem}><Ionicons name="basket-outline" size={16} color={BRAND} />
               <Text style={styles.reviewOverviewText}>{editor.ingredients.length} malzeme</Text>
             </View>
-            <View style={styles.reviewOverviewItem}><Ionicons name="list-outline" size={16} color="#b36d59" />
+            <View style={styles.reviewOverviewItem}><Ionicons name="list-outline" size={16} color={BRAND} />
               <Text style={styles.reviewOverviewText}>{editor.steps.length} adım</Text>
             </View>
           </View>
@@ -528,7 +618,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
             </View>
             <Text style={styles.small}>Farklı bir kişi sayısı:</Text>
             <TextInput ref={servingsRef} value={editor.servings} keyboardType="number-pad"
-              placeholder="1–36 arası" placeholderTextColor="#a79a91"
+              placeholder="1–36 arası" placeholderTextColor={colors.textFaint}
               onChangeText={text => updateEditor(old => ({ ...old, servings: text }))}
               style={[styles.input, fieldError === 'servings' && styles.invalidInput]}
               accessibilityLabel="Tarifin kaç kişilik olduğu" />
@@ -556,9 +646,9 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
           {notes.length > 0 && <View style={styles.notice}>
             <TouchableOpacity style={styles.noticeToggle} accessibilityRole="button"
               accessibilityState={{ expanded: reviewNotesOpen }} onPress={() => setReviewNotesOpen(v => !v)}>
-              <Ionicons name="information-circle-outline" size={18} color="#966335" />
+              <Ionicons name="information-circle-outline" size={18} color={colors.warning} />
               <Text style={styles.noticeTitle}>Tarifinde kontrol etmeni önerdiğimiz {notes.length} konu</Text>
-              <Ionicons name={reviewNotesOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#966335" />
+              <Ionicons name={reviewNotesOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.warning} />
             </TouchableOpacity>
             {reviewNotesOpen && notes.map(note => <Text key={note} style={styles.noticeText}>• {note}</Text>)}
           </View>}
@@ -574,7 +664,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
                 name: '', amount: '', unit: '', original_span: '', source_verified: false, userEdited: true,
               }] }));
               setOpenIngredient(editor.ingredients.length);
-            }}><Text style={styles.add}>+ Ekle</Text></TouchableOpacity>
+            }} style={styles.addButton}><Ionicons name="add" size={16} color={BRAND} /><Text style={styles.add}>Ekle</Text></TouchableOpacity>
           </View>
           {editor.ingredients.map(renderIngredient)}
 
@@ -589,13 +679,13 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
                 content: '', original_span: '', source_verified: false, userEdited: true,
               }] }));
               setOpenStep(editor.steps.length);
-            }}><Text style={styles.add}>+ Ekle</Text></TouchableOpacity>
+            }} style={styles.addButton}><Ionicons name="add" size={16} color={BRAND} /><Text style={styles.add}>Ekle</Text></TouchableOpacity>
           </View>
           {editor.steps.map(renderStep)}
 
           <TouchableOpacity style={styles.seoRow} onPress={() => setSeoOpen(v => !v)} accessibilityRole="button">
             <Text style={styles.seoTitle}>Tarifin daha kolay bulunsun</Text>
-            <Ionicons name={seoOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#93796e" />
+            <Ionicons name={seoOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
           </TouchableOpacity>
           {seoOpen && <View style={styles.seoFields}>
             <EditorLabel>SEO BAŞLIĞI</EditorLabel>
@@ -609,7 +699,6 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
           <View style={styles.publishCard}>
             <Text style={styles.sectionTitle}>Yayımlamaya hazır mısın?</Text>
             <Text style={styles.small}>Tarifin yalnızca sen onaylarsan herkese açık yayımlanır.</Text>
-
           </View>
         </View>
       </> : null}
@@ -618,7 +707,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
     <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
       {error ? <Text accessibilityRole="alert" style={styles.footerError}>{error}</Text> : null}
       {busy === 'publish' && publishSlow ? <View style={styles.footerProgress}>
-        <Ionicons name="cloud-upload-outline" size={15} color="#946a47" />
+        <Ionicons name="cloud-upload-outline" size={15} color={colors.textMuted} />
         <Text style={styles.footerProgressText}>Sunucu yanıtını bekliyoruz. Tarifini yeniden göndermiyoruz.</Text>
       </View> : null}
       {stage === 'review' && editor && (preview || videoReview) ? <>
@@ -626,14 +715,14 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
           accessibilityRole="button" onPress={() => {
             scrollToSection('servings'); setTimeout(() => servingsRef.current?.focus(), 260);
           }}>
-          <Ionicons name="alert-circle-outline" size={16} color="#b76b32" />
+          <Ionicons name="alert-circle-outline" size={16} color={colors.warning} />
           <Text style={styles.footerRequiredText}>Yayımlamak için kaç kişilik olduğunu seç</Text>
-          <Ionicons name="arrow-up" size={14} color="#b76b32" />
+          <Ionicons name="arrow-up" size={14} color={colors.warning} />
         </TouchableOpacity>}
         <View style={styles.footerConsentRow}>
           <Switch value={accepted} onValueChange={setAccepted}
-            trackColor={{ true: '#8ccaae', false: '#e4dad3' }}
-            thumbColor={accepted ? '#347d58' : '#fff'}
+            trackColor={{ true: '#9fd3b8', false: colors.lineStrong }}
+            thumbColor={accepted ? colors.success : '#fff'}
             accessibilityLabel="Herkese açık yayımlama onayı" />
           <Text style={styles.footerConsentText}>Tarifimi kontrol ettim. Herkese açık yayımlamayı onaylıyorum.</Text>
         </View>
@@ -658,7 +747,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
         accessibilityRole="button" accessibilityLabel={publishUnknown ? 'Tariflerim bölümünde kontrol et' : stage === 'source' ? (importMethod === 'social' ? 'Bağlantıdan tarif oluştur' : 'Tarifimi güzelleştir') : 'Onayla ve yayımla'}>
         {busy ? <ActivityIndicator color="#fff" />
           : <Ionicons name={publishUnknown ? 'search-outline' : stage === 'source' ? 'sparkles' : 'checkmark-circle-outline'} size={19} color="#fff" />}
-        <Text style={styles.mainButtonText}>{busy === 'preview' ? (importMethod === 'social' && isVideoRecipeLink(socialUrl) ? 'Videon inceleniyor…' : 'Tarifini düzenliyoruz…')
+        <Text style={styles.mainButtonText}>{busy === 'preview' ? (importMethod === 'social' && (isVideoRecipeLink(socialUrl) || isTikTokShortLink(socialUrl)) ? 'Videon inceleniyor…' : 'Tarifini düzenliyoruz…')
           : busy === 'publish' ? 'Tarifin yayımlanıyor…'
             : publishUnknown ? 'Tariflerimde kontrol et'
             : stage === 'source'
@@ -671,108 +760,130 @@ export default function RecipeTextImportScreen({ initialMethod = 'text' }: { ini
 }
 
 const styles = StyleSheet.create({
-  footerProgress: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 6 },
-  footerProgressText: { flex: 1, fontSize: 11, lineHeight: 17, color: '#8d7057' },
-  reviewHero: { borderRadius: 24, borderWidth: 1, borderColor: '#eaded5', backgroundColor: '#fff', padding: 18, gap: 8 },
-  reviewOverview: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 4 },
-  reviewOverviewItem: { flexDirection: 'row', gap: 6, alignItems: 'center', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: '#fff6f1' },
-  reviewOverviewText: { color: '#9a6252', fontSize: 11, fontWeight: '800' },
+  root: { flex: 1, backgroundColor: BG },
+  scroll: { paddingHorizontal: 20, paddingTop: 8, gap: 16, paddingBottom: 36 },
+
+  hero: { paddingTop: 4, paddingBottom: 2 },
+  kicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', color: BRAND },
+  heading: { fontFamily: fonts.headingBold, fontSize: 31, lineHeight: 37, letterSpacing: -0.9, color: colors.ink, marginTop: 8 },
+  subtitle: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22, color: colors.textMuted, marginTop: 8 },
+  stageRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16, flexWrap: 'wrap' },
+  stageActive: { fontFamily: fonts.bodySemi, color: BRAND, backgroundColor: colors.brandSoft, paddingVertical: 7, paddingHorizontal: 12, borderRadius: radius.pill, fontSize: 12, overflow: 'hidden' },
+  stageInactive: { fontFamily: fonts.bodyMedium, color: colors.textFaint, fontSize: 12 },
+
+  socialTabs: { flexDirection: 'row', padding: 5, gap: 6, backgroundColor: colors.cream, borderRadius: radius.pill },
+  socialTab: { flex: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, borderRadius: radius.pill, minHeight: 44, paddingHorizontal: 8 },
+  socialTabActive: { backgroundColor: colors.ink },
+  socialTabText: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.text },
+  socialTabTextActive: { color: '#fff' },
+
+  card: { borderRadius: radius.xl, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: 18, gap: 10, ...shadow.card },
+  cardHeading: { fontFamily: fonts.headingBold, color: colors.ink, fontSize: 20, letterSpacing: -0.3 },
+  fieldLabel: { fontFamily: fonts.bodySemi, color: colors.textMuted, fontSize: 10, letterSpacing: 1.4, marginTop: 6 },
+  input: {
+    borderColor: colors.line, borderWidth: 1, borderRadius: radius.md, minHeight: 50, paddingHorizontal: 14,
+    color: colors.ink, backgroundColor: colors.canvas, fontFamily: fonts.body, fontSize: 15,
+  },
+  linkInput: { minHeight: 56, fontSize: 15 },
+  multiInput: { minHeight: 86, paddingVertical: 12, lineHeight: 22 },
+  sourceInput: {
+    fontFamily: fonts.body, color: colors.ink, fontSize: 15, lineHeight: 24, borderColor: colors.line, backgroundColor: colors.canvas,
+    borderWidth: 1, borderRadius: radius.lg, minHeight: 220, maxHeight: 380, padding: 15,
+  },
+  platformRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  platformDot: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
+  platformLine: { flex: 1, fontFamily: fonts.body, fontSize: 12, color: colors.textMuted, marginLeft: 4 },
+  detected: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 10, height: 28, borderRadius: radius.pill, backgroundColor: colors.successSoft },
+  detectedText: { fontFamily: fonts.bodySemi, fontSize: 12, color: colors.success },
+  socialHelp: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: colors.textMuted },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: radius.md, backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line },
+  statusText: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 13, lineHeight: 18, color: colors.text },
+  socialSourceBox: { borderWidth: 1, borderColor: colors.line, padding: 12, borderRadius: radius.md, backgroundColor: colors.canvas, gap: 5 },
+  socialSourceTitle: { fontFamily: fonts.bodySemi, fontSize: 12, color: colors.success },
+  socialSourceText: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted, lineHeight: 19 },
+
+  howTo: { padding: 18, borderRadius: radius.xl, backgroundColor: '#f8f1ea', gap: 12 },
+  howTitle: { fontFamily: fonts.heading, fontSize: 16, color: colors.ink },
+  howRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  howNumber: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
+  howNumberText: { fontFamily: fonts.bodyBold, fontSize: 12, color: '#fff' },
+  howText: { flex: 1, fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.text, marginTop: 2 },
+
+  reviewHero: { paddingTop: 4, gap: 6 },
+  reviewOverview: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 8 },
+  reviewOverviewItem: { flexDirection: 'row', gap: 6, alignItems: 'center', paddingHorizontal: 12, height: 34, borderRadius: radius.pill, backgroundColor: colors.brandSoft },
+  reviewOverviewText: { fontFamily: fonts.bodySemi, color: colors.ink, fontSize: 13 },
   reviewStep: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  reviewStepText: { fontSize: 10, color: '#25845e', fontWeight: '800', letterSpacing: 1 },
+  reviewStepText: { fontFamily: fonts.bodySemi, fontSize: 11, color: colors.success, letterSpacing: 1.4 },
   backToNotes: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 6, paddingVertical: 9 },
-  backToNotesText: { color: BRAND, fontWeight: '700', fontSize: 12 },
-  reviewHeading: { gap: 5, marginBottom: 5 },
-  reviewHint: { color: '#96897e', fontSize: 11 },
-  servingsHeading: { color: '#1f2f47', fontWeight: '900', fontSize: 17 },
-  servingsDescription: { color: '#887f75', lineHeight: 18, fontSize: 11 },
-  servingsChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginVertical: 8 },
-  servingsChoice: { borderRadius: 12, borderWidth: 1, borderColor: '#e8dbcf', paddingVertical: 9, paddingHorizontal: 11, backgroundColor: '#fff' },
-  servingsChoiceSelected: { borderColor: BRAND, backgroundColor: '#fff0eb' },
-  servingsChoiceText: { color: '#665c52', fontSize: 12, fontWeight: '700' },
-  servingsChoiceTextSelected: { color: BRAND },
+  backToNotesText: { fontFamily: fonts.bodySemi, color: BRAND, fontSize: 14 },
+  reviewHeading: { gap: 4, marginBottom: 4 },
+  reviewHint: { fontFamily: fonts.body, color: colors.textMuted, fontSize: 12 },
+
+  servingsBox: { borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.canvas, padding: 14, gap: 6, marginVertical: 10 },
+  servingsHeading: { fontFamily: fonts.heading, color: colors.ink, fontSize: 17 },
+  servingsDescription: { fontFamily: fonts.body, color: colors.textMuted, lineHeight: 18, fontSize: 12 },
+  servingsChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 8 },
+  servingsChoice: { borderRadius: radius.pill, borderWidth: 1, borderColor: colors.line, height: 38, justifyContent: 'center', paddingHorizontal: 14, backgroundColor: colors.surface },
+  servingsChoiceSelected: { borderColor: colors.ink, backgroundColor: colors.ink },
+  servingsChoiceText: { fontFamily: fonts.bodySemi, color: colors.text, fontSize: 13 },
+  servingsChoiceTextSelected: { color: '#fff' },
   servingsInvalid: { borderColor: '#dc7753', borderWidth: 2 },
   invalidInput: { borderColor: '#dc7753' },
-  inlineError: { fontSize: 12, color: '#bd4d32', fontWeight: '700', lineHeight: 19 },
-  noticeToggle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  bottomBar: { backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 10, borderTopWidth: 1, borderColor: '#f0e6dd', gap: 8 },
-  footerConsentRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  footerConsentText: { flex: 1, fontSize: 11, color: '#49536a', lineHeight: 17 },
-  footerRequired: { borderRadius: 11, backgroundColor: '#fff8ea', flexDirection: 'row', gap: 7, alignItems: 'center', paddingVertical: 7, paddingHorizontal: 10 },
-  footerRequiredText: { flex: 1, color: '#a35d31', fontWeight: '700', fontSize: 11 },
-  footerError: { color: '#b54237', fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  inlineError: { fontFamily: fonts.bodySemi, fontSize: 12, color: '#bd4d32', lineHeight: 19 },
 
-  root: { flex: 1, backgroundColor: BG },
-  scroll: { paddingHorizontal: 14, paddingVertical: 14, gap: 12, paddingBottom: 32 },
-  hero: { borderRadius: 26, borderWidth: 1, borderColor: '#eee0d4', backgroundColor: '#fff', padding: 20 },
-  kicker: { color: BRAND, fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
-  heading: { color: '#152039', fontWeight: '900', fontSize: 23, lineHeight: 30, marginTop: 8, marginBottom: 4 },
-  subtitle: { color: '#8f8277', fontSize: 12, lineHeight: 20 },
-  stageRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14, flexWrap: 'wrap' },
-  stageActive: { color: '#bf5140', backgroundColor: '#fff0e9', paddingVertical: 7, paddingHorizontal: 11, borderRadius: 30, fontSize: 11, fontWeight: '800', overflow: 'hidden' },
-  stageInactive: { color: '#b09c90', fontSize: 11, fontWeight: '700' },
-  stageArrow: { color: '#cbb8ad' },
-  card: { borderRadius: 23, borderWidth: 1, borderColor: '#eee1d6', backgroundColor: '#fff', padding: 14, gap: 10 },
-  cardHeading: { color: '#152039', fontSize: 19, fontWeight: '900', letterSpacing: -0.3 },
-  fieldLabel: { color: '#657389', fontSize: 10, fontWeight: '800', letterSpacing: 1, marginTop: 6 },
-  input: { borderColor: '#e9dcd2', borderWidth: 1, borderRadius: 13, minHeight: 48, paddingHorizontal: 14, color: '#273245', backgroundColor: '#fffcfa', fontSize: 14 },
-  multiInput: { minHeight: 82, paddingVertical: 12, lineHeight: 21 },
-  socialTabs: { flexDirection: 'row', padding: 5, gap: 7, backgroundColor: '#fff5f0', borderRadius: 14 },
-  socialTab: { flex: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 5, borderRadius: 11, minHeight: 43, paddingHorizontal: 8 },
-  socialTabActive: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#f1dfd3' },
-  socialTabText: { fontSize: 12, fontWeight: '800', color: '#a85d4a' },
-  socialHelp: { fontSize: 12, lineHeight: 20, color: '#8f8277' },
-  socialSourceBox: { borderWidth: 1, borderColor: '#e9dcd2', padding: 12, borderRadius: 12, backgroundColor: '#fffdfa', gap: 5 },
-  socialSourceTitle: { fontSize: 11, fontWeight: '800', color: '#42745e' },
-  socialSourceText: { fontSize: 11, color: '#6c7380', lineHeight: 19 },
-  sourceInput: { color: '#253246', fontSize: 14, lineHeight: 24, borderColor: '#e9dcd2', backgroundColor: '#fffcfa', borderWidth: 1, borderRadius: 15, minHeight: 210, maxHeight: 360, padding: 15 },
-  quotaRow: { borderColor: '#ebece9', borderWidth: 1, borderRadius: 12, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 12 },
-  quotaLabel: { color: '#5b687a', fontSize: 11, fontWeight: '700' },
-  quotaValue: { color: BRAND, fontSize: 12, fontWeight: '800' },
-  mainButton: { minHeight: 49, borderRadius: 12, backgroundColor: BRAND, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9, paddingHorizontal: 12 },
-  mainButtonText: { color: '#fff', fontWeight: '800', fontSize: 13 },
-  buttonDisabled: { opacity: 0.45 },
-  small: { color: '#8c9aac', fontSize: 11, lineHeight: 18 },
-  center: { textAlign: 'center' },
-  error: { backgroundColor: '#fff1ef', borderColor: '#fecaca', borderWidth: 1, borderRadius: 13, padding: 13 },
-  errorText: { color: '#ab3830', fontSize: 12, lineHeight: 19 },
-  notice: { borderRadius: 14, borderWidth: 1, borderColor: '#f5dca5', backgroundColor: '#fffaf0', padding: 13, gap: 7 },
-  noticeTitle: { color: '#95602c', fontSize: 12, fontWeight: '800' },
-  noticeText: { color: '#9b6536', fontSize: 11, lineHeight: 18 },
-  usageToast: { position: 'absolute', top: 8, left: 18, right: 18, backgroundColor: '#284b3c', borderRadius: 14, padding: 13, zIndex: 20, flexDirection: 'row', gap: 8, alignItems: 'center' },
-  usageText: { color: '#fff', fontSize: 11, fontWeight: '800', flex: 1 },
-  metaBox: { borderRadius: 16, borderWidth: 1, borderColor: '#f1dcc8', backgroundColor: '#fff9f1', padding: 13, gap: 8, marginVertical: 10 },
-  metaHeading: { color: '#ad604b', fontWeight: '900', fontSize: 13 },
-  servingsBox: { borderRadius: 16, borderWidth: 1, borderColor: '#f3dcc2', backgroundColor: '#fffbf4', padding: 13, gap: 6, marginVertical: 10 },
-  sectionRow: { marginTop: 20, marginBottom: 3, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionHeading: { flex: 1, gap: 4 },
-  sectionEyebrow: { color: '#bb6655', fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
-  sectionCount: { fontSize: 12, color: '#a88a7b', fontWeight: '700' },
-  sectionTitle: { color: '#16223a', fontSize: 17, fontWeight: '900', letterSpacing: -0.3 },
-  add: { color: BRAND, fontWeight: '800', fontSize: 12, paddingVertical: 8, paddingHorizontal: 10 },
-  item: { borderColor: '#eee3db', borderRadius: 15, borderWidth: 1, backgroundColor: '#fffcfa', marginVertical: 2, overflow: 'hidden' },
-  itemOpen: { borderColor: '#deb4a6', backgroundColor: '#fffdfb' },
-  itemHeader: { paddingHorizontal: 10, paddingVertical: 13, minHeight: 61, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  metaBox: { borderRadius: radius.lg, borderWidth: 1, borderColor: '#f1dcc8', backgroundColor: '#fff9f1', padding: 14, gap: 8, marginVertical: 10 },
+  metaHeading: { fontFamily: fonts.heading, color: colors.ink, fontSize: 14 },
+  notice: { borderRadius: radius.md, borderWidth: 1, borderColor: '#f5dca5', backgroundColor: colors.warningSoft, padding: 13, gap: 7 },
+  noticeToggle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  noticeTitle: { flex: 1, fontFamily: fonts.bodySemi, color: colors.warning, fontSize: 13 },
+  noticeText: { fontFamily: fonts.body, color: '#8a5a1f', fontSize: 12, lineHeight: 18 },
+
+  sectionRow: { marginTop: 22, marginBottom: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sectionHeading: { flex: 1, gap: 3 },
+  sectionEyebrow: { fontFamily: fonts.bodySemi, color: BRAND, fontSize: 10, letterSpacing: 1.6 },
+  sectionTitle: { fontFamily: fonts.headingBold, color: colors.ink, fontSize: 19, letterSpacing: -0.3 },
+  sectionCount: { fontFamily: fonts.body, fontSize: 14, color: colors.textFaint },
+  addButton: { flexDirection: 'row', alignItems: 'center', gap: 3, height: 36, paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: colors.brandSoft },
+  add: { fontFamily: fonts.bodySemi, color: BRAND, fontSize: 13 },
+
+  item: { borderColor: colors.line, borderRadius: radius.md, borderWidth: 1, backgroundColor: colors.surface, marginVertical: 3, overflow: 'hidden' },
+  itemOpen: { borderColor: '#e7c3b6', backgroundColor: '#fffdfb' },
+  itemHeader: { paddingHorizontal: 12, paddingVertical: 12, minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10 },
   itemContent: { flex: 1, minWidth: 0 },
-  itemTitle: { color: '#283041', fontSize: 13, fontWeight: '900' },
-  amountPill: { maxWidth: 95, paddingVertical: 6, paddingHorizontal: 6, borderRadius: 9, backgroundColor: '#f5f1eb' },
-  amountPillMissing: { backgroundColor: '#fff1df' },
-  itemAmount: { color: '#79675b', fontSize: 10, textAlign: 'right', flexShrink: 1 },
-  itemAmountMissing: { color: '#b27b42', fontWeight: '700' },
-  itemNote: { color: '#5c9e74', fontSize: 10, marginTop: 4, lineHeight: 14 },
-  amber: { color: '#bf7955' },
-  dot: { width: 16, height: 16, borderRadius: 10, backgroundColor: '#ffe8d5', borderWidth: 2, borderColor: '#dfa978' },
-  stepNumber: { width: 27, height: 27, borderRadius: 10, backgroundColor: '#fff0ec', alignItems: 'center', justifyContent: 'center' },
-  stepNumberText: { color: BRAND, fontWeight: '800', fontSize: 11 },
-  stepContent: { color: '#31415b', fontSize: 12, lineHeight: 20 },
-  itemEdit: { paddingHorizontal: 12, paddingBottom: 14, paddingTop: 8, borderTopColor: '#f1e6dd', borderTopWidth: 1, gap: 7 },
+  itemTitle: { fontFamily: fonts.bodySemi, color: colors.ink, fontSize: 14 },
+  amountPill: { maxWidth: 100, paddingVertical: 6, paddingHorizontal: 8, borderRadius: radius.sm, backgroundColor: colors.cream },
+  amountPillMissing: { backgroundColor: colors.warningSoft },
+  itemAmount: { fontFamily: fonts.bodyMedium, color: colors.text, fontSize: 11, textAlign: 'right', flexShrink: 1 },
+  itemAmountMissing: { color: colors.warning },
+  itemNote: { fontFamily: fonts.body, color: colors.success, fontSize: 11, marginTop: 3, lineHeight: 15 },
+  amber: { color: colors.warning },
+  stepNumber: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
+  stepNumberText: { fontFamily: fonts.bodyBold, color: '#fff', fontSize: 12 },
+  stepContent: { fontFamily: fonts.body, color: colors.text, fontSize: 14, lineHeight: 21 },
+  itemEdit: { paddingHorizontal: 12, paddingBottom: 14, paddingTop: 8, borderTopColor: colors.line, borderTopWidth: 1, gap: 7 },
   inputRow: { flexDirection: 'row', gap: 10 },
   inputHalf: { flex: 1, gap: 6 },
-  evidence: { color: '#8e7765', fontSize: 11, lineHeight: 18, backgroundColor: '#fff8f0', padding: 10, borderRadius: 10 },
-  remove: { color: '#c0564b', fontSize: 11, fontWeight: '700', marginVertical: 5 },
-  seoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 14, padding: 12, borderColor: '#eee0d6', borderWidth: 1, marginTop: 15 },
-  seoTitle: { color: '#334155', fontSize: 13, fontWeight: '800' },
+  evidence: { fontFamily: fonts.body, color: colors.textMuted, fontSize: 12, lineHeight: 18, backgroundColor: colors.cream, padding: 10, borderRadius: radius.sm },
+  remove: { fontFamily: fonts.bodySemi, color: '#c0564b', fontSize: 12, marginVertical: 5 },
+  seoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: radius.md, padding: 14, borderColor: colors.line, borderWidth: 1, marginTop: 16 },
+  seoTitle: { fontFamily: fonts.bodySemi, color: colors.text, fontSize: 14 },
   seoFields: { gap: 7 },
-  publishCard: { backgroundColor: '#f7f9f8', borderColor: '#e1e9e6', borderWidth: 1, borderRadius: 15, padding: 13, gap: 12, marginTop: 16 },
-  consentRow: { flexDirection: 'row', gap: 8, alignItems: 'center', backgroundColor: '#fff', borderRadius: 11, padding: 10 },
-  consentText: { flex: 1, color: '#334155', fontSize: 11, lineHeight: 18 },
+  publishCard: { backgroundColor: colors.successSoft, borderColor: '#cfe9da', borderWidth: 1, borderRadius: radius.lg, padding: 14, gap: 6, marginTop: 16 },
+  small: { fontFamily: fonts.body, color: colors.textMuted, fontSize: 12, lineHeight: 18 },
+
+  usageToast: { position: 'absolute', top: 8, left: 20, right: 20, backgroundColor: colors.ink, borderRadius: radius.lg, padding: 13, zIndex: 20, flexDirection: 'row', gap: 8, alignItems: 'center', ...shadow.floating },
+  usageText: { fontFamily: fonts.bodySemi, color: '#fff', fontSize: 12, flex: 1 },
+
+  bottomBar: { backgroundColor: colors.canvas, paddingHorizontal: 20, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.lineStrong, gap: 8 },
+  footerProgress: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 6 },
+  footerProgressText: { flex: 1, fontFamily: fonts.body, fontSize: 12, lineHeight: 17, color: colors.textMuted },
+  footerConsentRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  footerConsentText: { flex: 1, fontFamily: fonts.body, fontSize: 12, color: colors.text, lineHeight: 17 },
+  footerRequired: { borderRadius: radius.md, backgroundColor: colors.warningSoft, flexDirection: 'row', gap: 7, alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12 },
+  footerRequiredText: { flex: 1, fontFamily: fonts.bodySemi, color: colors.warning, fontSize: 12 },
+  footerError: { fontFamily: fonts.bodySemi, color: '#b54237', fontSize: 13, lineHeight: 18 },
+  mainButton: { minHeight: 54, borderRadius: radius.pill, backgroundColor: BRAND, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9, paddingHorizontal: 16 },
+  mainButtonText: { fontFamily: fonts.bodySemi, color: '#fff', fontSize: 15 },
+  buttonDisabled: { opacity: 0.45 },
 });

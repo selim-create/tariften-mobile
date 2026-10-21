@@ -8,20 +8,29 @@ module.exports = ({ config }) => {
     return config;
   }
 
+  // The DEV build gets its own share-sheet entry and an ink icon, so it is
+  // never mistaken for the store app when both are installed.
+  const plugins = (config.plugins || []).map(plugin =>
+    Array.isArray(plugin) && plugin[0] === 'expo-share-intent'
+      ? [plugin[0], { ...plugin[1], iosShareExtensionName: "DEV Tariften'e Aktar" }]
+      : plugin);
+
   return {
     ...config,
     name: 'Tariften DEV',
     scheme: 'tariften-dev',
+    icon: './assets/icon-dev.png',
     ios: {
       ...config.ios,
       bundleIdentifier: 'com.tariften.app.dev',
+      icon: { ...(config.ios && config.ios.icon), light: './assets/icon-dev.png' },
     },
     android: {
       ...config.android,
       package: 'com.tariften.app.dev',
     },
     plugins: [
-      ...(config.plugins || []),
+      ...plugins,
       ['expo-dev-client', { addGeneratedScheme: true }],
     ],
   };

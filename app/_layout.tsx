@@ -8,8 +8,16 @@ import {
   Poppins_500Medium, Poppins_600SemiBold, Poppins_600SemiBold_Italic, Poppins_700Bold, Poppins_700Bold_Italic,
 } from '@expo-google-fonts/poppins';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import { useEffect } from 'react';
 import { View } from 'react-native';
-import { colors } from '../constants/theme';
+import * as SplashScreen from 'expo-splash-screen';
+import { ShareIntentProvider } from 'expo-share-intent';
+import ShareIntentWatcher from '../components/navigation/ShareIntentWatcher';
+import { colors, fonts } from '../constants/theme';
+
+// Keep the native splash (brand tile on cream) until the brand fonts are in,
+// so the first frame is already the real screen. No-op without the module.
+SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 export default function RootLayout() {
   // Brand fonts (same pairing as the web). Render a plain canvas for the few
@@ -18,39 +26,59 @@ export default function RootLayout() {
     Poppins_500Medium, Poppins_600SemiBold, Poppins_600SemiBold_Italic, Poppins_700Bold, Poppins_700Bold_Italic,
     Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
   });
-  if (!fontsLoaded && !fontError) return <View style={{ flex: 1, backgroundColor: colors.canvas }} />;
+  const ready = fontsLoaded || !!fontError;
+  useEffect(() => {
+    if (ready) SplashScreen.hideAsync().catch(() => undefined);
+  }, [ready]);
 
+  // "Paylaş → Tariften": the provider must sit above every other provider.
+  return (
+    <ShareIntentProvider options={{ resetOnBackground: true }}>
+      {ready ? <AppShell /> : <View style={{ flex: 1, backgroundColor: colors.canvas }} />}
+    </ShareIntentProvider>
+  );
+}
+
+function AppShell() {
   return (
     <SafeAreaProvider>
     <ErrorBoundary>
       <AuthProvider>
         <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false }}>
+        <ShareIntentWatcher />
+        <Stack screenOptions={{
+          headerShown: false,
+          // One quiet header for every stacked screen: canvas, no hairline,
+          // ink back arrow, Poppins title.
+          headerStyle: { backgroundColor: colors.canvas },
+          headerShadowVisible: false,
+          headerTintColor: colors.ink,
+          headerTitleStyle: { fontFamily: fonts.headingBold, fontSize: 17, color: colors.ink },
+          headerBackButtonDisplayMode: 'minimal',
+          contentStyle: { backgroundColor: colors.canvas },
+        }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="share" options={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen
           name="recipe/create"
-          options={{ headerShown: true, headerTitle: 'Tarif Oluştur', headerBackTitle: 'Tarifler', headerTintColor: '#df5043' }}
+          options={{ headerShown: true, headerTitle: 'Tarif Oluştur' }}
         />
         <Stack.Screen
           name="recipe/edit/[id]"
-          options={{ headerShown: true, headerTitle: 'Tarifi Düzenle', headerBackTitle: 'Geri', headerTintColor: '#df5043' }}
+          options={{ headerShown: true, headerTitle: 'Tarifi Düzenle' }}
         />
         <Stack.Screen
           name="recipe/aktar"
           options={{
             headerShown: true,
             headerTitle: 'Tarif Aktar',
-            headerBackTitle: 'Geri',
-            headerTintColor: '#db4c3f',
           }}
         />
         <Stack.Screen
           name="recipe/import"
           options={{
             headerShown: true,
-            headerTitle: 'Akıllı Tarif Aktarımı',
-            headerBackTitle: 'Tarifler',
-            headerTintColor: '#db4c3f',
+            headerTitle: 'Tarif Aktar',
           }}
         />
         <Stack.Screen
@@ -66,8 +94,6 @@ export default function RootLayout() {
           options={{
             headerShown: true,
             headerTitle: 'Yeni Menü',
-            headerBackTitle: 'Vazgeç',
-            headerTintColor: '#e74c3c',
           }}
         />
         {/* Menus and the blog draw their own editorial headers with safe-area back buttons. */}
@@ -79,8 +105,6 @@ export default function RootLayout() {
           options={{
             headerShown: true,
             headerTitle: 'Giriş Yap',
-            headerBackTitle: 'Geri',
-            headerTintColor: '#e74c3c',
           }}
         />
         <Stack.Screen
@@ -88,8 +112,6 @@ export default function RootLayout() {
           options={{
             headerShown: true,
             headerTitle: 'Kayıt Ol',
-            headerBackTitle: 'Geri',
-            headerTintColor: '#e74c3c',
           }}
         />
         <Stack.Screen
@@ -97,8 +119,6 @@ export default function RootLayout() {
           options={{
             headerShown: true,
             headerTitle: 'Şifremi Unuttum',
-            headerBackTitle: 'Geri',
-            headerTintColor: '#e74c3c',
           }}
         />
         <Stack.Screen
@@ -106,8 +126,6 @@ export default function RootLayout() {
           options={{
             headerShown: true,
             headerTitle: 'Koleksiyonlar',
-            headerBackTitle: 'Geri',
-            headerTintColor: '#e74c3c',
           }}
         />
         <Stack.Screen
@@ -115,8 +133,6 @@ export default function RootLayout() {
           options={{
             headerShown: true,
             headerTitle: 'Profili Düzenle',
-            headerBackTitle: 'Geri',
-            headerTintColor: '#e74c3c',
           }}
         />
         </Stack>
