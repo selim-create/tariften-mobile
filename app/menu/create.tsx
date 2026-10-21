@@ -28,7 +28,7 @@ const STEP_LABELS = ['Konsept', 'Detaylar', 'Onay'];
 
 export default function CreateMenuScreen() {
   const router = useRouter();
-  const { user, token } = useAuth();
+  const { user, token, isLoading: authLoading } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [job, setJob] = useState<MenuJob | null>(null);
@@ -45,10 +45,11 @@ export default function CreateMenuScreen() {
   const [diet, setDiet] = useState('Normal');
 
   useEffect(() => {
-    if (!user || !token) {
+    // Wait for the stored session before sending a guest to sign in.
+    if (!authLoading && (!user || !token)) {
       router.replace('/(tabs)/profile');
     }
-  }, [user, token, router]);
+  }, [authLoading, user, token, router]);
 
   // SecureStore is account-scoped; never open another user's pending job.
   useEffect(() => {
