@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -139,17 +139,8 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const typed = useTypewriter(PLACEHOLDERS);
-  const float = useRef(new Animated.Value(0)).current;
   const hello = useMemo(() => greeting(), []);
 
-  useEffect(() => {
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(float, { toValue: 1, duration: 2800, useNativeDriver: true }),
-      Animated.timing(float, { toValue: 0, duration: 2800, useNativeDriver: true }),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, [float]);
 
   const load = useCallback(async () => {
     try {
@@ -186,7 +177,6 @@ export default function HomeScreen() {
 
   if (loading) return <LoadingSpinner fullScreen />;
 
-  const lift = (range: number) => ({ transform: [{ translateY: float.interpolate({ inputRange: [0, 1], outputRange: [0, -range] }) }] });
 
   return (
     <ScrollView style={styles.screen} showsVerticalScrollIndicator={false}
@@ -195,8 +185,6 @@ export default function HomeScreen() {
 
       {/* Hero */}
       <View style={styles.hero}>
-        <Animated.View style={[styles.floatA, lift(6)]} pointerEvents="none"><LokmaIngredientIcon name="domates" size={26} /></Animated.View>
-        <Animated.View style={[styles.floatB, lift(9)]} pointerEvents="none"><LokmaIngredientIcon name="fesleğen" size={22} /></Animated.View>
         <Text style={styles.kicker}>{hello}</Text>
         <Text style={styles.heroTitle}>Bugün ne{'\n'}<Text style={styles.heroAccent}>pişiriyoruz?</Text></Text>
         <Text style={styles.heroLine}>Elindekileri yaz, gerisini Tariften'e bırak.</Text>
@@ -379,8 +367,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
   hero: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
-  floatA: { position: 'absolute', right: 30, top: 20 },
-  floatB: { position: 'absolute', right: 86, top: 64 },
   kicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', color: colors.brand },
   heroTitle: { fontFamily: fonts.headingBold, fontSize: 40, lineHeight: 44, letterSpacing: -1.4, color: colors.ink, marginTop: 10 },
   heroAccent: { fontFamily: fonts.headingBoldItalic, color: colors.brand },
