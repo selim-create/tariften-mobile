@@ -37,17 +37,17 @@ test('mobile cookbook ingredients, rating and comments use local emoji, not AI o
  assert.match(comment,/addComment\(token, recipeId, newComment\.trim\(\)\)/);
 });
 
-test('mobile Lokma illustrations match the full curated 89-art Web catalog, including neutral fallback', () => {
+test('mobile Lokma illustrations match the full curated 131-art Web catalog, including neutral fallback', () => {
  const artSrc=fs.readFileSync(path.join(__dirname,'..','lib/lokma-svg-art.ts'),'utf8');
  const artComp=ts.transpileModule(artSrc,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
  const artModule={exports:{}};
  new Function('module','exports',artComp)(artModule,artModule.exports);
  const {LOKMA_SVG_ART,LOKMA_FIGURES,lokmaArtUri}=artModule.exports;
  const list=shim.exports.LOKMA_ICON_SAMPLES;
- assert.equal(LOKMA_FIGURES.length,89);
- assert.equal(new Set(LOKMA_FIGURES).size,89);
- assert.equal(list.length,89);
- assert.ok(list.every(item=>item.figure in LOKMA_SVG_ART), 'All 89 preview figures have real art');
+ assert.equal(LOKMA_FIGURES.length,131);
+ assert.equal(new Set(LOKMA_FIGURES).size,131);
+ assert.equal(list.length,131);
+ assert.ok(list.every(item=>item.figure in LOKMA_SVG_ART), 'All 131 preview figures have real art');
  for (const id of LOKMA_FIGURES) {
   const svg=decodeURIComponent(lokmaArtUri(id).replace(/^data:image\/svg\+xml;charset=utf-8,/, ''));
   assert.match(svg, /<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);

@@ -55,6 +55,12 @@ jobs:
         run: node --test scripts/check-cooking-assistant.test.cjs scripts/check-tts-voices.test.cjs scripts/check-chirp3-voice.test.cjs scripts/check-cooking-commands.test.cjs scripts/check-dev-build-variant.test.cjs
       - name: Verify semantic Lokma food emoji, ratings and comment reactions
         run: node --test scripts/check-lokma-emoji.test.cjs
+      - name: Lokma ingredient resolution matches the web resolver
+        run: node --test scripts/check-lokma-resolution.test.cjs
+      - name: Shopping list sums only unambiguous amounts
+        run: node --test scripts/check-shopping-list.test.cjs
+      - name: Redesign foundation (tokens, fonts, floating tabs, honest social metrics)
+        run: node --test scripts/check-mobile-redesign-foundation.test.cjs
       - name: Verify mobile membership, servings and profile navigation parity
         run: node --test scripts/check-mobile-content-parity.test.cjs
       - name: Guard Expo Router URI parsing compatibility

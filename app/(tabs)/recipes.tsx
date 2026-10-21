@@ -18,6 +18,7 @@ import SimilarRecipeChoice from '../../components/recipe/SimilarRecipeChoice';
 import { quickRecipeFromAI, validateQuickRecipe, approvedQuickRecipe, type QuickRecipeDraft } from '../../lib/quick-recipe-review';
 import { Recipe, RecipeFilters } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
+import { useTabBarSpace } from '../../components/navigation/FloatingTabBar';
 import SearchBar from '../../components/SearchBar';
 import FilterSheet from '../../components/FilterSheet';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -35,6 +36,7 @@ const AI_LOADING_MESSAGES = [
 ];
 
 export default function RecipesScreen() {
+  const tabSpace = useTabBarSpace();
   const params = useLocalSearchParams<{
     query?: string;
     cuisine?: string;
@@ -421,6 +423,7 @@ export default function RecipesScreen() {
           data={recipes}
           keyExtractor={(item) => (item as Recipe).id.toString()}
           renderItem={({ item }) => <RecipeCard recipe={item as Recipe} />}
+          contentContainerStyle={{ paddingBottom: tabSpace }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#e74c3c" />
           }

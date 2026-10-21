@@ -1,147 +1,100 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useAuth } from '../../context/AuthContext';
 import { useResponsive } from '../../hooks/useResponsive';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GlobalCreateAction from '../../components/navigation/GlobalCreateAction';
+import FloatingTabBar from '../../components/navigation/FloatingTabBar';
+import { colors, fonts } from '../../constants/theme';
 
-type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
-
-interface TabConfig {
-  name: string;
-  title: string;
-  icon: IoniconName;
-  iconOutline: IoniconName;
-}
-
-const otherTabs: TabConfig[] = [
-  { name: 'recipes', title: 'Tarifler', icon: 'restaurant', iconOutline: 'restaurant-outline' },
-  { name: 'pantry', title: 'Dolap', icon: 'basket', iconOutline: 'basket-outline' },
-  { name: 'menus', title: 'Menüler', icon: 'book', iconOutline: 'book-outline' },
-  { name: 'profile', title: 'Profil', icon: 'person', iconOutline: 'person-outline' },
+/**
+ * Visible tabs: Keşfet · Defterim · ＋ · Bu Hafta · Alışveriş (floating pill).
+ * Tarifler, Dolap, Menüler and Profil stay real routes (deep links, pushes)
+ * but are reached from Keşfet, Defterim and the header avatar.
+ */
+const hiddenTabs: { name: string; title: string }[] = [
+  { name: 'recipes', title: 'Tarifler' },
+  { name: 'pantry', title: 'Dolap' },
+  { name: 'menus', title: 'Menüler' },
+  { name: 'profile', title: 'Profil' },
 ];
 
 export default function TabLayout() {
   const router = useRouter();
   const { user } = useAuth();
   const { isTablet } = useResponsive();
-
-  const insets = useSafeAreaInsets();
-  const tabBarHeight = (isTablet ? 72 : 60) + insets.bottom;
-  const tabBarLabelSize = isTablet ? 13 : 11;
-  const headerTitleSize = isTablet ? 22 : 18;
+  const [createOpen, setCreateOpen] = useState(false);
+  const headerTitleSize = isTablet ? 21 : 18;
 
   return (
-    <View style={{ flex: 1 }}>
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: '#e74c3c',
-        tabBarInactiveTintColor: '#999999',
-        tabBarStyle: {
-          backgroundColor: '#ffffff',
-          borderTopColor: '#e5e5e5',
-          paddingBottom: (isTablet ? 8 : 4) + insets.bottom,
-          height: tabBarHeight,
-        },
-        tabBarLabelStyle: {
-          fontSize: tabBarLabelSize,
-          fontWeight: '600',
-        },
-        headerStyle: {
-          backgroundColor: '#ffffff',
-        },
-        headerTintColor: '#1a1a1a',
-        headerTitleStyle: {
-          fontWeight: '700',
-          fontSize: headerTitleSize,
-        },
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Keşfet',
-          headerTitle: () => (
-            <Image
-              source={require('../../assets/logo.svg')}
-              style={headerStyles.logoImage}
-              contentFit="contain"
-            />
-          ),
-          headerRight: () => (
-            <View style={headerStyles.rightContainer}>
-              <TouchableOpacity onPress={() => router.push('/recipes')} style={headerStyles.iconButton}>
-                <Ionicons name="search-outline" size={22} color="#1a1a1a" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => router.push('/profile')} style={headerStyles.iconButton}>
-                <Ionicons name="heart-outline" size={22} color="#1a1a1a" />
-              </TouchableOpacity>
-              {user?.avatar_url && user.avatar_url.length > 0 ? (
-                <TouchableOpacity onPress={() => router.push('/profile')} style={headerStyles.iconButton}>
-                  <Image
-                    source={{ uri: user.avatar_url }}
-                    style={headerStyles.userAvatar}
-                    contentFit="cover"
-                  />
-                </TouchableOpacity>
-              ) : user ? (
-                <TouchableOpacity onPress={() => router.push('/profile')} style={headerStyles.iconButton}>
-                  <Image
-                    source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(user.user_display_name || 'U')}&background=db4c3f&color=fff&size=56` }}
-                    style={headerStyles.userAvatar}
-                    contentFit="cover"
-                  />
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity onPress={() => router.push('/profile')} style={headerStyles.iconButton}>
-                  <Ionicons name="person-circle-outline" size={28} color="#1a1a1a" />
-                </TouchableOpacity>
-              )}
-            </View>
-          ),
-          tabBarIcon: ({ focused, color, size }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
-          ),
+    <View style={{ flex: 1, backgroundColor: colors.canvas }}>
+      <Tabs
+        tabBar={props => <FloatingTabBar {...props} onCreate={() => setCreateOpen(true)} createOpen={createOpen} />}
+        screenOptions={{
+          headerStyle: { backgroundColor: colors.canvas },
+          headerShadowVisible: false,
+          headerTintColor: colors.ink,
+          headerTitleStyle: { fontFamily: fonts.headingBold, fontSize: headerTitleSize },
+          sceneStyle: { backgroundColor: colors.canvas },
         }}
-      />
-      {otherTabs.map((tab) => (
+      >
         <Tabs.Screen
-          key={tab.name}
-          name={tab.name}
+          name="index"
           options={{
-            title: tab.title,
-            tabBarIcon: ({ focused, color, size }) => (
-              <Ionicons name={focused ? tab.icon : tab.iconOutline} size={size} color={color} />
+            title: 'Keşfet',
+            headerTitle: () => (
+              <Image
+                source={require('../../assets/logo.svg')}
+                style={headerStyles.logoImage}
+                contentFit="contain"
+                accessibilityLabel="Tariften"
+              />
+            ),
+            headerTitleAlign: 'left',
+            headerRight: () => (
+              <View style={headerStyles.rightContainer}>
+                <TouchableOpacity onPress={() => router.push('/recipes')} style={headerStyles.circle}
+                  accessibilityRole="button" accessibilityLabel="Tarif ara">
+                  <Ionicons name="search" size={19} color={colors.ink} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push(user ? '/profile' : '/login')} style={headerStyles.circle}
+                  accessibilityRole="button" accessibilityLabel={user ? 'Profilim' : 'Giriş yap'}>
+                  {user?.avatar_url ? (
+                    <Image source={{ uri: user.avatar_url }} style={headerStyles.userAvatar} contentFit="cover" />
+                  ) : user ? (
+                    <View style={headerStyles.initial}>
+                      <Ionicons name="person" size={17} color={colors.brand} />
+                    </View>
+                  ) : (
+                    <Ionicons name="person-outline" size={19} color={colors.ink} />
+                  )}
+                </TouchableOpacity>
+              </View>
             ),
           }}
         />
-      ))}
-    </Tabs>
-    <GlobalCreateAction tabBarHeight={tabBarHeight} />
+        <Tabs.Screen name="defterim" options={{ title: 'Defterim', headerShown: false }} />
+        <Tabs.Screen name="bu-hafta" options={{ title: 'Bu Hafta', headerShown: false }} />
+        <Tabs.Screen name="alisveris" options={{ title: 'Alışveriş', headerShown: false }} />
+        {hiddenTabs.map(tab => (
+          <Tabs.Screen key={tab.name} name={tab.name} options={{ title: tab.title, href: null }} />
+        ))}
+      </Tabs>
+      <GlobalCreateAction visible={createOpen} onClose={() => setCreateOpen(false)} />
     </View>
   );
 }
 
 const headerStyles = StyleSheet.create({
-  logoImage: {
-    height: 30,
-    width: 120,
+  logoImage: { height: 28, width: 138 },
+  rightContainer: { flexDirection: 'row', gap: 8, paddingRight: 16, alignItems: 'center' },
+  circle: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.lineStrong,
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
-  rightContainer: {
-    flexDirection: 'row',
-    gap: 4,
-    paddingRight: 12,
-    alignItems: 'center',
-  },
-  iconButton: {
-    padding: 4,
-  },
-  userAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-  },
+  userAvatar: { width: 40, height: 40 },
+  initial: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandSoft },
 });

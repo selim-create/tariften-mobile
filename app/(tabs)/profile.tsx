@@ -21,11 +21,13 @@ import { Recipe } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import MyKitchenLibrary from '../../components/account/MyKitchenLibrary';
+import { useTabBarSpace } from '../../components/navigation/FloatingTabBar';
 
 type ProfileTab = 'my_recipes' | 'my_menus' | 'favorites' | 'cooked';
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 export default function ProfileScreen() {
+  const tabSpace = useTabBarSpace();
   const router = useRouter();
   const { user, token, logout } = useAuth();
   const quotas = useQuotas(token);
@@ -134,6 +136,7 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: tabSpace }}
         refreshControl={<RefreshControl refreshing={refreshing && (activeTab === 'favorites' || activeTab === 'cooked')}
           onRefresh={onRefresh} tintColor="#df5043" />}>
         {/* Profile Header */}

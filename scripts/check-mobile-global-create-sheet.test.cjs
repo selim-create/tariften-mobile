@@ -7,19 +7,27 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = pathName => fs.readFileSync(path.join(root, pathName), 'utf8');
 
-test('creation FAB belongs to shared bottom tabs and stays above the footer at safe-area-aware offset', () => {
+test('create button lives in the centre of the floating tab bar and opens the shared sheet', () => {
   const layout = read('app/(tabs)/_layout.tsx');
-  const component = read('components/navigation/GlobalCreateAction.tsx');
-  assert.match(layout, /<GlobalCreateAction tabBarHeight=\{tabBarHeight\} \/>/);
-  assert.match(layout, /const tabBarHeight = \(isTablet \? 72 : 60\) \+ insets\.bottom/);
+  const bar = read('components/navigation/FloatingTabBar.tsx');
+  assert.match(layout, /tabBar=\{props => <FloatingTabBar \{\.\.\.props\} onCreate=\{\(\) => setCreateOpen\(true\)\} createOpen=\{createOpen\} \/>\}/);
+  assert.match(layout, /<GlobalCreateAction visible=\{createOpen\} onClose=\{\(\) => setCreateOpen\(false\)\} \/>/);
+  // Hidden routes stay real (deep links, pushes) but are not tabs.
   for (const tab of ['recipes', 'pantry', 'menus', 'profile']) {
     assert.match(layout, new RegExp("name: '"+tab+"'"));
   }
-  assert.match(component, /position: 'absolute', right: 18/);
-  assert.match(component, /bottom: tabBarHeight \+ 14/);
-  assert.match(component, /pointerEvents="box-none"/);
-  assert.match(component, /accessibilityLabel="Tarif veya menü ekle"/);
-  assert.match(component, /accessibilityState=\{\{ expanded: visible \}\}/);
+  assert.match(layout, /href: null/);
+  const visible = [...bar.matchAll(/\{ name: '([^']+)', label: '([^']+)'/g)].map(m => m[2]);
+  assert.deepEqual(visible, ['Keşfet', 'Defterim', 'Bu Hafta', 'Alışveriş']);
+  for (const screen of ['defterim', 'bu-hafta', 'alisveris']) {
+    assert.ok(fs.existsSync(path.join(root, 'app/(tabs)/' + screen + '.tsx')), screen + ' screen exists');
+  }
+  assert.match(bar, /accessibilityLabel="Tarif veya menü ekle"/);
+  assert.match(bar, /accessibilityState=\{\{ expanded: createOpen \}\}/);
+  assert.match(bar, /accessibilityRole="tab"/);
+  assert.match(bar, /pointerEvents="box-none"/);
+  assert.match(bar, /bottom: Math\.max\(insets\.bottom, BAR_GAP\)/);
+  assert.match(bar, /export function useTabBarSpace/);
 });
 
 test('sheet uses a native dimmed bottom modal with accessible close and navigation actions', () => {
@@ -33,13 +41,13 @@ test('sheet uses a native dimmed bottom modal with accessible close and navigati
   assert.match(component, /Math\.max\(insets\.bottom, 16\)/);
   assert.match(component, /clearTimeout\(navigationTimer\.current\)/);
   assert.match(component, /router\.push\(user && token \? route : '\/login'\)/);
-  assert.match(component, /setVisible\(false\)/);
+  assert.match(component, /const close = \(\) => onClose\(\)/);
 });
 
 test('global create sheet exposes only real manual, import and menu create destinations', () => {
   const component = read('components/navigation/GlobalCreateAction.tsx');
   const destinations = [...component.matchAll(/route: '(\/[^']+)'/g)].map(x => x[1]);
-  assert.deepEqual(destinations, ['/(tabs)/recipes?quick=1', '/recipe/aktar', '/recipe/create', '/menu/create']);
+  assert.deepEqual(destinations, ['/recipe/aktar', '/(tabs)/recipes?quick=1', '/recipe/create', '/menu/create']);
   for(const [route, file] of [
     ['/recipe/create', 'app/recipe/create.tsx'],
     ['/recipe/aktar', 'app/recipe/aktar.tsx'],

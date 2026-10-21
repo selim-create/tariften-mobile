@@ -1,125 +1,172 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import {
-  FlatList,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getBlogPosts, getMenus, getRecipes } from '../../lib/api';
 import { BlogPost, Menu, Recipe } from '../../lib/types';
-import RecipeCard from '../../components/RecipeCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import { useResponsive } from '../../hooks/useResponsive';
-import { rf } from '../../utils/responsiveFont';
+import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
+import ImagePlaceholder, { isPlaceholderImage } from '../../components/ImagePlaceholder';
+import { AccentText } from '../../components/ui/ScreenTitle';
+import { useTabBarSpace } from '../../components/navigation/FloatingTabBar';
+import { colors, fonts, radius, shadow } from '../../constants/theme';
 
-type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
-
-const CUISINES = [
-  {
-    label: '🇹🇷 Türk',
-    param: 'Türk Mutfağı',
-    image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=400&auto=format&fit=crop',
-  },
-  {
-    label: '🇮🇹 İtalyan',
-    param: 'İtalyan Mutfağı',
-    image: 'https://images.unsplash.com/photo-1595295333158-4742f28fbd85?q=80&w=400&auto=format&fit=crop',
-  },
-  {
-    label: '🥢 Asya',
-    param: 'Asya Mutfağı',
-    image: 'https://images.unsplash.com/photo-1552590635-27c2c2128abf?q=80&w=400&auto=format&fit=crop',
-  },
-  {
-    label: '🌮 Meksika',
-    param: 'Meksika Mutfağı',
-    image: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?q=80&w=400&auto=format&fit=crop',
-  },
-];
-
+// Same voice and destinations as the web home page.
 const PLACEHOLDERS = [
-  'Dolapta sadece yumurta ve yoğurt var...',
-  'Akşama misafir var, havalı bir şey lazım...',
-  '15 dakikada hazırlayabileceğim fit bir tarif...',
-  'Canım tatlı çekiyor ama diyetteyim...',
-  'İtalyan mutfağından makarna harici ne var?',
+  'Dolapta sadece yumurta ve yoğurt var…',
+  'Akşama misafir var, havalı bir şey lazım…',
+  '15 dakikada hazırlanacak hafif bir şey…',
+  'Canım tatlı çekiyor ama diyetteyim…',
+  'İtalyan mutfağından makarna dışında ne var?',
 ];
 
 const PILLS = [
-  '🥑 Elimde avokado var',
-  '⏱️ 15 dakikada akşam yemeği',
-  '💪 Spor sonrası protein',
-  '🌱 Vegan ve glutensiz',
+  { icon: 'avokado', label: 'Elimde avokado var', query: 'avokado' },
+  { icon: 'yumurta', label: '15 dakikada akşam yemeği', query: 'pratik' },
+  { icon: 'tavuk göğsü', label: 'Spor sonrası protein', query: 'tavuk' },
+  { icon: 'nohut', label: 'Vegan ve doyurucu', query: 'nohut' },
 ];
 
-const MOODS: { label: string; icon: IoniconName; color: string; param: Record<string, string> }[] = [
-  { label: 'Fit & Sağlıklı', icon: 'leaf-outline', color: '#27ae60', param: { diet: 'Düşük Karbonhidrat' } },
-  { label: 'Üşengeç Şef', icon: 'bed-outline', color: '#8e44ad', param: { difficulty: 'Kolay' } },
-  { label: 'Ziyafet', icon: 'heart-outline', color: '#e74c3c', param: { difficulty: 'Şef' } },
-  { label: 'Tatlı Krizi', icon: 'ice-cream-outline', color: '#e67e22', param: { mealType: 'Tatlı' } },
-  { label: 'Acı Sever', icon: 'flame-outline', color: '#c0392b', param: { cuisine: 'Meksika Mutfağı' } },
-  { label: 'Pazar Kahvaltısı', icon: 'cafe-outline', color: '#16a085', param: { mealType: 'Kahvaltı' } },
+const ASIAN = 'Çin Mutfağı,Japon Mutfağı,Kore Mutfağı,Hint Mutfağı';
+const CUISINES = [
+  { name: 'Türk Mutfağı', param: 'Türk Mutfağı', icon: 'domates', note: 'Zeytinyağlılar, hamur işleri' },
+  { name: 'İtalyan Mutfağı', param: 'İtalyan Mutfağı', icon: 'makarna', note: 'Makarna, risotto, fırın' },
+  { name: 'Asya Mutfağı', param: ASIAN, icon: 'pirinç', note: 'Çin, Japon, Kore, Hint' },
+  { name: 'Meksika Mutfağı', param: 'Meksika Mutfağı', icon: 'avokado', note: 'Tortilla, salsa, acı sos' },
 ];
+
+const MOODS: { label: string; line: string; icon: string; params: Record<string, string> }[] = [
+  { label: 'Fit & Sağlıklı', line: 'Hafif ama doyurucu', icon: 'brokoli', params: { diet: 'Düşük Karbonhidrat' } },
+  { label: 'Üşengeç Şef', line: 'Az emek, az bulaşık', icon: 'yumurta', params: { difficulty: 'Kolay' } },
+  { label: 'Ziyafet', line: 'Misafire göster', icon: 'dana eti', params: { difficulty: 'Şef' } },
+  { label: 'Tatlı Krizi', line: 'Bir dilim yeter mi?', icon: 'çikolata', params: { mealType: 'Tatlı' } },
+  { label: 'Acı Sever', line: 'Biberi eksik olmasın', icon: 'acı biber', params: { query: 'acı biber' } },
+  { label: 'Pazar Kahvaltısı', line: 'Uzun, sıcak, kalabalık', icon: 'bal', params: { mealType: 'Kahvaltı' } },
+];
+
+function greeting(date = new Date()) {
+  const h = date.getHours();
+  if (h < 5) return 'Gece atıştırması';
+  if (h < 11) return 'Günaydın';
+  if (h < 16) return 'Öğle arası';
+  if (h < 19) return 'İyi akşamlar';
+  return 'Akşam sofrası';
+}
+
+function minutesOf(recipe: Recipe) {
+  const total = (Number(recipe.prep_time) || 0) + (Number(recipe.cook_time) || 0);
+  return total > 0 ? total : 0;
+}
+
+/** Typed placeholder that writes and erases the suggestions in turn. */
+function useTypewriter(lines: string[]) {
+  const [index, setIndex] = useState(0);
+  const [text, setText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  useEffect(() => {
+    const full = lines[index];
+    const done = !deleting && text === full;
+    const empty = deleting && text === '';
+    const delay = done ? 1900 : deleting ? 28 : 46;
+    const timer = setTimeout(() => {
+      if (done) { setDeleting(true); return; }
+      if (empty) { setDeleting(false); setIndex(i => (i + 1) % lines.length); return; }
+      setText(deleting ? full.slice(0, text.length - 1) : full.slice(0, text.length + 1));
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [text, deleting, index, lines]);
+  return text;
+}
+
+function Heading({ kicker, title, onMore, more }: { kicker: string; title: string; onMore?: () => void; more?: string }) {
+  return (
+    <View style={styles.heading}>
+      <View style={{ flex: 1, gap: 6 }}>
+        <Text style={styles.kicker}>{kicker}</Text>
+        <AccentText style={styles.sectionTitle}>{title}</AccentText>
+      </View>
+      {onMore ? (
+        <TouchableOpacity onPress={onMore} hitSlop={8} style={styles.moreBtn}>
+          <Text style={styles.more}>{more || 'Tümü'}</Text>
+          <Ionicons name="arrow-forward" size={15} color={colors.ink} />
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+}
+
+function FeatureCard({ recipe, height, onPress }: { recipe: Recipe; height: number; onPress: () => void }) {
+  const photo = !isPlaceholderImage(recipe.image);
+  const minutes = minutesOf(recipe);
+  const kicker = recipe.cuisine?.[0] || recipe.meal_type?.[0];
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.feature, { height }, pressed && { transform: [{ scale: 0.985 }] }]}
+      accessibilityRole="link" accessibilityLabel={recipe.title}>
+      {photo ? (
+        <>
+          <Image source={{ uri: recipe.image }} style={StyleSheet.absoluteFill} contentFit="cover" transition={250} />
+          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.72)']} style={StyleSheet.absoluteFill} />
+        </>
+      ) : (
+        <ImagePlaceholder title={recipe.title} style={StyleSheet.absoluteFill} />
+      )}
+      <View style={styles.featureCopy}>
+        {kicker ? <Text style={[styles.featureKicker, !photo && { color: colors.brand }]}>{kicker}</Text> : null}
+        <Text style={[styles.featureTitle, !photo && { color: colors.ink }]} numberOfLines={3}>{recipe.title}</Text>
+        {minutes > 0 ? (
+          <View style={styles.featureMeta}>
+            <Ionicons name="time-outline" size={13} color={photo ? 'rgba(255,255,255,0.85)' : colors.textMuted} />
+            <Text style={[styles.featureMetaText, !photo && { color: colors.textMuted }]}>{minutes} dk</Text>
+          </View>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { isTablet, horizontalPadding, fontScale, heroImageHeight } = useResponsive();
-  const [popularRecipes, setPopularRecipes] = useState<Recipe[]>([]);
-  const [editorsRecipes, setEditorsRecipes] = useState<Recipe[]>([]);
-  const [latestBlog, setLatestBlog] = useState<BlogPost[]>([]);
+  const bottom = useTabBarSpace();
+  const [popular, setPopular] = useState<Recipe[]>([]);
+  const [editors, setEditors] = useState<Recipe[]>([]);
+  const [cuisines, setCuisines] = useState<{ cover: string | null; count: number }[]>([]);
+  const [blog, setBlog] = useState<BlogPost[]>([]);
   const [menus, setMenus] = useState<Menu[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Typewriter states
-  const [placeholderIndex, setPlaceholderIndex] = useState(0);
-  const [displayText, setDisplayText] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [typingSpeed, setTypingSpeed] = useState(100);
+  const [search, setSearch] = useState('');
+  const typed = useTypewriter(PLACEHOLDERS);
+  const float = useRef(new Animated.Value(0)).current;
+  const hello = useMemo(() => greeting(), []);
 
   useEffect(() => {
-    const currentFullText = PLACEHOLDERS[placeholderIndex];
-    const handleTyping = () => {
-      if (!isDeleting) {
-        setDisplayText(currentFullText.substring(0, displayText.length + 1));
-        setTypingSpeed(50);
-        if (displayText === currentFullText) {
-          setIsDeleting(true);
-          setTypingSpeed(2000);
-        }
-      } else {
-        setDisplayText(currentFullText.substring(0, displayText.length - 1));
-        setTypingSpeed(30);
-        if (displayText === '') {
-          setIsDeleting(false);
-          setPlaceholderIndex((prev) => (prev + 1) % PLACEHOLDERS.length);
-        }
-      }
-    };
-    const timer = setTimeout(handleTyping, typingSpeed);
-    return () => clearTimeout(timer);
-  }, [displayText, isDeleting, placeholderIndex, typingSpeed]);
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(float, { toValue: 1, duration: 2800, useNativeDriver: true }),
+      Animated.timing(float, { toValue: 0, duration: 2800, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [float]);
 
-  const loadData = useCallback(async () => {
+  const load = useCallback(async () => {
     try {
-      const [popularData, editorsData, blogData, menusData] = await Promise.all([
+      const [pop, ed, blogData, menuData, ...cuisineData] = await Promise.all([
         getRecipes({ collection: ['Popüler'] }),
         getRecipes({ collection: ['Editörün Seçimi'] }),
         getBlogPosts({ perPage: 3 }),
         getMenus({ collection: 'vitrin' }),
+        ...CUISINES.map(c => getRecipes({ cuisine: [c.param] })),
       ]);
-      setPopularRecipes(popularData.data.slice(0, 6));
-      setEditorsRecipes(editorsData.data.slice(0, 4));
-      setLatestBlog(blogData.data);
-      setMenus(menusData.slice(0, 3));
+      setPopular((pop.data || []).slice(0, 5));
+      setEditors((ed.data || []).slice(0, 4));
+      setBlog(blogData.data || []);
+      setMenus(menuData.slice(0, 4));
+      setCuisines(cuisineData.map(r => ({
+        cover: (r.data || []).find((x: Recipe) => !isPlaceholderImage(x.image))?.image || null,
+        count: r.count || 0,
+      })));
     } catch (error) {
       console.error('Home load error:', error);
     } finally {
@@ -128,859 +175,243 @@ export default function HomeScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useEffect(() => { void load(); }, [load]);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadData();
-  }, [loadData]);
-
-  const handleSearch = () => {
-    if (searchQuery.trim()) {
-      router.push({ pathname: '/recipes', params: { query: searchQuery.trim() } } as any);
-    } else {
-      router.push('/recipes');
-    }
-  };
-
-  const navigateWithFilter = (params: Record<string, string>) => {
-    router.push({ pathname: '/recipes', params } as any);
-  };
+  const go = (params: Record<string, string>) => router.push({ pathname: '/recipes', params } as never);
+  const submit = () => (search.trim() ? go({ query: search.trim() }) : router.push('/recipes'));
 
   if (loading) return <LoadingSpinner fullScreen />;
 
+  const lift = (range: number) => ({ transform: [{ translateY: float.interpolate({ inputRange: [0, 1], outputRange: [0, -range] }) }] });
+
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#e74c3c" />}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Section 1: Hero */}
-      <View style={[styles.hero, { paddingHorizontal: horizontalPadding, ...(isTablet ? {} : { minHeight: heroImageHeight }) }]}>
-        <View style={styles.heroBadge}>
-          <Ionicons name="sparkles" size={13} color="#db4c3f" />
-          <Text style={[styles.heroBadgeText, { fontSize: rf(12, fontScale) }]}>Yapay Zeka Mutfak Asistanı</Text>
-        </View>
-        <Text style={[styles.heroTitle, { fontSize: rf(26, fontScale) }]}>
-          Bugün ne{' '}
-          <Text style={styles.heroTitleAccent}>pişiriyoruz?</Text>
-        </Text>
-        <Text style={[styles.heroSubtitle, { fontSize: rf(15, fontScale) }]}>Malzemeleri yaz, gerisini yapay zekaya bırak.</Text>
-        <View style={[styles.searchContainer, isTablet && { maxWidth: 600 }]}>
-          <Ionicons name="search-outline" size={18} color="#999999" />
+    <ScrollView style={styles.screen} showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: bottom }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} tintColor={colors.brand} />}>
+
+      {/* Hero */}
+      <View style={styles.hero}>
+        <Animated.View style={[styles.floatA, lift(6)]} pointerEvents="none"><LokmaIngredientIcon name="domates" size={26} /></Animated.View>
+        <Animated.View style={[styles.floatB, lift(9)]} pointerEvents="none"><LokmaIngredientIcon name="fesleğen" size={22} /></Animated.View>
+        <Text style={styles.kicker}>{hello}</Text>
+        <Text style={styles.heroTitle}>Bugün ne{'\n'}<Text style={styles.heroAccent}>pişiriyoruz?</Text></Text>
+        <Text style={styles.heroLine}>Elindekileri yaz, gerisini Tariften'e bırak.</Text>
+        <View style={styles.search}>
+          <Ionicons name="search" size={19} color={colors.textMuted} />
           <TextInput
-            style={[styles.searchInput, { fontSize: rf(15, fontScale) }]}
-            placeholder={searchQuery.length === 0 ? displayText + '|' : undefined}
-            placeholderTextColor="#999999"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSubmitEditing={handleSearch}
+            style={styles.searchInput}
+            value={search}
+            onChangeText={setSearch}
+            onSubmitEditing={submit}
             returnKeyType="search"
+            placeholder={search ? undefined : `${typed}|`}
+            placeholderTextColor={colors.textFaint}
+            accessibilityLabel="Tarif ya da malzeme ara"
           />
+          <TouchableOpacity onPress={submit} style={styles.searchGo} accessibilityRole="button" accessibilityLabel="Ara">
+            <Ionicons name="arrow-forward" size={18} color="#fff" />
+          </TouchableOpacity>
         </View>
-        {isTablet ? (
-          <View style={styles.pillsContainerTablet}>
-            {PILLS.map((pill) => (
-              <TouchableOpacity
-                key={pill}
-                style={styles.pill}
-                onPress={() => router.push({ pathname: '/recipes', params: { query: pill } } as any)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.pillText, { fontSize: rf(13, fontScale) }]}>{pill}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.pillsContainer}
-          >
-            {PILLS.map((pill) => (
-              <TouchableOpacity
-                key={pill}
-                style={styles.pill}
-                onPress={() => router.push({ pathname: '/recipes', params: { query: pill } } as any)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.pillText, { fontSize: rf(13, fontScale) }]}>{pill}</Text>
-              </TouchableOpacity>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
+          {PILLS.map(pill => (
+            <TouchableOpacity key={pill.label} onPress={() => go({ query: pill.query })} style={styles.pill} activeOpacity={0.85}>
+              <LokmaIngredientIcon name={pill.icon} size={18} />
+              <Text style={styles.pillText}>{pill.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Social import: the flagship flow */}
+      <Pressable onPress={() => router.push('/recipe/aktar')} style={({ pressed }) => [styles.importCard, pressed && { opacity: 0.92 }]}
+        accessibilityRole="button" accessibilityLabel="Sosyal medyadan tarif aktar">
+        <View style={{ flex: 1 }}>
+          <Text style={styles.importKicker}>Reels · TikTok · Shorts</Text>
+          <Text style={styles.importTitle}>Kaydettiğin videoyu <Text style={styles.importAccent}>tarife</Text> çevir.</Text>
+          <Text style={styles.importLine}>Linki yapıştır; malzemeler ve adımlar defterine gelsin.</Text>
+        </View>
+        <View style={styles.importIcons}>
+          {(['logo-instagram', 'logo-tiktok', 'logo-youtube'] as const).map(icon => (
+            <View key={icon} style={styles.importIcon}><Ionicons name={icon} size={18} color={colors.ink} /></View>
+          ))}
+        </View>
+      </Pressable>
+
+      {popular.length > 0 && (
+        <View style={styles.section}>
+          <Heading kicker="Öne çıkanlar" title="Bu hafta bunları *pişiriyoruz*" onMore={() => router.push('/recipes')} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={292} decelerationRate="fast" contentContainerStyle={styles.rail}>
+            {popular.map(recipe => (
+              <View key={recipe.id} style={{ width: 280 }}>
+                <FeatureCard recipe={recipe} height={360} onPress={() => router.push(`/recipe/${recipe.slug}`)} />
+              </View>
             ))}
           </ScrollView>
-        )}
-      </View>
-
-      {/* Section 2: Vizesiz Dünya Turu */}
-      <View style={[styles.section, { paddingHorizontal: horizontalPadding }]}>
-        <View style={styles.sectionHeader}>
-          <Ionicons name="earth" size={18} color="#1a1a1a" />
-          <Text style={[styles.sectionTitle, { fontSize: rf(17, fontScale) }]}>Vizesiz Dünya Turu</Text>
-        </View>
-        {isTablet ? (
-          <View style={styles.cuisineGridTablet}>
-            {CUISINES.map((item) => (
-              <TouchableOpacity
-                key={item.param}
-                style={styles.cuisineCardTablet}
-                onPress={() => navigateWithFilter({ cuisine: item.param })}
-                activeOpacity={0.85}
-              >
-                <Image source={{ uri: item.image }} style={styles.cuisineImage} contentFit="cover" />
-                <View style={styles.cuisineOverlay}>
-                  <Text style={styles.cuisineLabel}>{item.label}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        ) : (
-          <FlatList
-            data={CUISINES}
-            keyExtractor={(item) => item.param}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.cuisineCard}
-                onPress={() => navigateWithFilter({ cuisine: item.param })}
-                activeOpacity={0.85}
-              >
-                <Image source={{ uri: item.image }} style={styles.cuisineImage} contentFit="cover" />
-                <View style={styles.cuisineOverlay}>
-                  <Text style={styles.cuisineLabel}>{item.label}</Text>
-                </View>
-              </TouchableOpacity>
-            )}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalList}
-          />
-        )}
-      </View>
-
-      {/* Section 3: Şu An Herkes Bunu Pişiriyor */}
-      {popularRecipes.length > 0 && (
-        <View style={[styles.section, { paddingHorizontal: horizontalPadding }]}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="flame" size={18} color="#e74c3c" />
-            <Text style={[styles.sectionTitle, { fontSize: rf(17, fontScale) }]}>Şu An Herkes Bunu Pişiriyor</Text>
-            <TouchableOpacity onPress={() => router.push('/recipes')}>
-              <Text style={styles.seeAll}>Tümü →</Text>
-            </TouchableOpacity>
-          </View>
-          {isTablet ? (
-            <View style={styles.popularGridTablet}>
-              {popularRecipes.map((item) => (
-                <View key={item.id} style={{ width: '31.5%' }}>
-                  <RecipeCard recipe={item} badge="Popüler" fullWidth />
-                </View>
-              ))}
-            </View>
-          ) : (
-            <FlatList
-              data={popularRecipes}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => <RecipeCard recipe={item} horizontal badge="Popüler" />}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalList}
-            />
-          )}
         </View>
       )}
 
-      {/* Section 4: Şefin Tavsiyesi */}
-      {editorsRecipes.length > 0 && (
-        <View style={[styles.section, { paddingHorizontal: horizontalPadding }]}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="ribbon" size={18} color="#f39c12" />
-            <Text style={[styles.sectionTitle, { fontSize: rf(17, fontScale) }]}>Şefin Tavsiyesi</Text>
-            <TouchableOpacity onPress={() => router.push('/recipes')}>
-              <Text style={styles.seeAll}>Tümü →</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.editorsGrid}>
-            {editorsRecipes.map((recipe) => (
-              <TouchableOpacity
-                key={recipe.id}
-                style={[styles.editorCard, isTablet && styles.editorCardTablet]}
-                onPress={() => router.push(`/recipe/${recipe.slug}`)}
-                activeOpacity={0.85}
-              >
-                <Image source={{ uri: recipe.image }} style={styles.editorImage} contentFit="cover" />
-                <View style={styles.editorOverlay}>
-                  <Text style={styles.editorTitle} numberOfLines={2}>
-                    {recipe.title}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {/* Section 5: Mutfaktan Blog */}
-      {latestBlog.length > 0 && (
-        <View style={[styles.section, { paddingHorizontal: horizontalPadding }]}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="document-text" size={18} color="#1a1a1a" />
-            <Text style={[styles.sectionTitle, { fontSize: rf(17, fontScale) }]}>Mutfaktan Blog</Text>
-            <TouchableOpacity onPress={() => router.push('/blog')}>
-              <Text style={styles.seeAll}>Tümü →</Text>
-            </TouchableOpacity>
-          </View>
-          {isTablet ? (
-            <View style={styles.blogGridTablet}>
-              {latestBlog.map((post) => {
-                const imageUrl = post._embedded?.['wp:featuredmedia']?.[0]?.source_url;
-                return (
-                  <TouchableOpacity
-                    key={post.id}
-                    style={[styles.blogCard, styles.blogCardTablet]}
-                    onPress={() => router.push(`/blog/${post.slug}`)}
-                  >
-                    {imageUrl && (
-                      <Image source={{ uri: imageUrl }} style={styles.blogImageTablet} contentFit="cover" transition={200} />
-                    )}
-                    <View style={styles.blogContent}>
-                      <Text style={styles.blogTitle} numberOfLines={2}>
-                        {post.title.rendered.replace(/<[^>]*>/g, '')}
-                      </Text>
-                      <Text style={styles.blogDate}>
-                        {new Date(post.date).toLocaleDateString('tr-TR')}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          ) : (
-            latestBlog.map((post) => {
-              const imageUrl = post._embedded?.['wp:featuredmedia']?.[0]?.source_url;
-              return (
-                <TouchableOpacity
-                  key={post.id}
-                  style={styles.blogCard}
-                  onPress={() => router.push(`/blog/${post.slug}`)}
-                >
-                  {imageUrl && (
-                    <Image source={{ uri: imageUrl }} style={styles.blogImage} contentFit="cover" transition={200} />
-                  )}
-                  <View style={styles.blogContent}>
-                    <Text style={styles.blogTitle} numberOfLines={2}>
-                      {post.title.rendered.replace(/<[^>]*>/g, '')}
-                    </Text>
-                    <Text style={styles.blogDate}>
-                      {new Date(post.date).toLocaleDateString('tr-TR')}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </View>
-      )}
-
-      {/* Section 6: Menü Showcase */}
-      {menus.length > 0 && (
-        <View style={[styles.section, { paddingHorizontal: horizontalPadding }]}>
-          <View style={styles.menuShowcaseBadge}>
-            <Ionicons name="trophy" size={13} color="#db4c3f" />
-            <Text style={styles.menuShowcaseBadgeText}>Şefin Tavsiyesi</Text>
-          </View>
-          <Text style={[styles.menuShowcaseTitle, { fontSize: rf(20, fontScale) }]}>
-            "Bugün ne pişirsem?" derdine{' '}
-            <Text style={styles.menuShowcaseTitleAccent}>ilaç gibi</Text>
-            {' '}menüler.
-          </Text>
-          <Text style={[styles.menuShowcaseDesc, { fontSize: rf(13, fontScale) }]}>
-            Sizin yerinize düşündük, planladık, eşleştirdik. Siz sadece mutfağa girin ve şovunuzu yapın. (Teşekküre gerek yok, bi' tabak gönderirsiniz.)
-          </Text>
-          <View style={isTablet ? styles.menuGridTablet : undefined}>
-            {menus.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={[styles.menuCard, isTablet && styles.menuCardTablet]}
-              onPress={() => router.push(`/menu/${item.slug}`)}
-              activeOpacity={0.85}
-            >
-              <View style={styles.menuImageWrapper}>
-                {item.image ? (
-                  <Image source={{ uri: item.image }} style={styles.menuImage} contentFit="cover" />
+      <View style={styles.section}>
+        <Heading kicker="Mutfaklar" title="Vizesiz *dünya turu*" />
+        <View style={styles.grid}>
+          {CUISINES.map((c, i) => {
+            const meta = cuisines[i];
+            const cover = meta?.cover;
+            return (
+              <Pressable key={c.name} onPress={() => go({ cuisine: c.param })} style={({ pressed }) => [styles.cuisine, pressed && { opacity: 0.9 }]}>
+                {cover ? (
+                  <>
+                    <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                    <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={StyleSheet.absoluteFill} />
+                  </>
                 ) : (
-                  <View style={[styles.menuImage, styles.menuImagePlaceholder]} />
+                  <View style={styles.cuisineArt}><LokmaIngredientIcon name={c.icon} size={44} /></View>
                 )}
-                <View style={styles.menuGuestBadge}>
-                  <Ionicons name="people-outline" size={12} color="#ffffff" />
-                  <Text style={styles.menuGuestText}>{item.guest_count} Kişilik</Text>
-                </View>
-                <View style={styles.menuAIBadge}>
-                  <Text style={styles.menuAIBadgeText}>✨ AI Choice</Text>
-                </View>
-              </View>
-              <View style={styles.menuCardContent}>
-                {item.concept ? (
-                  <View style={styles.menuConceptBadge}>
-                    <Text style={styles.menuConceptText}>{item.concept}</Text>
-                  </View>
-                ) : null}
-                <Text style={styles.menuTitle} numberOfLines={2}>
-                  {item.title}
+                <Text style={[styles.cuisineName, !cover && { color: colors.ink }]}>{c.name}</Text>
+                <Text style={[styles.cuisineNote, !cover && { color: colors.textMuted }]} numberOfLines={1}>
+                  {meta?.count ? `${meta.count} tarif · ` : ''}{c.note}
                 </Text>
-                {item.description ? (
-                  <Text style={styles.menuDescription} numberOfLines={2}>
-                    {item.description}
-                  </Text>
-                ) : null}
-                <View style={styles.menuCardFooter}>
-                  {item.event_type ? (
-                    <View style={styles.menuBadge}>
-                      <Text style={styles.menuBadgeText}>{item.event_type}</Text>
-                    </View>
-                  ) : null}
-                  <Text style={styles.menuInspect}>İncele →</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {editors.length > 0 && (
+        <View style={styles.section}>
+          <Heading kicker="Şefin tavsiyesi" title="Editörün *seçtikleri*" onMore={() => router.push('/recipes')} more="Daha fazlası" />
+          <View style={{ gap: 12, paddingHorizontal: 20 }}>
+            {editors.map(recipe => (
+              <Pressable key={recipe.id} onPress={() => router.push(`/recipe/${recipe.slug}`)} style={styles.row}>
+                <View style={styles.rowThumb}>
+                  {isPlaceholderImage(recipe.image)
+                    ? <ImagePlaceholder title={recipe.title} style={StyleSheet.absoluteFill} compact />
+                    : <Image source={{ uri: recipe.image }} style={StyleSheet.absoluteFill} contentFit="cover" />}
                 </View>
-              </View>
-            </TouchableOpacity>
+                <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+                  {recipe.cuisine?.[0] ? <Text style={styles.rowKicker}>{recipe.cuisine[0]}</Text> : null}
+                  <Text style={styles.rowTitle} numberOfLines={2}>{recipe.title}</Text>
+                  {minutesOf(recipe) > 0 ? <Text style={styles.rowMeta}>{minutesOf(recipe)} dk</Text> : null}
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
+              </Pressable>
             ))}
           </View>
-          <TouchableOpacity
-            style={styles.menuArchiveLink}
-            onPress={() => router.push('/menus')}
-          >
-            <Text style={styles.menuArchiveLinkText}>
-              Vitrindekiler yetmedi mi? Tüm arşivi karıştır →
-            </Text>
-          </TouchableOpacity>
         </View>
       )}
 
-      {/* Section 7: Hangi Moddasın? */}
-      <View style={[styles.section, { paddingHorizontal: horizontalPadding }]}>
-        <View style={styles.sectionHeader}>
-          <Ionicons name="color-palette" size={18} color="#1a1a1a" />
-          <Text style={[styles.sectionTitle, { fontSize: rf(17, fontScale) }]}>Hangi Moddasın?</Text>
-        </View>
-        <View style={styles.moodsGrid}>
-          {MOODS.map((mood) => (
-            <TouchableOpacity
-              key={mood.label}
-              style={[styles.moodButton, { backgroundColor: mood.color }, isTablet && { width: '31%' }]}
-              onPress={() => navigateWithFilter(mood.param)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name={mood.icon} size={22} color="#ffffff" />
-              <Text style={[styles.moodLabel, { fontSize: rf(13, fontScale) }]}>{mood.label}</Text>
-            </TouchableOpacity>
+      <View style={[styles.section, styles.moodBand]}>
+        <Heading kicker="Ruh haline göre" title="Hangi *moddasın?*" />
+        <View style={styles.moodGrid}>
+          {MOODS.map(mood => (
+            <Pressable key={mood.label} onPress={() => go(mood.params)} style={({ pressed }) => [styles.mood, pressed && { transform: [{ scale: 0.97 }] }]}>
+              <View style={styles.moodIcon}><LokmaIngredientIcon name={mood.icon} size={30} /></View>
+              <Text style={styles.moodLabel}>{mood.label}</Text>
+              <Text style={styles.moodLine}>{mood.line}</Text>
+            </Pressable>
           ))}
         </View>
       </View>
 
-      {/* Section 8: Akıllı Banner */}
-      <View style={[styles.bannerSection, { paddingHorizontal: horizontalPadding }]}>
-        <View style={styles.banner}>
-          <Ionicons name="sparkles" size={32} color="#ffffff" />
-          <Text style={[styles.bannerTitle, { fontSize: rf(20, fontScale) }]}>AI ile Tarif Keşfet</Text>
-          <Text style={[styles.bannerSubtitle, { fontSize: rf(14, fontScale) }]}>
-            Elindeki malzemelere göre yapay zeka destekli tarif önerileri al.
-          </Text>
-          <TouchableOpacity style={styles.bannerButton} onPress={() => router.push('/pantry')}>
-            <Text style={[styles.bannerButtonText, { fontSize: rf(15, fontScale) }]}>Hemen Dene</Text>
-          </TouchableOpacity>
+      {menus.length > 0 && (
+        <View style={styles.section}>
+          <Heading kicker="Hazır sofralar" title="Düşündük, *eşleştirdik*" onMore={() => router.push('/menus')} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rail}>
+            {menus.map(menu => (
+              <Pressable key={menu.id} onPress={() => router.push(`/menu/${menu.slug}`)} style={styles.menuCard}>
+                <View style={styles.menuImage}>
+                  {menu.image && !isPlaceholderImage(menu.image)
+                    ? <Image source={{ uri: menu.image }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                    : <ImagePlaceholder title={menu.title} style={StyleSheet.absoluteFill} />}
+                </View>
+                {menu.event_type ? <Text style={styles.rowKicker}>{menu.event_type}</Text> : null}
+                <Text style={styles.menuTitle} numberOfLines={2}>{menu.title}</Text>
+                {Number(menu.guest_count) > 0 ? <Text style={styles.rowMeta}>{menu.guest_count} kişilik</Text> : null}
+              </Pressable>
+            ))}
+          </ScrollView>
         </View>
-      </View>
+      )}
 
-      {/* Quick Actions */}
-      <View style={[styles.section, { paddingHorizontal: horizontalPadding }]}>
-        <Text style={[styles.sectionTitle, { fontSize: rf(17, fontScale) }]}>Hızlı Erişim</Text>
-        <View style={styles.actionsGrid}>
-          {[
-            { label: 'Dolabım', icon: 'basket-outline' as IoniconName, route: '/pantry' },
-            { label: 'Menüler', icon: 'book-outline' as IoniconName, route: '/menus' },
-            { label: 'Blog', icon: 'document-text-outline' as IoniconName, route: '/blog' },
-            { label: 'Profil', icon: 'person-outline' as IoniconName, route: '/profile' },
-          ].map((action) => (
-            <TouchableOpacity
-              key={action.route}
-              style={[styles.actionCard, isTablet && { width: '22.5%' }]}
-              onPress={() => router.push(action.route as any)}
-            >
-              <Ionicons name={action.icon} size={24} color="#e74c3c" />
-              <Text style={[styles.actionLabel, { fontSize: rf(13, fontScale) }]}>{action.label}</Text>
-            </TouchableOpacity>
-          ))}
+      {blog.length > 0 && (
+        <View style={styles.section}>
+          <Heading kicker="Mutfaktan blog" title="Okurken *acıktıran* yazılar" onMore={() => router.push('/blog')} />
+          <View style={{ gap: 12, paddingHorizontal: 20 }}>
+            {blog.map(post => {
+              const img = post._embedded?.['wp:featuredmedia']?.[0]?.source_url;
+              return (
+                <Pressable key={post.id} onPress={() => router.push(`/blog/${post.slug}`)} style={styles.row}>
+                  {img ? <View style={styles.rowThumb}><Image source={{ uri: img }} style={StyleSheet.absoluteFill} contentFit="cover" /></View> : null}
+                  <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+                    <Text style={styles.rowTitle} numberOfLines={2}>{post.title.rendered.replace(/<[^>]*>/g, '')}</Text>
+                    <Text style={styles.rowMeta}>{new Date(post.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}</Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
-      </View>
-
-      <View style={styles.bottomPadding} />
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  hero: {
-    backgroundColor: '#fcfcfc',
-    paddingHorizontal: 28,
-    paddingTop: 32,
-    paddingBottom: 28,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0e8e8',
-  },
-  heroBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#fde8e7',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    marginBottom: 14,
-  },
-  heroBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#db4c3f',
-  },
-  heroTitle: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#1a1a1a',
-    letterSpacing: -0.5,
-    textAlign: 'center',
-  },
-  heroTitleAccent: {
-    color: '#db4c3f',
-  },
-  heroSubtitle: {
-    fontSize: 15,
-    color: '#666666',
-    marginTop: 6,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    width: '100%',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: '#1a1a1a',
-  },
-  pillsContainer: {
-    paddingTop: 12,
-    paddingRight: 4,
-    gap: 8,
-  },
-  pill: {
-    backgroundColor: 'rgba(219,76,63,0.08)',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: 'rgba(219,76,63,0.2)',
-    marginRight: 8,
-  },
-  pillText: {
-    fontSize: 13,
-    color: '#db4c3f',
-    fontWeight: '500',
-  },
-  section: {
-    paddingTop: 36,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    flex: 1,
-  },
-  sectionSubtitle: {
-    fontSize: 13,
-    color: '#666666',
-    marginTop: -8,
-    marginBottom: 12,
-    fontStyle: 'italic',
-  },
-  seeAll: {
-    fontSize: 13,
-    color: '#e74c3c',
-    fontWeight: '600',
-  },
-  horizontalList: {
-    paddingRight: 16,
-  },
-  cuisineCard: {
-    width: 140,
-    height: 100,
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginRight: 12,
-  },
-  cuisineImage: {
-    width: '100%',
-    height: '100%',
-  },
-  cuisineOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  cuisineLabel: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  editorsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  editorCard: {
-    width: '47.5%',
-    height: 130,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  editorCardTablet: {
-    height: 180,
-  },
-  editorImage: {
-    width: '100%',
-    height: '100%',
-  },
-  editorOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 8,
-  },
-  editorTitle: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  blogCard: {
-    flexDirection: 'row',
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-  },
-  blogCardTablet: {
-    width: '31.5%',
-    flexDirection: 'column',
-  },
-  blogGridTablet: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  blogImage: {
-    width: 90,
-    height: 90,
-  },
-  blogImageTablet: {
-    width: '100%',
-    height: 120,
-  },
-  blogContent: {
-    flex: 1,
-    padding: 12,
-    justifyContent: 'space-between',
-  },
-  blogTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    lineHeight: 20,
-  },
-  blogDate: {
-    fontSize: 12,
-    color: '#999999',
-  },
-  menuShowcaseBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#fde8e7',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    alignSelf: 'flex-start',
-    marginBottom: 10,
-  },
-  menuShowcaseBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#db4c3f',
-  },
-  menuShowcaseTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#1a1a1a',
-    lineHeight: 28,
-    marginBottom: 8,
-  },
-  menuShowcaseTitleAccent: {
-    color: '#db4c3f',
-    fontStyle: 'italic',
-  },
-  menuShowcaseDesc: {
-    fontSize: 13,
-    color: '#666666',
-    lineHeight: 19,
-    marginBottom: 16,
-  },
-  menuCard: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 16,
-    backgroundColor: '#f9f9f9',
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-  },
-  menuImageWrapper: {
-    position: 'relative',
-  },
-  menuImage: {
-    width: '100%',
-    aspectRatio: 4 / 3,
-  },
-  menuImagePlaceholder: {
-    backgroundColor: '#e5e5e5',
-  },
-  menuGuestBadge: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  menuGuestText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  menuAIBadge: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
-    backgroundColor: 'rgba(26,26,26,0.8)',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  menuAIBadgeText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  menuCardContent: {
-    padding: 12,
-  },
-  menuConceptBadge: {
-    backgroundColor: '#fde8e7',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    alignSelf: 'flex-start',
-    marginBottom: 6,
-  },
-  menuConceptText: {
-    fontSize: 11,
-    color: '#db4c3f',
-    fontWeight: '600',
-  },
-  menuTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 4,
-    lineHeight: 20,
-  },
-  menuDescription: {
-    fontSize: 13,
-    color: '#666666',
-    lineHeight: 18,
-    marginBottom: 8,
-  },
-  menuCardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  menuBadge: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    alignSelf: 'flex-start',
-  },
-  menuBadgeText: {
-    fontSize: 10,
-    color: '#666666',
-    fontWeight: '600',
-  },
-  menuInspect: {
-    fontSize: 13,
-    color: '#db4c3f',
-    fontWeight: '600',
-  },
-  menuArchiveLink: {
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  menuArchiveLinkText: {
-    fontSize: 14,
-    color: '#db4c3f',
-    fontWeight: '600',
-  },
-  moodsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  moodButton: {
-    width: '47.5%',
-    borderRadius: 14,
-    padding: 16,
-    alignItems: 'center',
-    gap: 8,
-  },
-  moodLabel: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  bannerSection: {
-    paddingTop: 24,
-  },
-  banner: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    gap: 8,
-  },
-  bannerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#ffffff',
-    textAlign: 'center',
-  },
-  bannerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.75)',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  bannerButton: {
-    backgroundColor: '#e74c3c',
-    borderRadius: 10,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    marginTop: 8,
-  },
-  bannerButtonText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginTop: 12,
-  },
-  actionCard: {
-    width: '47%',
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    alignItems: 'center',
-    gap: 8,
-  },
-  actionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  pillsContainerTablet: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    paddingTop: 12,
-    justifyContent: 'center',
-  },
-  cuisineGridTablet: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  cuisineCardTablet: {
-    flex: 1,
-    height: 130,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  popularGridTablet: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'flex-start',
-  },
-  menuGridTablet: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    justifyContent: 'flex-start',
-  },
-  menuCardTablet: {
-    width: '31.5%',
-    marginBottom: 0,
-  },
-  bottomPadding: {
-    height: 32,
-  },
+  screen: { flex: 1, backgroundColor: colors.canvas },
+  hero: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
+  floatA: { position: 'absolute', right: 30, top: 20 },
+  floatB: { position: 'absolute', right: 86, top: 64 },
+  kicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', color: colors.brand },
+  heroTitle: { fontFamily: fonts.headingBold, fontSize: 40, lineHeight: 44, letterSpacing: -1.4, color: colors.ink, marginTop: 10 },
+  heroAccent: { fontFamily: fonts.headingBoldItalic, color: colors.brand },
+  heroLine: { fontFamily: fonts.body, fontSize: 16, lineHeight: 23, color: colors.textMuted, marginTop: 10 },
+  search: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, height: 58, marginTop: 20, paddingLeft: 18, paddingRight: 7,
+    borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, ...shadow.card,
+  },
+  searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 15, color: colors.ink },
+  searchGo: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  pills: { gap: 8, paddingTop: 14, paddingBottom: 4 },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 40, paddingLeft: 6, paddingRight: 14, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
+  pillText: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.text },
+  importCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14, marginHorizontal: 20, marginTop: 22, padding: 18,
+    borderRadius: radius.xl, backgroundColor: colors.ink,
+  },
+  importKicker: { fontFamily: fonts.bodySemi, fontSize: 10, letterSpacing: 1.8, textTransform: 'uppercase', color: '#f3b8ad' },
+  importTitle: { fontFamily: fonts.headingBold, fontSize: 20, lineHeight: 25, color: '#fff', marginTop: 6 },
+  importAccent: { fontFamily: fonts.headingBoldItalic, color: '#ff8a7c' },
+  importLine: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: 'rgba(255,255,255,0.7)', marginTop: 6 },
+  importIcons: { gap: 6 },
+  importIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  section: { marginTop: 34 },
+  heading: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, paddingHorizontal: 20, marginBottom: 16 },
+  sectionTitle: { fontFamily: fonts.headingBold, fontSize: 25, lineHeight: 30, letterSpacing: -0.6, color: colors.ink },
+  moreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingBottom: 4 },
+  more: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.ink },
+  rail: { gap: 12, paddingHorizontal: 20 },
+  feature: { borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.cream, justifyContent: 'flex-end' },
+  featureCopy: { padding: 18 },
+  featureKicker: { fontFamily: fonts.bodySemi, fontSize: 10, letterSpacing: 1.8, textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)' },
+  featureTitle: { fontFamily: fonts.headingBold, fontSize: 22, lineHeight: 27, color: '#fff', marginTop: 6 },
+  featureMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
+  featureMetaText: { fontFamily: fonts.body, fontSize: 12, color: 'rgba(255,255,255,0.85)' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 20 },
+  cuisine: { width: '47.5%', aspectRatio: 0.82, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.cream, justifyContent: 'flex-end', padding: 14 },
+  cuisineArt: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', paddingBottom: 40 },
+  cuisineName: { fontFamily: fonts.headingBold, fontSize: 17, lineHeight: 21, color: '#fff' },
+  cuisineNote: { fontFamily: fonts.body, fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 3 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 10, paddingRight: 14, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
+  rowThumb: { width: 76, height: 76, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.cream },
+  rowKicker: { fontFamily: fonts.bodySemi, fontSize: 10, letterSpacing: 1.6, textTransform: 'uppercase', color: colors.brand },
+  rowTitle: { fontFamily: fonts.heading, fontSize: 16, lineHeight: 21, color: colors.ink },
+  rowMeta: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted },
+  moodBand: { backgroundColor: '#f8f1ea', paddingVertical: 30, marginTop: 40 },
+  moodGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 20 },
+  mood: { width: '31%', flexGrow: 1, alignItems: 'center', paddingTop: 16, paddingBottom: 14, paddingHorizontal: 6, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: '#eadfd5' },
+  moodIcon: { marginBottom: 10 },
+  moodLabel: { fontFamily: fonts.heading, fontSize: 13, color: colors.ink, textAlign: 'center' },
+  moodLine: { fontFamily: fonts.body, fontSize: 11, color: colors.textMuted, textAlign: 'center', marginTop: 2 },
+  menuCard: { width: 220, gap: 4 },
+  menuImage: { height: 150, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.cream, marginBottom: 8 },
+  menuTitle: { fontFamily: fonts.heading, fontSize: 16, lineHeight: 21, color: colors.ink },
 });

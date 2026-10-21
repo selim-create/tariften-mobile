@@ -31,7 +31,9 @@ test('mobile recipe detail does not fabricate servings or scale unknown source q
   assert.match(detail, /currentServings === null \|\| defaultServings === null/);
   assert.match(detail, /Kişi sayısı belirtilmemiş/);
   assert.match(detail, /disabled=\{currentServings === null/);
-  assert.match(detail, /Besin Değerleri \(tahmini\)/);
+  // Macros appear only when checked; nothing is derived from calories.
+  assert.match(detail, /recipe\.nutrition_status === 'verified'/);
+  assert.doesNotMatch(detail, /calories \* 0\.(25|45|30)/);
   assert.doesNotMatch(detail, /parseInt\(String\(data\.servings\), 10\) \|\| 1/);
 });
 
