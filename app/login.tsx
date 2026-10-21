@@ -13,9 +13,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuth } from '../context/AuthContext';
 import { useResponsive } from '../hooks/useResponsive';
+import LokmaIngredientIcon from '../components/LokmaIngredientIcon';
+import { AccentText } from '../components/ui/ScreenTitle';
+import { colors, fonts, radius, shadow } from '../constants/theme';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -96,30 +100,41 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={[styles.formContainer, isTablet && styles.formContainerTablet]}>
-        <View style={styles.logo}>
-          <Text style={styles.logoText}>tariften</Text>
-          <Text style={styles.logoSubtitle}>Hesabınıza giriş yapın</Text>
+        <View style={styles.hero}>
+          <View style={styles.art} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            {['un', 'yumurta', 'tereyağı'].map(name => (
+              <View key={name} style={styles.artDot}><LokmaIngredientIcon name={name} size={22} /></View>
+            ))}
+          </View>
+          <Text style={styles.kicker}>Giriş yap</Text>
+          <AccentText style={styles.title}>{'Mutfağa *hoş geldin.*'}</AccentText>
+          <Text style={styles.subtitle}>Tariflerin, kaydettiklerin ve sofraların seni bekliyor.</Text>
         </View>
 
         {/* Social Buttons */}
         <View style={styles.socialRow}>
-          <TouchableOpacity style={styles.socialButton} onPress={handleGoogleSignIn}>
-            <Text style={styles.socialButtonText}>🔵 Google</Text>
-          </TouchableOpacity>
           {Platform.OS === 'ios' ? (
-            <TouchableOpacity style={styles.socialButton} onPress={handleAppleSignIn}>
-              <Text style={styles.socialButtonText}>🍎 Apple</Text>
+            <TouchableOpacity style={[styles.socialButton, styles.appleButton]} onPress={handleAppleSignIn}
+              accessibilityRole="button" accessibilityLabel="Apple ile giriş yap">
+              <Ionicons name="logo-apple" size={18} color="#ffffff" />
+              <Text style={[styles.socialButtonText, styles.appleButtonText]}>Apple</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={[styles.socialButton, styles.socialButtonDisabled]} disabled>
-              <Text style={[styles.socialButtonText, styles.socialButtonTextDisabled]}>🍎 Apple</Text>
+              <Ionicons name="logo-apple" size={18} color={colors.textFaint} />
+              <Text style={[styles.socialButtonText, styles.socialButtonTextDisabled]}>Apple</Text>
             </TouchableOpacity>
           )}
+          <TouchableOpacity style={styles.socialButton} onPress={handleGoogleSignIn}
+            accessibilityRole="button" accessibilityLabel="Google ile giriş yap">
+            <Ionicons name="logo-google" size={17} color={colors.ink} />
+            <Text style={styles.socialButtonText}>Google</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.divider}>
           <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>veya e-posta</Text>
+          <Text style={styles.dividerText}>veya e-posta ile</Text>
           <View style={styles.dividerLine} />
         </View>
 
@@ -131,19 +146,20 @@ export default function LoginScreen() {
               value={email}
               onChangeText={setEmail}
               placeholder="ornek@email.com"
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.textFaint}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               autoComplete="email"
               returnKeyType="next"
+              accessibilityLabel="E-posta"
             />
           </View>
 
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
               <Text style={styles.inputLabel}>Şifre</Text>
-              <TouchableOpacity onPress={() => router.push('/forgot-password')}>
+              <TouchableOpacity onPress={() => router.push('/forgot-password')} hitSlop={8}>
                 <Text style={styles.forgotLink}>Şifremi Unuttum</Text>
               </TouchableOpacity>
             </View>
@@ -153,13 +169,15 @@ export default function LoginScreen() {
                 value={password}
                 onChangeText={setPassword}
                 placeholder="••••••••"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.textFaint}
                 secureTextEntry={!showPassword}
                 returnKeyType="done"
                 onSubmitEditing={handleLogin}
+                accessibilityLabel="Şifre"
               />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
-                <Text style={styles.eyeIcon}>{showPassword ? '🙈' : '👁'}</Text>
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}
+                accessibilityRole="button" accessibilityLabel={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}>
+                <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
           </View>
@@ -168,22 +186,31 @@ export default function LoginScreen() {
             style={[styles.loginButton, loading && styles.buttonDisabled]}
             onPress={handleLogin}
             disabled={loading}
+            accessibilityRole="button"
           >
             {loading ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <Text style={styles.loginButtonText}>Giriş Yap</Text>
+              <>
+                <Text style={styles.loginButtonText}>Giriş Yap</Text>
+                <Ionicons name="arrow-forward" size={18} color="#ffffff" />
+              </>
             )}
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.registerLink}
+            style={styles.registerCard}
             onPress={() => router.replace('/register')}
+            accessibilityRole="button"
           >
-            <Text style={styles.registerLinkText}>
-              Hesabınız yok mu?{' '}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.registerCardTitle}>Hesabın yok mu?</Text>
+              <Text style={styles.registerCardText}>Standart Üye ol; tariflerini ve aktarımlarını bir yerde topla.</Text>
+            </View>
+            <View style={styles.registerCardGo}>
               <Text style={styles.registerLinkBold}>Kayıt Olun</Text>
-            </Text>
+              <Ionicons name="arrow-forward" size={15} color={colors.brand} />
+            </View>
           </TouchableOpacity>
 
           <Text style={styles.legalText}>
@@ -205,176 +232,62 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
+  container: { flex: 1, backgroundColor: colors.canvas },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32 },
+  scrollContentTablet: { alignItems: 'center' },
+  formContainer: { width: '100%' },
+  formContainerTablet: { maxWidth: 480 },
+  hero: { marginBottom: 26 },
+  art: { flexDirection: 'row', marginBottom: 18 },
+  artDot: {
+    width: 42, height: 42, borderRadius: 21, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: colors.canvas, marginRight: -8,
   },
-  scrollContent: {
-    flexGrow: 1,
-    padding: 24,
-    justifyContent: 'center',
-  },
-  scrollContentTablet: {
-    alignItems: 'center',
-  },
-  formContainer: {
-    width: '100%',
-  },
-  formContainerTablet: {
-    maxWidth: 480,
-  },
-  logo: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  logoText: {
-    fontSize: 40,
-    fontWeight: '900',
-    color: '#e74c3c',
-    letterSpacing: -1,
-  },
-  logoSubtitle: {
-    fontSize: 16,
-    color: '#666666',
-    marginTop: 4,
-  },
-  socialRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
+  kicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', color: colors.brand },
+  title: { fontFamily: fonts.headingBold, fontSize: 36, lineHeight: 41, letterSpacing: -1.2, color: colors.ink, marginTop: 10 },
+  subtitle: { fontFamily: fonts.body, fontSize: 16, lineHeight: 23, color: colors.textMuted, marginTop: 10 },
+  socialRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   socialButton: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: '#e5e5e5',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: '#f9f9f9',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 4,
+    flex: 1, height: 52, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
-  socialButtonDisabled: {
-    opacity: 0.5,
-  },
-  socialButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  socialButtonTextDisabled: {
-    color: '#999',
-  },
-  soonBadge: {
-    fontSize: 10,
-    color: '#999',
-    marginLeft: 4,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 8,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e5e5e5',
-  },
-  dividerText: {
-    fontSize: 12,
-    color: '#999',
-  },
-  form: {
-    gap: 16,
-  },
-  inputGroup: {
-    gap: 6,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#666666',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  forgotLink: {
-    fontSize: 13,
-    color: '#e74c3c',
-    fontWeight: '600',
-  },
+  appleButton: { backgroundColor: colors.ink, borderColor: colors.ink },
+  appleButtonText: { color: '#ffffff' },
+  socialButtonDisabled: { opacity: 0.5 },
+  socialButtonText: { fontFamily: fonts.bodySemi, fontSize: 15, color: colors.ink },
+  socialButtonTextDisabled: { color: colors.textFaint },
+  divider: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 10 },
+  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.lineStrong },
+  dividerText: { fontFamily: fonts.body, fontSize: 12, color: colors.textFaint },
+  form: { gap: 16 },
+  inputGroup: { gap: 7 },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  inputLabel: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.text },
+  forgotLink: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.brand },
   input: {
-    borderWidth: 1.5,
-    borderColor: '#e5e5e5',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: '#1a1a1a',
-    backgroundColor: '#f9f9f9',
+    height: 52, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: 16,
+    fontFamily: fonts.body, fontSize: 15, color: colors.ink, backgroundColor: colors.surface,
   },
   passwordContainer: {
-    flexDirection: 'row',
-    borderWidth: 1.5,
-    borderColor: '#e5e5e5',
-    borderRadius: 12,
-    backgroundColor: '#f9f9f9',
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', height: 52, borderWidth: 1, borderColor: colors.line,
+    borderRadius: radius.md, backgroundColor: colors.surface,
   },
-  passwordInput: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: '#1a1a1a',
-  },
-  eyeButton: {
-    paddingHorizontal: 14,
-  },
-  eyeIcon: {
-    fontSize: 18,
-  },
+  passwordInput: { flex: 1, height: '100%', paddingHorizontal: 16, fontFamily: fonts.body, fontSize: 15, color: colors.ink },
+  eyeButton: { width: 48, height: '100%', alignItems: 'center', justifyContent: 'center' },
   loginButton: {
-    backgroundColor: '#e74c3c',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
+    height: 54, borderRadius: radius.pill, backgroundColor: colors.brand, marginTop: 6,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
-  buttonDisabled: {
-    opacity: 0.6,
+  buttonDisabled: { opacity: 0.6 },
+  loginButtonText: { fontFamily: fonts.bodySemi, color: '#ffffff', fontSize: 16 },
+  registerCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10, padding: 16,
+    borderRadius: radius.xl, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, ...shadow.card,
   },
-  loginButtonText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  registerLink: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  registerLinkText: {
-    fontSize: 14,
-    color: '#666666',
-  },
-  registerLinkBold: {
-    color: '#e74c3c',
-    fontWeight: '700',
-  },
-  legalText: {
-    fontSize: 11,
-    color: '#999999',
-    textAlign: 'center',
-    marginTop: 16,
-  },
-  legalLink: {
-    color: '#e74c3c',
-    textDecorationLine: 'underline',
-  },
+  registerCardTitle: { fontFamily: fonts.heading, fontSize: 16, color: colors.ink },
+  registerCardText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.textMuted, marginTop: 3 },
+  registerCardGo: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  registerLinkBold: { fontFamily: fonts.bodySemi, color: colors.brand, fontSize: 14 },
+  legalText: { fontFamily: fonts.body, fontSize: 12, lineHeight: 18, color: colors.textFaint, textAlign: 'center', marginTop: 12 },
+  legalLink: { fontFamily: fonts.bodySemi, color: colors.textMuted, textDecorationLine: 'underline' },
 });

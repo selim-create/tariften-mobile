@@ -104,21 +104,21 @@ function AppShell() {
           name="login"
           options={{
             headerShown: true,
-            headerTitle: 'Giriş Yap',
+            headerTitle: '',
           }}
         />
         <Stack.Screen
           name="register"
           options={{
             headerShown: true,
-            headerTitle: 'Kayıt Ol',
+            headerTitle: '',
           }}
         />
         <Stack.Screen
           name="forgot-password"
           options={{
             headerShown: true,
-            headerTitle: 'Şifremi Unuttum',
+            headerTitle: '',
           }}
         />
         <Stack.Screen
