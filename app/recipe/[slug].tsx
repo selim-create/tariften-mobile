@@ -35,6 +35,11 @@ import CookingAssistant from '../../components/CookingAssistant';
 import RecipeCard from '../../components/RecipeCard';
 import ImagePlaceholder, { isPlaceholderImage } from '../../components/ImagePlaceholder';
 import AuthorCard from '../../components/AuthorCard';
+import SocialSourceCard from '../../components/recipe/SocialSourceCard';
+import WeekPickerSheet from '../../components/recipe/WeekPickerSheet';
+import { colors, fonts, radius, shadow } from '../../constants/theme';
+import { formatAmountTr } from '../../lib/amount-format';
+import { addRecipeToShopping, addToPlan, isInShopping, removeRecipeFromShopping, useKitchen } from '../../lib/kitchen-store';
 
 const RATING_ICONS = ['sad-outline', 'remove-circle-outline', 'happy-outline', 'heart-outline', 'sparkles-outline'] as const;
 // Short visual captions keep five choices aligned on narrow screens.
@@ -65,6 +70,15 @@ export default function RecipeDetailScreen() {
   const [currentServings, setCurrentServings] = useState<number | null>(null);
   const [defaultServings, setDefaultServings] = useState<number | null>(null);
   const [similarRecipes, setSimilarRecipes] = useState<Recipe[]>([]);
+  const [tab, setTab] = useState<'ingredients' | 'steps'>('ingredients');
+  const [weekPickerVisible, setWeekPickerVisible] = useState(false);
+  const [toast, setToast] = useState('');
+  const kitchen = useKitchen(user?.id);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(''), 2600);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const requestCookingAssistant = () => {
     if (authLoading) return;
@@ -182,9 +196,9 @@ export default function RecipeDetailScreen() {
   };
 
   const displayAmount = (amount: string | number): string => {
-    if (currentServings === null || defaultServings === null || !/^[0-9]+(?:[.,][0-9]+)?$/.test(String(amount).trim())) return String(amount);
+    if (currentServings === null || defaultServings === null || !/^[0-9]+(?:[.,][0-9]+)?$/.test(String(amount).trim())) return formatAmountTr(amount);
     const scaled = (Number(String(amount).replace(',', '.')) * currentServings) / defaultServings;
-    return Number.isInteger(scaled) ? String(scaled) : scaled.toFixed(1);
+    return formatAmountTr(Number.isInteger(scaled) ? String(scaled) : scaled.toFixed(2));
   };
 
   if (loading) return <LoadingSpinner fullScreen />;
@@ -193,17 +207,46 @@ export default function RecipeDetailScreen() {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Tarif bulunamadı.</Text>
+        <TouchableOpacity onPress={handleBack} style={styles.errorBack}><Text style={styles.errorBackText}>Geri dön</Text></TouchableOpacity>
       </View>
     );
   }
 
-  const calories = recipe.nutrition?.calories || Number(recipe.calories) || 0;
-  const protein = recipe.nutrition?.protein ?? Math.round((calories * 0.25) / 4);
-  const carbs = recipe.nutrition?.carbs ?? Math.round((calories * 0.45) / 4);
-  const fat = recipe.nutrition?.fat ?? Math.round((calories * 0.30) / 9);
-  const nutritionTotal = protein + carbs + fat;
+  // Never fabricate macronutrients from calories: only checked values are shown.
+  const verifiedMacros = recipe.nutrition_status === 'verified'
+    && recipe.nutrition != null
+    && [recipe.nutrition.protein, recipe.nutrition.carbs, recipe.nutrition.fat]
+      .every(value => typeof value === 'number' && Number.isFinite(value) && value >= 0);
+  const calories = Number(recipe.nutrition?.calories || recipe.calories) || 0;
   const ingredientsReady = recipe.ingredients?.filter((_, index) => checkedIngredients.has(index)).length || 0;
   const stepsReady = recipe.steps?.filter((_, index) => completedSteps.has(index)).length || 0;
+  const minutes = (Number(recipe.prep_time) || 0) + (Number(recipe.cook_time) || 0);
+  const facts = [
+    minutes > 0 ? `${minutes} dk` : null,
+    defaultServings ? `${defaultServings} kişilik` : null,
+    recipe.difficulty?.[0] || null,
+    calories > 0 ? `${calories} kcal` : null,
+  ].filter(Boolean) as string[];
+  const tags = [...(recipe.cuisine || []).map(v => ({ v, key: 'cuisine' })), ...(recipe.meal_type || []).map(v => ({ v, key: 'mealType' })), ...(recipe.diet || []).map(v => ({ v, key: 'diet' }))];
+  const inList = isInShopping(recipe.id, kitchen);
+
+  const toggleShopping = () => {
+    if (inList) { removeRecipeFromShopping(recipe.id); setToast('Alışveriş listesinden çıkarıldı'); return; }
+    addRecipeToShopping({ id: recipe.id, slug: recipe.slug, title: recipe.title, servings: defaultServings, ingredients: recipe.ingredients });
+    setToast('Malzemeler alışveriş listene eklendi');
+  };
+  const pickDay = (day: string) => {
+    addToPlan({ id: recipe.id, slug: recipe.slug, title: recipe.title, image: isPlaceholderImage(recipe.image) ? undefined : recipe.image }, day);
+    setWeekPickerVisible(false);
+    setToast('Haftana eklendi');
+  };
+
+  const quickActions: { key: string; label: string; icon: React.ComponentProps<typeof Ionicons>['name']; active?: boolean; onPress: () => void }[] = [
+    { key: 'cook', label: 'Pişir', icon: 'play', onPress: requestCookingAssistant },
+    { key: 'week', label: 'Haftaya ekle', icon: 'calendar-clear-outline', onPress: () => setWeekPickerVisible(true) },
+    { key: 'shop', label: inList ? 'Listede' : 'Alışverişe ekle', icon: inList ? 'basket' : 'basket-outline', active: inList, onPress: toggleShopping },
+    ...(user ? [{ key: 'cooked', label: 'Pişirdim', icon: (isCooked ? 'checkmark-circle' : 'checkmark-circle-outline') as React.ComponentProps<typeof Ionicons>['name'], active: isCooked, onPress: handleCooked }] : []),
+  ];
 
   return (
     <>
@@ -211,178 +254,103 @@ export default function RecipeDetailScreen() {
       <ScrollView style={styles.container}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="never"
-        automaticallyAdjustContentInsets={false}>
+        automaticallyAdjustContentInsets={false}
+        contentContainerStyle={{ paddingBottom: 110 + insets.bottom }}>
         <View style={styles.hero}>
           {isPlaceholderImage(recipe.image) ? (
             <ImagePlaceholder title={recipe.title} variant="detail" style={styles.image} />
           ) : (
             <Image source={{ uri: recipe.image }} style={styles.image} contentFit="cover" transition={300} />
           )}
-          <LinearGradient colors={['rgba(18,23,33,0.56)', 'rgba(18,23,33,0.10)', 'transparent']}
+          <LinearGradient colors={['rgba(18,23,33,0.50)', 'rgba(18,23,33,0.08)', 'transparent']}
             locations={[0, 0.55, 1]}
             style={styles.heroGradient} pointerEvents="none" />
           <TouchableOpacity style={[styles.heroBack, { top: Math.max(insets.top + 8, 20) }]}
             onPress={handleBack} accessibilityRole="button" accessibilityLabel="Tariflere geri dön"
             activeOpacity={0.8}>
-            <Ionicons name="chevron-back" size={20} color="#17243a" />
-            <Text style={styles.heroBackText}>Geri</Text>
+            <Ionicons name="chevron-back" size={22} color={colors.ink} />
           </TouchableOpacity>
-        </View>
-
-      <View style={styles.content}>
-        {/* Title & Actions */}
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>{recipe.title}</Text>
-          <View style={styles.actions}>
-            {user && (
-              <>
-                <TouchableOpacity onPress={handleFavorite} style={styles.actionButton}>
-                  <Ionicons
-                    name={isFavorite ? 'heart' : 'heart-outline'}
-                    size={24}
-                    color={isFavorite ? '#e74c3c' : '#666666'}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleCooked} style={styles.actionButton}>
-                  <Ionicons
-                    name={isCooked ? 'checkmark-circle' : 'checkmark-circle-outline'}
-                    size={24}
-                    color={isCooked ? '#27ae60' : '#666666'}
-                  />
-                </TouchableOpacity>
-              </>
-            )}
-            <TouchableOpacity onPress={handleShare} style={styles.actionButton}>
-              <Ionicons name="share-outline" size={24} color="#666666" />
+          <View style={[styles.heroRight, { top: Math.max(insets.top + 8, 20) }]}>
+            {user ? (
+              <TouchableOpacity onPress={handleFavorite} style={styles.heroCircle} accessibilityRole="button"
+                accessibilityLabel={isFavorite ? 'Kaydedilenlerden çıkar' : 'Tarifi kaydet'} accessibilityState={{ selected: isFavorite }}>
+                <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={21} color={isFavorite ? colors.brand : colors.ink} />
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity onPress={handleShare} style={styles.heroCircle} accessibilityRole="button" accessibilityLabel="Tarifi paylaş">
+              <Ionicons name="share-outline" size={20} color={colors.ink} />
             </TouchableOpacity>
           </View>
         </View>
+
+      <View style={styles.content}>
+        {facts.length > 0 ? <Text style={styles.kicker}>{facts.join('  ·  ')}</Text> : null}
+        <Text style={styles.title}>{recipe.title}</Text>
+        {recipe.excerpt ? <Text style={styles.excerpt}>{recipe.excerpt}</Text> : null}
+
+        {tags.length > 0 && (
+          <View style={styles.tagsRow}>
+            {tags.map(({ v, key }) => (
+              <TouchableOpacity key={`${key}-${v}`} style={styles.tag}
+                onPress={() => router.push({ pathname: '/recipes', params: { [key]: v } })}>
+                <Text style={styles.tagText}>{v}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {ratingData.count > 0 && (
+          <View style={styles.ratingSection}>
+            <RatingStars rating={ratingData.average} size={15} />
+            <Text style={styles.ratingText}>
+              {ratingData.average.toFixed(1)} · {ratingData.count} değerlendirme
+            </Text>
+          </View>
+        )}
+
+        {recipe.social_source ? (
+          <View style={styles.block}><SocialSourceCard source={recipe.social_source} /></View>
+        ) : null}
 
         {user && Number(recipe.author?.id) === Number(user.id) ? (
           <TouchableOpacity style={styles.authorEditButton} accessibilityRole="button"
             accessibilityLabel="Kendi tarifimi düzenle"
             onPress={() => router.push(`/recipe/edit/${recipe.id}`)}>
-            <Ionicons name="create-outline" size={17} color="#b95b49" />
+            <Ionicons name="create-outline" size={17} color={colors.brand} />
             <Text style={styles.authorEditText}>Bu tarif sana ait · Düzenle</Text>
-            <Ionicons name="chevron-forward" size={16} color="#b95b49" />
+            <Ionicons name="chevron-forward" size={16} color={colors.brand} />
           </TouchableOpacity>
         ) : null}
-        {recipe.excerpt ? <Text style={styles.excerpt}>{recipe.excerpt}</Text> : null}
 
-        {/* Tags (above rating) */}
-        {(recipe.meal_type?.length > 0 || recipe.cuisine?.length > 0 || recipe.diet?.length > 0) && (
-          <View style={styles.tagsRow}>
-            {recipe.meal_type?.map((m) => (
-              <TouchableOpacity
-                key={m}
-                style={[styles.tag, styles.tagMealType]}
-                onPress={() => router.push({ pathname: '/recipes', params: { mealType: m } })}
-              >
-                <Text style={[styles.tagText, styles.tagMealTypeText]}>{m}</Text>
-              </TouchableOpacity>
-            ))}
-            {recipe.cuisine?.map((c) => (
-              <TouchableOpacity
-                key={c}
-                style={[styles.tag, styles.tagCuisine]}
-                onPress={() => router.push({ pathname: '/recipes', params: { cuisine: c } })}
-              >
-                <Text style={[styles.tagText, styles.tagCuisineText]}>{c}</Text>
-              </TouchableOpacity>
-            ))}
-            {recipe.diet?.map((d) => (
-              <TouchableOpacity
-                key={d}
-                style={[styles.tag, styles.tagDiet]}
-                onPress={() => router.push({ pathname: '/recipes', params: { diet: d } })}
-              >
-                <Text style={[styles.tagText, styles.tagDietText]}>{d}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Rating */}
-        <View style={styles.ratingSection}>
-          <RatingStars rating={ratingData.average} size={18} />
-          <Text style={styles.ratingText}>
-            {ratingData.average.toFixed(1)} ({ratingData.count} değerlendirme)
-          </Text>
+        <View style={styles.quickRow}>
+          {quickActions.map(action => (
+            <TouchableOpacity key={action.key} onPress={action.onPress} style={styles.quick} accessibilityRole="button"
+              accessibilityLabel={action.label} accessibilityState={action.active ? { selected: true } : undefined}>
+              <View style={[styles.quickIcon, action.key === 'cook' && styles.quickIconPrimary, action.active && styles.quickIconActive]}>
+                <Ionicons name={action.icon} size={21} color={action.key === 'cook' || action.active ? '#ffffff' : colors.ink} />
+              </View>
+              <Text style={styles.quickLabel} numberOfLines={2}>{action.label}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {/* User Rating */}
-        {user && (
-          <View style={styles.userRating}>
-            <Text style={styles.userRatingLabel}>Değerlendirin:</Text>
-            <RatingStars
-              rating={userRating || 0}
-              size={28}
-              interactive
-              onRate={handleRate}
-            />
-          </View>
-        )}
-
-        {user && (
-          <View style={styles.lokmaRatingRow}>
-            {LOKMA_RATINGS.map(({ rating, label }) => (
-              <TouchableOpacity key={rating} accessibilityRole="button"
-                accessibilityLabel={`${rating} yıldız, ${label}`}
-                accessibilityState={{ selected: userRating === rating }}
-                onPress={() => handleRate(rating)}
-                style={[styles.lokmaRatingOption, userRating === rating && styles.lokmaRatingOptionSelected]}>
-                <View style={[styles.lokmaRatingSymbol, userRating === rating && styles.lokmaRatingSymbolSelected]}>
-                  <Ionicons name={RATING_ICONS[rating - 1]} size={21}
-                    color={userRating === rating ? '#ffffff' : '#b55f4d'} />
-                </View>
-                <Text style={styles.lokmaRatingLabel} numberOfLines={1}
-                  adjustsFontSizeToFit minimumFontScale={0.85} ellipsizeMode="tail">
-                  {RATING_DISPLAY_LABELS[rating - 1]}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Meta Info */}
-        <View style={styles.metaGrid}>
-          {recipe.prep_time ? (
-            <View style={styles.metaItem}>
-              <Ionicons name="time-outline" size={20} color="#db4c3f" />
-              <Text style={styles.metaLabel}>Hazırlık</Text>
-              <Text style={styles.metaValue}>{recipe.prep_time} dk</Text>
-            </View>
-          ) : null}
-          {recipe.cook_time ? (
-            <View style={styles.metaItem}>
-              <Ionicons name="flame-outline" size={20} color="#f97316" />
-              <Text style={styles.metaLabel}>Pişirme</Text>
-              <Text style={styles.metaValue}>{recipe.cook_time} dk</Text>
-            </View>
-          ) : null}
-          {recipe.calories ? (
-            <View style={styles.metaItem}>
-              <Ionicons name="leaf-outline" size={20} color="#22c55e" />
-              <Text style={styles.metaLabel}>Kalori</Text>
-              <Text style={styles.metaValue}>{recipe.calories} kcal</Text>
-            </View>
-          ) : null}
-          {recipe.difficulty?.[0] ? (
-            <View style={styles.metaItem}>
-              <Ionicons name="bar-chart-outline" size={20} color="#3b82f6" />
-              <Text style={styles.metaLabel}>Zorluk</Text>
-              <Text style={styles.metaValue}>{recipe.difficulty[0]}</Text>
-            </View>
-          ) : null}
+        <View style={styles.segment} accessibilityRole="tablist">
+          {(['ingredients', 'steps'] as const).map(key => (
+            <TouchableOpacity key={key} onPress={() => setTab(key)} style={[styles.segmentItem, tab === key && styles.segmentActive]}
+              accessibilityRole="tab" accessibilityState={{ selected: tab === key }}>
+              <Text style={[styles.segmentText, tab === key && styles.segmentTextActive]}>
+                {key === 'ingredients' ? `Malzemeler${recipe.ingredients?.length ? ` · ${recipe.ingredients.length}` : ''}` : `Tarif${recipe.steps?.length ? ` · ${recipe.steps.length} adım` : ''}`}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* Ingredients */}
-        {recipe.ingredients?.length > 0 && (
+        {tab === 'ingredients' && recipe.ingredients?.length > 0 && (
           <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <View style={styles.sectionHeadingBlock}>
-                <Text style={styles.sectionEyebrow}>HAZIRLIK LİSTEN</Text>
-                <Text style={styles.sectionTitle}>Malzemeler</Text>
+            <View style={styles.servingsRow}>
+              <View>
+                <Text style={styles.servingsLabel}>Kişi sayısı</Text>
                 <Text style={styles.sectionCaption}>{ingredientsReady} / {recipe.ingredients.length} malzeme hazır</Text>
               </View>
               <View style={styles.servingsControl}>
@@ -392,16 +360,16 @@ export default function RecipeDetailScreen() {
                   accessibilityLabel="Porsiyonu azalt"
                   onPress={() => setCurrentServings((s) => s === null ? null : Math.max(1, s - 1))}
                 >
-                  <Ionicons name="remove" size={16} color="#e74c3c" />
+                  <Ionicons name="remove" size={17} color={colors.ink} />
                 </TouchableOpacity>
-                <Text style={styles.servingsText}>{currentServings === null ? 'Kişi sayısı belirtilmemiş' : `${currentServings} Porsiyon`}</Text>
+                <Text style={styles.servingsText}>{currentServings === null ? 'Kişi sayısı belirtilmemiş' : `${currentServings} kişilik`}</Text>
                 <TouchableOpacity
                   style={styles.servingsBtn}
                   disabled={currentServings === null || currentServings >= 36}
                   accessibilityLabel="Porsiyonu artır"
                   onPress={() => setCurrentServings((s) => s === null ? null : Math.min(36, s + 1))}
                 >
-                  <Ionicons name="add" size={16} color="#e74c3c" />
+                  <Ionicons name="add" size={17} color={colors.ink} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -421,32 +389,26 @@ export default function RecipeDetailScreen() {
                 <LokmaIngredientIcon name={ing.name} size={27} />
                 <View style={styles.ingredientCopy}>
                   <Text style={[styles.ingredientText, checkedIngredients.has(idx) && styles.ingredientTextChecked]}>
-                    {[displayAmount(ing.amount), ing.unit, ing.name].filter(v => String(v || '').trim()).join(' ')}
+                    {[displayAmount(ing.amount), ing.unit].filter(v => String(v || '').trim()).length
+                      ? <Text style={styles.ingredientAmount}>{[displayAmount(ing.amount), ing.unit].filter(v => String(v || '').trim()).join(' ')} </Text>
+                      : null}
+                    {ing.name}
                   </Text>
                   {ing.note ? <Text style={styles.ingredientNote}>{ing.note}</Text> : null}
                 </View>
               </TouchableOpacity>
             ))}
+            <TouchableOpacity onPress={toggleShopping} style={styles.inlineShop} accessibilityRole="button">
+              <Ionicons name={inList ? 'checkmark' : 'basket-outline'} size={18} color={colors.brand} />
+              <Text style={styles.inlineShopText}>{inList ? 'Alışveriş listende' : 'Tüm malzemeleri alışveriş listesine ekle'}</Text>
+            </TouchableOpacity>
           </View>
         )}
 
         {/* Steps */}
-        {recipe.steps?.length > 0 && (
+        {tab === 'steps' && recipe.steps?.length > 0 && (
           <View style={styles.section}>
-            <View style={styles.stepsSectionHeader}>
-              <View style={styles.sectionHeadingBlock}>
-                <Text style={styles.sectionEyebrow}>ADIM ADIM</Text>
-                <Text style={styles.sectionTitle}>Yapılışı</Text>
-                <Text style={styles.sectionCaption}>{stepsReady} / {recipe.steps.length} adım tamamlandı</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.startCookingButton}
-                onPress={requestCookingAssistant}
-              >
-                <Ionicons name="play-circle" size={16} color="#ffffff" />
-                <Text style={styles.startCookingText}>Pişirmeye Başla</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.sectionCaption}>{stepsReady} / {recipe.steps.length} adım tamamlandı · dokunarak işaretle</Text>
             {recipe.steps.map((step, idx) => (
               <TouchableOpacity
                 key={idx}
@@ -459,12 +421,10 @@ export default function RecipeDetailScreen() {
               >
                 {completedSteps.has(idx) ? (
                   <View style={styles.stepNumberDone}>
-                    <Ionicons name="checkmark" size={14} color="#ffffff" />
+                    <Ionicons name="checkmark" size={15} color="#ffffff" />
                   </View>
                 ) : (
-                  <View style={styles.stepNumber}>
-                    <Text style={styles.stepNumberText}>{idx + 1}</Text>
-                  </View>
+                  <Text style={styles.stepNumberText}>{idx + 1}</Text>
                 )}
                 <Text
                   style={[
@@ -476,69 +436,65 @@ export default function RecipeDetailScreen() {
                 </Text>
               </TouchableOpacity>
             ))}
-          </View>
-        )}
-
-        {/* Chef Tip */}
-        {recipe.chef_tip && (
-          <View style={styles.chefTip}>
-            <Ionicons name="bulb-outline" size={22} color="#d97706" />
-            <View style={styles.chefTipContent}>
-              <Text style={styles.chefTipTitle}>Şefin İpucu:</Text>
-              <Text style={styles.chefTipText}>{recipe.chef_tip}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Nutrition */}
-        {(recipe.nutrition || calories > 0) && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{defaultServings === null ? 'Besin Değerleri (tahmini)' : '1 Porsiyon İçin Besin Değerleri'}</Text>
-            {recipe.serving_weight ? (
-              <Text style={styles.servingWeightText}>yaklaşık {recipe.serving_weight} gr</Text>
+            {recipe.chef_tip ? (
+              <View style={styles.chefTip}>
+                <Text style={styles.chefTipTitle}>Şefin notu</Text>
+                <Text style={styles.chefTipText}>{recipe.chef_tip}</Text>
+              </View>
             ) : null}
-            <View style={styles.nutritionCalorieRow}>
-              <Text style={styles.nutritionCalorieLabel}>Kalori</Text>
-              <Text style={styles.nutritionCalorieValue}>{calories} kcal</Text>
+          </View>
+        )}
+
+        {/* Nutrition: checked values only */}
+        {verifiedMacros && (
+          <View style={styles.card}>
+            <View style={styles.cardHead}>
+              <Text style={styles.cardTitle}>Besin değerleri</Text>
+              <Text style={styles.cardMeta}>{defaultServings === null ? 'Tarifin tamamı' : '1 porsiyon'} · doğrulanmış</Text>
             </View>
-            <View style={styles.nutritionBars}>
-              {[
-                { label: 'Protein', value: protein, unit: 'g', color: '#3b82f6', max: nutritionTotal || 1 },
-                { label: 'Karbonhidrat', value: carbs, unit: 'g', color: '#f97316', max: nutritionTotal || 1 },
-                { label: 'Yağ', value: fat, unit: 'g', color: '#ef4444', max: nutritionTotal || 1 },
-              ].map((n) => (
-                <View key={n.label} style={styles.nutritionBarItem}>
-                  <View style={styles.nutritionBarHeader}>
-                    <Text style={styles.nutritionBarLabel}>{n.label}</Text>
-                    <Text style={styles.nutritionBarValue}>{n.value}{n.unit}</Text>
+            <View style={styles.macroRow}>
+              {calories > 0 && <Macro label="Kalori" value={`${calories}`} unit="kcal" />}
+              <Macro label="Protein" value={String(recipe.nutrition.protein)} unit="g" />
+              <Macro label="Karbonhidrat" value={String(recipe.nutrition.carbs)} unit="g" />
+              <Macro label="Yağ" value={String(recipe.nutrition.fat)} unit="g" />
+            </View>
+          </View>
+        )}
+
+        {/* Lokma rating: one control, five honest feelings */}
+        {user && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Nasıl buldun?</Text>
+            <View style={styles.lokmaRatingRow}>
+              {LOKMA_RATINGS.map(({ rating, label }) => (
+                <TouchableOpacity key={rating} accessibilityRole="button"
+                  accessibilityLabel={`${rating} yıldız, ${label}`}
+                  accessibilityState={{ selected: userRating === rating }}
+                  onPress={() => handleRate(rating)}
+                  style={[styles.lokmaRatingOption, userRating === rating && styles.lokmaRatingOptionSelected]}>
+                  <View style={[styles.lokmaRatingSymbol, userRating === rating && styles.lokmaRatingSymbolSelected]}>
+                    <Ionicons name={RATING_ICONS[rating - 1]} size={21}
+                      color={userRating === rating ? '#ffffff' : colors.brand} />
                   </View>
-                  <View style={styles.nutritionBarBg}>
-                    <View
-                      style={[
-                        styles.nutritionBarFill,
-                        {
-                          backgroundColor: n.color,
-                          width: `${Math.min(100, (n.value / n.max) * 100)}%`,
-                        },
-                      ]}
-                    />
-                  </View>
-                </View>
+                  <Text style={styles.lokmaRatingLabel} numberOfLines={1}
+                    adjustsFontSizeToFit minimumFontScale={0.85} ellipsizeMode="tail">
+                    {RATING_DISPLAY_LABELS[rating - 1]}
+                  </Text>
+                </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.nutritionDisclaimer}>Değerler yaklaşık olarak hesaplanmıştır.</Text>
           </View>
         )}
 
         {/* Similar Recipes */}
         {similarRecipes.length > 0 && (
-          <View style={styles.section}>
+          <View style={styles.sectionWide}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Bunu Sevenler Şunlara da Düştü 😍</Text>
+              <Text style={styles.sectionTitle}>Bunu sevenler <Text style={styles.sectionAccent}>şunlara da</Text> bayıldı</Text>
               <TouchableOpacity
                 onPress={() => router.push({ pathname: '/recipes', params: { cuisine: recipe.cuisine?.[0] } })}
               >
-                <Text style={styles.seeAllText}>Tümünü Gör</Text>
+                <Text style={styles.seeAllText}>Tümü</Text>
               </TouchableOpacity>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.similarList}>
@@ -551,17 +507,15 @@ export default function RecipeDetailScreen() {
 
         {/* Author */}
         {recipe.author?.name && (
-          <View style={styles.section}>
+          <View style={styles.block}>
             <AuthorCard author={recipe.author} />
           </View>
         )}
 
         {/* Comments */}
-        <View style={styles.section}>
+        <View style={styles.block}>
           <CommentSection recipeId={recipe.id} />
         </View>
-
-        <View style={styles.bottomPadding} />
       </View>
 
       <Modal visible={assistantAuthVisible} transparent animationType="fade"
@@ -594,417 +548,156 @@ export default function RecipeDetailScreen() {
         />
       )}
       </ScrollView>
+
+      <View style={[styles.cookBar, { paddingBottom: Math.max(insets.bottom, 14) }]} pointerEvents="box-none">
+        <TouchableOpacity onPress={requestCookingAssistant} style={styles.cookButton} accessibilityRole="button" activeOpacity={0.9}>
+          <Ionicons name="play" size={18} color="#ffffff" />
+          <Text style={styles.cookButtonText}>Pişirmeye başla</Text>
+        </TouchableOpacity>
+      </View>
+
+      {toast ? (
+        <View style={[styles.toast, { bottom: Math.max(insets.bottom, 14) + 74 }]} pointerEvents="none" accessibilityLiveRegion="polite">
+          <Ionicons name="checkmark-circle" size={18} color="#ffffff" />
+          <Text style={styles.toastText}>{toast}</Text>
+        </View>
+      ) : null}
+
+      <WeekPickerSheet visible={weekPickerVisible} title={recipe.title} onClose={() => setWeekPickerVisible(false)} onPick={pickDay} />
     </>
   );
 }
 
-const styles = StyleSheet.create({
-  authorEditButton: {
-    marginBottom: 15, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 11,
-    borderWidth: 1, borderColor: '#efddcd', backgroundColor: '#fff7f2',
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-  },
-  authorEditText: { flex: 1, color: '#a65c4a', fontSize: 12, fontWeight: '800' },
+function Macro({ label, value, unit }: { label: string; value: string; unit: string }) {
+  return (
+    <View style={styles.macro}>
+      <Text style={styles.macroValue}>{value}<Text style={styles.macroUnit}> {unit}</Text></Text>
+      <Text style={styles.macroLabel}>{label}</Text>
+    </View>
+  );
+}
 
-  container: {
-    flex: 1,
-    backgroundColor: '#fffbf7',
-  },
-  hero: { width: '100%', position: 'relative' },
-  image: { width: '100%', height: 320 },
-  heroGradient: {
-    position: 'absolute', top: 0, left: 0, right: 0, height: 150,
-  },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.canvas },
+  hero: { position: 'relative', height: 400, backgroundColor: colors.cream },
+  image: { width: '100%', height: '100%' },
+  heroGradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 150 },
   heroBack: {
-    position: 'absolute', left: 16,
-    height: 42, minWidth: 79, paddingHorizontal: 13,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3,
-    borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.94)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.84)',
+    position: 'absolute', left: 16, width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.95)', alignItems: 'center', justifyContent: 'center', ...shadow.card,
   },
-  heroBackText: { color: '#17243a', fontSize: 13, fontWeight: '800' },
+  heroRight: { position: 'absolute', right: 16, flexDirection: 'row', gap: 10 },
+  heroCircle: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.95)',
+    alignItems: 'center', justifyContent: 'center', ...shadow.card,
+  },
   content: {
-    paddingHorizontal: 17,
-    paddingTop: 22,
-    paddingBottom: 20,
+    marginTop: -30, borderTopLeftRadius: 30, borderTopRightRadius: 30, backgroundColor: colors.canvas,
+    paddingTop: 26,
   },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+  kicker: { fontFamily: fonts.bodySemi, fontSize: 12, letterSpacing: 1.6, textTransform: 'uppercase', color: colors.textMuted, marginHorizontal: 20 },
+  title: { fontFamily: fonts.headingBold, fontSize: 30, lineHeight: 36, letterSpacing: -0.8, color: colors.ink, marginHorizontal: 20, marginTop: 8 },
+  excerpt: { fontFamily: fonts.body, fontSize: 16, lineHeight: 24, color: colors.textMuted, marginHorizontal: 20, marginTop: 10 },
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginHorizontal: 20, marginTop: 16 },
+  tag: { height: 34, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: colors.cream, justifyContent: 'center' },
+  tagText: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.text },
+  ratingSection: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginTop: 14 },
+  ratingText: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted },
+  block: { marginHorizontal: 20, marginTop: 20 },
+  authorEditButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginTop: 16,
+    paddingHorizontal: 14, height: 44, borderRadius: radius.pill, backgroundColor: colors.brandSoft,
   },
-  title: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#18243a',
-    flex: 1,
-    marginRight: 12,
-    lineHeight: 34,
-    letterSpacing: -0.6,
+  authorEditText: { flex: 1, fontFamily: fonts.bodySemi, fontSize: 14, color: colors.brand },
+  quickRow: { flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: 12, marginTop: 24 },
+  quick: { flex: 1, alignItems: 'center', gap: 8, paddingHorizontal: 4 },
+  quickIcon: {
+    width: 56, height: 56, borderRadius: 28, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line,
+    alignItems: 'center', justifyContent: 'center',
   },
-  actions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    padding: 4,
-  },
-  excerpt: {
-    fontSize: 14,
-    color: '#81756e',
-    lineHeight: 23,
-    marginBottom: 19,
-    paddingLeft: 12,
-    borderLeftWidth: 2,
-    borderLeftColor: '#e5afa0',
-  },
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 12,
-  },
-  tag: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-  },
-  tagMealType: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#bfdbfe',
-  },
-  tagCuisine: {
-    backgroundColor: '#fff7ed',
-    borderColor: '#fed7aa',
-  },
-  tagDiet: {
-    backgroundColor: '#f0fdf4',
-    borderColor: '#bbf7d0',
-  },
-  tagDifficulty: {
-    backgroundColor: '#fff0f0',
-    borderColor: '#fecaca',
-  },
-  tagText: {
-    fontSize: 12,
-    color: '#666666',
-  },
-  tagMealTypeText: {
-    color: '#1d4ed8',
-  },
-  tagCuisineText: {
-    color: '#c2410c',
-  },
-  tagDietText: {
-    color: '#15803d',
-  },
-  ratingSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  ratingText: {
-    fontSize: 13,
-    color: '#666666',
-  },
-  userRating: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-    padding: 12,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 10,
-  },
-  userRatingLabel: {
-    fontSize: 14,
-    color: '#666666',
-  },
-  metaGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  metaItem: {
-    flex: 1,
-    minWidth: '22%',
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 9,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#efe4dd',
-  },
-  metaLabel: {
-    fontSize: 11,
-    color: '#8b807b',
-    marginBottom: 4,
-    marginTop: 5,
-  },
-  metaValue: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#202b3d',
-  },
-  section: {
-    marginBottom: 18,
-    backgroundColor: '#ffffff',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#efe3da',
-    padding: 15,
-  },
-  sectionHeadingBlock: { flex: 1, minWidth: 0, gap: 3, paddingRight: 5 },
-  sectionEyebrow: { color: '#d35c4b', fontSize: 9, fontWeight: '900', letterSpacing: 1.3 },
-  sectionCaption: { color: '#96877b', fontSize: 11, fontWeight: '600' },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#1d2940',
-    marginBottom: 4,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  seeAllText: {
-    fontSize: 13,
-    color: '#e74c3c',
-    fontWeight: '600',
-  },
+  quickIconPrimary: { backgroundColor: colors.brand, borderColor: colors.brand },
+  quickIconActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  quickLabel: { fontFamily: fonts.bodyMedium, fontSize: 12, lineHeight: 15, color: colors.text, textAlign: 'center' },
+  segment: { flexDirection: 'row', gap: 4, padding: 4, marginHorizontal: 20, marginTop: 26, borderRadius: radius.pill, backgroundColor: colors.cream },
+  segmentItem: { flex: 1, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  segmentActive: { backgroundColor: colors.brand },
+  segmentText: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.textMuted },
+  segmentTextActive: { color: '#ffffff' },
+  section: { marginHorizontal: 20, marginTop: 18 },
+  sectionWide: { marginTop: 30 },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12, marginHorizontal: 20, marginBottom: 14 },
+  sectionTitle: { flex: 1, fontFamily: fonts.headingBold, fontSize: 21, lineHeight: 26, color: colors.ink },
+  sectionAccent: { fontFamily: fonts.headingBoldItalic, color: colors.brand },
+  sectionCaption: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  seeAllText: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.brand },
+  servingsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 8 },
+  servingsLabel: { fontFamily: fonts.heading, fontSize: 16, color: colors.ink },
   servingsControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#fff8f2',
-    borderRadius: 13,
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: '#f1e0d3',
-    maxWidth: '55%',
+    flexDirection: 'row', alignItems: 'center', height: 48, borderRadius: radius.pill,
+    borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface, paddingHorizontal: 4,
   },
-  servingsBtn: {
-    minWidth: 30,
-    minHeight: 32,
-    borderRadius: 9,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  servingsText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#5c4c43',
-    textAlign: 'center',
-    flexShrink: 1,
-  },
-  stepsSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  startCookingButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#e74c3c',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  startCookingText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 13,
-  },
+  servingsBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  servingsText: { minWidth: 76, textAlign: 'center', fontFamily: fonts.bodySemi, fontSize: 14, color: colors.ink },
   ingredientRow: {
-    flexDirection: 'row', alignItems: 'center', marginBottom: 7, gap: 10,
-    paddingHorizontal: 10, paddingVertical: 11, minHeight: 62,
-    borderRadius: 15, borderWidth: 1, borderColor: '#f1e9e3', backgroundColor: '#fffcfa',
+    flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.lineStrong,
   },
-  ingredientRowChecked: { backgroundColor: '#f3f8f4', borderColor: '#e0ebe2' },
-  ingredientCheck: {
-    width: 21, height: 21, borderRadius: 11, borderWidth: 1.5,
-    borderColor: '#d9c5b8', alignItems: 'center', justifyContent: 'center',
-  },
-  ingredientCheckActive: { backgroundColor: '#5f9d78', borderColor: '#5f9d78' },
+  ingredientRowChecked: { opacity: 0.55 },
+  ingredientCheck: { width: 24, height: 24, borderRadius: 8, borderWidth: 1.5, borderColor: colors.lineStrong, alignItems: 'center', justifyContent: 'center' },
+  ingredientCheckActive: { backgroundColor: colors.brand, borderColor: colors.brand },
   ingredientCopy: { flex: 1, minWidth: 0 },
-  ingredientNote: { fontSize: 11, color: '#9b8777', lineHeight: 17, marginTop: 3 },
-  lokmaRatingRow: {
-    flexDirection: 'row', flexWrap: 'nowrap', width: '100%',
-    gap: 5, marginBottom: 16, alignItems: 'stretch',
+  ingredientText: { fontFamily: fonts.body, fontSize: 16, lineHeight: 22, color: colors.ink },
+  ingredientAmount: { fontFamily: fonts.bodySemi },
+  ingredientTextChecked: { textDecorationLine: 'line-through', color: colors.textFaint },
+  ingredientNote: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  inlineShop: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 48, marginTop: 16,
+    borderRadius: radius.pill, borderWidth: 1, borderColor: '#f0c8bd', backgroundColor: colors.brandSoft,
   },
+  inlineShopText: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.brand },
+  stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.lineStrong },
+  stepRowDone: { opacity: 0.5 },
+  stepNumberText: { width: 30, fontFamily: fonts.headingBold, fontSize: 24, lineHeight: 28, color: colors.brand, textAlign: 'center' },
+  stepNumberDone: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center' },
+  stepText: { flex: 1, fontFamily: fonts.body, fontSize: 17, lineHeight: 26, color: colors.ink },
+  stepTextDone: { textDecorationLine: 'line-through', color: colors.textFaint },
+  chefTip: { marginTop: 18, padding: 16, borderRadius: radius.lg, backgroundColor: colors.cream },
+  chefTipTitle: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 1.8, textTransform: 'uppercase', color: colors.brand },
+  chefTipText: { fontFamily: fonts.headingItalic, fontSize: 16, lineHeight: 24, color: colors.ink, marginTop: 6 },
+  card: { marginHorizontal: 20, marginTop: 24, padding: 18, borderRadius: radius.xl, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
+  cardHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 },
+  cardTitle: { fontFamily: fonts.headingBold, fontSize: 18, color: colors.ink },
+  cardMeta: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted },
+  macroRow: { flexDirection: 'row', marginTop: 14 },
+  macro: { flex: 1 },
+  macroValue: { fontFamily: fonts.headingBold, fontSize: 20, color: colors.ink },
+  macroUnit: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted },
+  macroLabel: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  lokmaRatingRow: { flexDirection: 'row', flexWrap: 'nowrap', justifyContent: 'space-between', gap: 5, marginTop: 14 },
   lokmaRatingOption: {
-    flex: 1, minWidth: 0, paddingHorizontal: 3, paddingVertical: 9,
-    height: 80, borderRadius: 13, backgroundColor: '#fff7f1',
-    borderWidth: 1, borderColor: '#f0e4db',
-    alignItems: 'center', justifyContent: 'space-between', gap: 5,
+    flex: 1, minWidth: 0, height: 80, borderRadius: 13, alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line,
   },
-  lokmaRatingOptionSelected: { borderColor: '#db4c3f', backgroundColor: '#fff0e9' },
-  lokmaRatingSymbol: {
-    width: 31, height: 31, borderRadius: 11,
-    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
+  lokmaRatingOptionSelected: { borderColor: colors.brand, backgroundColor: colors.brandSoft },
+  lokmaRatingSymbol: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandSoft },
+  lokmaRatingSymbolSelected: { backgroundColor: colors.brand },
+  lokmaRatingLabel: { height: 16, fontFamily: fonts.bodyMedium, fontSize: 11, color: colors.text, textAlign: 'center' },
+  similarList: { paddingHorizontal: 20, gap: 12 },
+  cookBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 10 },
+  cookButton: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: 58,
+    borderRadius: radius.pill, backgroundColor: colors.brand, ...shadow.floating,
   },
-  lokmaRatingSymbolSelected: { backgroundColor: '#db4c3f' },
-  lokmaRatingLabel: {
-    fontSize: 9, lineHeight: 13, fontWeight: '800',
-    color: '#715b51', textAlign: 'center', textAlignVertical: 'center',
-    includeFontPadding: false, width: '100%', height: 16, flexShrink: 1,
+  cookButtonText: { fontFamily: fonts.bodySemi, fontSize: 17, color: '#ffffff' },
+  toast: {
+    position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 16, height: 42, borderRadius: radius.pill, backgroundColor: colors.ink,
   },
-  ingredientText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#344052',
-    lineHeight: 19,
-  },
-  ingredientTextChecked: {
-    textDecorationLine: 'line-through',
-    opacity: 0.5,
-  },
-  stepRow: {
-    flexDirection: 'row', alignItems: 'flex-start', marginBottom: 9,
-    padding: 13, gap: 12, borderRadius: 15, backgroundColor: '#fffcfa',
-    borderWidth: 1, borderColor: '#f1e9e3',
-  },
-  stepRowDone: { backgroundColor: '#f3f8f4', borderColor: '#e0ebe2' },
-  stepNumber: {
-    width: 29, height: 29, borderRadius: 10, backgroundColor: '#fff0ea',
-    justifyContent: 'center', alignItems: 'center', flexShrink: 0,
-  },
-  stepNumberText: {
-    color: '#d4594b',
-    fontWeight: '900', fontSize: 12,
-  },
-  stepNumberDone: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#22c55e',
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  stepText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#354157',
-    lineHeight: 21,
-  },
-  stepTextDone: {
-    textDecorationLine: 'line-through',
-    opacity: 0.6,
-  },
-  chefTip: {
-    flexDirection: 'row',
-    backgroundColor: '#fffbeb',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#fde68a',
-    gap: 12,
-    alignItems: 'flex-start',
-  },
-  chefTipContent: {
-    flex: 1,
-  },
-  chefTipTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#92400e',
-    marginBottom: 4,
-  },
-  chefTipText: {
-    fontSize: 14,
-    color: '#78350f',
-    lineHeight: 21,
-  },
-  servingWeightText: {
-    fontSize: 13,
-    color: '#999999',
-    marginBottom: 12,
-    marginTop: -8,
-  },
-  nutritionCalorieRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  nutritionCalorieLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  nutritionCalorieValue: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#e74c3c',
-  },
-  nutritionBars: {
-    gap: 12,
-  },
-  nutritionBarItem: {
-    gap: 4,
-  },
-  nutritionBarHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  nutritionBarLabel: {
-    fontSize: 13,
-    color: '#666666',
-  },
-  nutritionBarValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  nutritionBarBg: {
-    height: 6,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  nutritionBarFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  nutritionDisclaimer: {
-    fontSize: 11,
-    color: '#999999',
-    marginTop: 12,
-    fontStyle: 'italic',
-  },
-  similarList: {
-    paddingRight: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#666666',
-  },
-  bottomPadding: {
-    height: 40,
-  },
+  toastText: { fontFamily: fonts.bodySemi, fontSize: 14, color: '#ffffff' },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, backgroundColor: colors.canvas },
+  errorText: { fontFamily: fonts.heading, fontSize: 18, color: colors.ink },
+  errorBack: { height: 44, paddingHorizontal: 20, borderRadius: radius.pill, backgroundColor: colors.ink, justifyContent: 'center' },
+  errorBackText: { fontFamily: fonts.bodySemi, fontSize: 15, color: '#fff' },
 });
 
 const assistantGateStyles = StyleSheet.create({

@@ -12,8 +12,10 @@ import { getMenus } from '../../lib/api';
 import { Menu } from '../../lib/types';
 import MenuCard from '../../components/MenuCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { useTabBarSpace } from '../../components/navigation/FloatingTabBar';
 
 export default function MenusScreen() {
+  const tabSpace = useTabBarSpace();
   const [menus, setMenus] = useState<Menu[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,7 +49,7 @@ export default function MenusScreen() {
       data={menus}
       keyExtractor={(item) => item.id.toString()}
       renderItem={({ item }) => <MenuCard menu={item} />}
-      contentContainerStyle={styles.list}
+      contentContainerStyle={[styles.list, { paddingBottom: tabSpace }]}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#e74c3c" />
       }

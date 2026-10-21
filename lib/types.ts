@@ -47,6 +47,26 @@ export interface Recipe {
   cooked_count?: number;
   average_rating?: number;
   rating_count?: number;
+  /** 'verified' only when macros were checked; anything else is never shown as fact. */
+  nutrition_status?: 'unverified' | 'verified' | string;
+  social_source?: RecipeSocialSource | null;
+}
+
+/** Where an imported recipe came from; metrics are a snapshot taken at import time. */
+export interface RecipeSocialSource {
+  platform: 'instagram' | 'tiktok' | 'youtube';
+  video_id: string;
+  url: string;
+  creator_handle: string | null;
+  creator_name?: string | null;
+  creator_profile_url?: string | null;
+  creator_verified?: boolean;
+  view_count?: number | null;
+  like_count?: number | null;
+  comment_count?: number | null;
+  follower_count?: number | null;
+  metrics_origin?: 'public_instagram_extractor' | 'public_tiktok_extractor' | 'public_youtube_data_api' | null;
+  metrics_captured_at?: string | null;
 }
 
 export interface Ingredient {

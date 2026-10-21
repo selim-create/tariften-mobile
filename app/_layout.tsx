@@ -3,8 +3,23 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '../context/AuthContext';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
+import {
+  Poppins_500Medium, Poppins_600SemiBold, Poppins_600SemiBold_Italic, Poppins_700Bold, Poppins_700Bold_Italic,
+} from '@expo-google-fonts/poppins';
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import { View } from 'react-native';
+import { colors } from '../constants/theme';
 
 export default function RootLayout() {
+  // Brand fonts (same pairing as the web). Render a plain canvas for the few
+  // milliseconds they load so text never flashes in the system font.
+  const [fontsLoaded, fontError] = useFonts({
+    Poppins_500Medium, Poppins_600SemiBold, Poppins_600SemiBold_Italic, Poppins_700Bold, Poppins_700Bold_Italic,
+    Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
+  });
+  if (!fontsLoaded && !fontError) return <View style={{ flex: 1, backgroundColor: colors.canvas }} />;
+
   return (
     <SafeAreaProvider>
     <ErrorBoundary>

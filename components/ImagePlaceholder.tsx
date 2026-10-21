@@ -1,12 +1,15 @@
 import React from 'react';
 import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import LokmaIngredientIcon from './LokmaIngredientIcon';
+import { lokmaDishName } from '../lib/lokma-emoji';
+import { colors, fonts } from '../constants/theme';
 
 interface ImagePlaceholderProps {
   title?: string;
   variant?: 'card' | 'detail';
   style?: StyleProp<ViewStyle>;
+  /** Small thumbnails show only the illustration. */
+  compact?: boolean;
 }
 
 export function isPlaceholderImage(url?: string | null): boolean {
@@ -17,194 +20,47 @@ export function isPlaceholderImage(url?: string | null): boolean {
   return false;
 }
 
+/**
+ * Cover for a recipe without a photograph: the dish's own Lokma illustration
+ * on the brand cream (same as the web). It states plainly that the photo is
+ * pending; nothing else is implied.
+ */
 export default function ImagePlaceholder({
-  title = 'Lezzetli Tarif',
+  title = 'Tarif',
   variant = 'card',
   style,
+  compact = false,
 }: ImagePlaceholderProps) {
+  const dish = lokmaDishName(title);
 
   if (variant === 'detail') {
     return (
       <View style={[detailStyles.container, style]}>
-        <LinearGradient
-          colors={['#1f2937', '#111827', '#000000']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        {/* Turuncu glow sağ alt */}
-        <View style={detailStyles.glowOrange} />
-        {/* Sarı glow sol üst */}
-        <View style={detailStyles.glowYellow} />
-
-        <View style={detailStyles.content}>
-          {/* Ikon kutusu */}
-          <View style={detailStyles.iconBox}>
-            <Ionicons name="restaurant" size={32} color="#f97316" />
-          </View>
-
-          <Text style={detailStyles.label}>GÖRSEL HAZIRLANIYOR</Text>
-
-          <Text style={detailStyles.title} numberOfLines={3}>
-            {title}
-          </Text>
-
-          <Text style={detailStyles.description}>
-            Bu lezzetli tarifin fotoğrafı fırında, pişmek üzere!{'\n'}Çok yakında burada olacak.
-          </Text>
-
-          <View style={detailStyles.brandRow}>
-            <View style={detailStyles.brandIcon}>
-              <Text style={detailStyles.brandIconText}>t</Text>
-            </View>
-            <Text style={detailStyles.brandText}>tariften.com</Text>
-          </View>
+        <View style={detailStyles.frame} pointerEvents="none" />
+        <View style={detailStyles.art}>
+          <LokmaIngredientIcon name={dish} size={96} />
         </View>
+        <Text style={detailStyles.label}>Fotoğraf hazırlanıyor</Text>
       </View>
     );
   }
 
-  // Card varyantı
   return (
     <View style={[cardStyles.container, style]}>
-      <View style={cardStyles.iconCircle}>
-        <Ionicons name="restaurant" size={20} color="#fb923c" />
-      </View>
-      <Text style={cardStyles.label}>GÖRSEL HAZIRLANIYOR</Text>
-      <Text style={cardStyles.description}>Bu lezzet fırında, yakında burada!</Text>
+      <LokmaIngredientIcon name={dish} size={compact ? 30 : 44} />
+      {compact ? null : <Text style={cardStyles.label}>Görsel hazırlanıyor</Text>}
     </View>
   );
 }
 
 const detailStyles = StyleSheet.create({
-  container: {
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  glowOrange: {
-    position: 'absolute',
-    bottom: -60,
-    right: -60,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: 'rgba(234, 88, 12, 0.15)',
-  },
-  glowYellow: {
-    position: 'absolute',
-    top: -60,
-    left: -60,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: 'rgba(202, 138, 4, 0.08)',
-  },
-  content: {
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 32,
-    zIndex: 1,
-  },
-  iconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
-    backgroundColor: 'rgba(31, 41, 55, 0.5)',
-    borderWidth: 1,
-    borderColor: 'rgba(75, 85, 99, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  label: {
-    color: '#f97316',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 3,
-    marginBottom: 8,
-  },
-  title: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: '800',
-    textAlign: 'center',
-    lineHeight: 32,
-    marginBottom: 12,
-    maxWidth: 260,
-  },
-  description: {
-    color: 'rgba(156, 163, 175, 1)',
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
-    maxWidth: 260,
-  },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    opacity: 0.5,
-  },
-  brandIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    backgroundColor: 'rgba(55, 65, 81, 1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  brandIconText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  brandText: {
-    color: 'rgba(107, 114, 128, 1)',
-    fontSize: 13,
-    fontWeight: '500',
-  },
+  container: { width: '100%', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: colors.cream },
+  frame: { position: 'absolute', top: 64, left: 18, right: 18, bottom: 48, borderRadius: 24, borderWidth: 1, borderColor: colors.creamDeep },
+  art: { transform: [{ scale: 1.1 }] },
+  label: { position: 'absolute', bottom: 66, fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: '#a89a8d' },
 });
 
 const cardStyles = StyleSheet.create({
-  container: {
-    width: '100%',
-    backgroundColor: '#f9fafb',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-  },
-  iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#ffffff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
-  },
-  label: {
-    color: '#ea580c',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 2,
-    marginBottom: 4,
-  },
-  description: {
-    color: '#9ca3af',
-    fontSize: 11,
-    textAlign: 'center',
-    maxWidth: 150,
-  },
+  container: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: colors.cream },
+  label: { fontFamily: fonts.bodySemi, fontSize: 10, letterSpacing: 1.6, textTransform: 'uppercase', color: '#a89a8d' },
 });

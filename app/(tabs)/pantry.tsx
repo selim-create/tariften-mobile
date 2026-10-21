@@ -19,6 +19,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { analyzePantry, createRecipe, generateAIRecipe, getPantry, updatePantry } from '../../lib/api';
 import { PantryItem } from '../../lib/types';
+import { useTabBarSpace } from '../../components/navigation/FloatingTabBar';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
 // --- TYPES ---
@@ -82,6 +83,7 @@ const calculateStatus = (expiryDateString: string | null | undefined): { status:
 };
 
 export default function PantryScreen() {
+  const tabSpace = useTabBarSpace();
   const { token } = useAuth();
   const router = useRouter();
 
@@ -410,6 +412,7 @@ export default function PantryScreen() {
 
       <ScrollView
         style={styles.scrollView}
+        contentContainerStyle={{ paddingBottom: tabSpace }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#e74c3c" />
         }
