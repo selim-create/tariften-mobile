@@ -10,9 +10,13 @@ const { resolve } = require('node:path');
  * This is a maximum accepted *regression baseline*, not an assertion that
  * existing vulnerabilities are safe, fixed, or excluded from the mobile app.
  * Review any increase or new high-severity affected package before merging.
+ *
+ * 2026-10-21 review: expo-share-intent (Paylaş → Tariften) is listed only
+ * because npm attributes its peer `expo` advisories to it ("via": ["expo"]).
+ * It adds no advisory ID of its own (check-known-advisories still passes).
  */
 const BASELINE = Object.freeze({
-  high: 21,
+  high: 22,
   moderate: 8,
   highPackages: Object.freeze([
     '@expo/cli',
@@ -26,6 +30,7 @@ const BASELINE = Object.freeze({
     'babel-jest',
     'braces',
     'expo',
+    'expo-share-intent',
     'jest-environment-node',
     'jest-haste-map',
     'jest-message-util',
