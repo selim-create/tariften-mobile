@@ -87,9 +87,11 @@ export default function NotebookScreen() {
         <ScreenTitle kicker="Defterim" title="Mutfak *defterin*" subtitle={firstName ? `Merhaba ${firstName}.` : undefined} right={avatar} />
 
         <View style={styles.doors}>
-          <Door icon="file-tray-full" tint="#3f6f8f" tile="#eaf3f8" title="Dolap" line="Evde ne var, ne bitiyor"
+          <Door icon="book" tint="#b03d32" tile="#fdf1ea" title="Tarifler" line="Herkesin tarifleri"
+            onPress={() => router.push('/recipes')} />
+          <Door icon="file-tray-full" tint="#3f6f8f" tile="#eaf3f8" title="Dolap" line="Evde ne var"
             onPress={() => router.push('/pantry')} />
-          <Door icon="restaurant" tint="#387b64" tile="#e9f5ee" title="Menüler" line="Hazır sofralar ve davetler"
+          <Door icon="restaurant" tint="#387b64" tile="#e9f5ee" title="Menüler" line="Hazır sofralar"
             onPress={() => router.push('/menus')} />
         </View>
 
@@ -150,8 +152,8 @@ const styles = StyleSheet.create({
     width: 44, height: 44, borderRadius: 22, overflow: 'hidden', backgroundColor: colors.brandSoft,
     alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line,
   },
-  doors: { flexDirection: 'row', gap: 12, paddingHorizontal: 20, marginBottom: 22 },
-  door: { flex: 1, padding: 16, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, ...shadow.card },
+  doors: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 22 },
+  door: { flex: 1, padding: 14, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, ...shadow.card },
   doorIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   doorTitle: { fontFamily: fonts.heading, fontSize: 16, color: colors.ink },
   doorLine: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.textMuted, marginTop: 2 },

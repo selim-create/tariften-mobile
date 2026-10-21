@@ -81,6 +81,7 @@ test('Tarifler is a real archive: two-column tiles, API total, Core-supported so
   assert.doesNotMatch(sheet, /value: '(date|popular|rating)'/, 'no sort option the API ignores');
   const home = read('app/(tabs)/index.tsx');
   assert.match(home, /accessibilityLabel="Tüm tarifleri gör"/);
+  assert.match(read('app/(tabs)/defterim.tsx'), /title="Tarifler" line="Herkesin tarifleri"\s+onPress=\{\(\) => router\.push\('\/recipes'\)\}/);
   const layout = read('app/(tabs)/_layout.tsx');
   assert.match(layout, /\{ name: 'recipes', title: 'Tarifler', ownHeader: true \}/);
 });
