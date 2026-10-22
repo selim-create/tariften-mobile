@@ -159,7 +159,32 @@ test('local simulator build compiles app, extension and pods for the same iOS 16
   assert.match(shell, /SIM_IOS_MIN="16\.0"/);
   assert.equal((shell.match(/IPHONEOS_DEPLOYMENT_TARGET="\$SIM_IOS_MIN"/g) || []).length, 2, 'both xcodebuild runs override the target');
   assert.match(cjs, /const MINIMUM = '16\.0';/, 'pods repair uses the same minimum');
-  // app.json (production builds) is untouched by this local-only change.
+  // Store builds use the same iOS 16 minimum (owner decision, 2026-10-22).
   const app = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
-  assert.equal(JSON.stringify(app).includes('"deploymentTarget":"16.0"'), false);
+  const bp = app.expo.plugins.find(p => Array.isArray(p) && p[0] === 'expo-build-properties');
+  assert.equal(bp && bp[1].ios.deploymentTarget, '16.0');
+});
+
+test('universal links: store app claims tariften.com/rehber, the DEV build does not', () => {
+  const app = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8')).expo;
+  assert.deepEqual(app.ios.associatedDomains, ['applinks:tariften.com', 'applinks:www.tariften.com']);
+  const filter = app.android.intentFilters[0];
+  assert.equal(filter.autoVerify, true);
+  assert.ok(filter.data.every(d => d.scheme === 'https' && d.pathPrefix === '/rehber'));
+  const config = require(path.join(root, 'app.config.js'));
+  const prev = process.env.APP_VARIANT;
+  process.env.APP_VARIANT = 'development';
+  try {
+    const dev = config({ config: app });
+    assert.equal(dev.ios.associatedDomains, undefined);
+    assert.equal(dev.android.intentFilters, undefined);
+    assert.equal(dev.ios.bundleIdentifier, 'com.tariften.app.dev');
+  } finally {
+    if (prev === undefined) delete process.env.APP_VARIANT; else process.env.APP_VARIANT = prev;
+  }
+  const saved = process.env.APP_VARIANT;
+  delete process.env.APP_VARIANT; // earlier tests in this file may leave it set
+  const prod = config({ config: app });
+  if (saved !== undefined) process.env.APP_VARIANT = saved;
+  assert.deepEqual(prod.ios.associatedDomains, app.ios.associatedDomains);
 });
