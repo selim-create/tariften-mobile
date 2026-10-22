@@ -4,6 +4,7 @@ import { User } from '../lib/types';
 import { getMe, login as apiLogin, register as apiRegister, googleAuth, appleAuth, RegisterData } from '../lib/api';
 import { setKitchenAuth } from '../lib/kitchen-store';
 import { forgetKitchenProfileCache } from '../lib/kitchen-profile';
+import { unregisterPushOnSignOut } from '../lib/notifications';
 
 const TOKEN_KEY = 'auth_token';
 
@@ -97,6 +98,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    // Remove this phone's push token from the account while the JWT is still
+    // valid (bounded; never blocks sign-out), so the next account on this
+    // device never receives the previous member's notifications.
+    await unregisterPushOnSignOut(token);
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     forgetKitchenProfileCache(); // allergens are health data: never outlive the session
     setToken(null);

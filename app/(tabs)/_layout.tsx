@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -7,6 +7,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useResponsive } from '../../hooks/useResponsive';
 import GlobalCreateAction from '../../components/navigation/GlobalCreateAction';
 import FloatingTabBar from '../../components/navigation/FloatingTabBar';
+import { useNotifications } from '../../components/notifications/NotificationsProvider';
+import { badgeLabel } from '../../lib/notifications-core';
 import { colors, fonts } from '../../constants/theme';
 
 /**
@@ -24,6 +26,8 @@ const hiddenTabs: { name: string; title: string; ownHeader?: boolean }[] = [
 export default function TabLayout() {
   const router = useRouter();
   const { user } = useAuth();
+  const { unreadCount } = useNotifications();
+  const badge = badgeLabel(unreadCount);
   const { isTablet } = useResponsive();
   const [createOpen, setCreateOpen] = useState(false);
   const headerTitleSize = isTablet ? 21 : 18;
@@ -59,6 +63,19 @@ export default function TabLayout() {
                   accessibilityRole="button" accessibilityLabel="Tarif ara">
                   <Ionicons name="search" size={19} color={colors.ink} />
                 </TouchableOpacity>
+                {/* Members only: the inbox sits on the landing screen, not in a 6th tab. */}
+                {user ? (
+                  <TouchableOpacity onPress={() => router.push('/notifications')} style={headerStyles.circle}
+                    accessibilityRole="button"
+                    accessibilityLabel={badge ? `Bildirimler, ${unreadCount} okunmamış` : 'Bildirimler'}>
+                    <Ionicons name="notifications-outline" size={19} color={colors.ink} />
+                    {badge ? (
+                      <View style={headerStyles.badge} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+                        <Text style={headerStyles.badgeText}>{badge}</Text>
+                      </View>
+                    ) : null}
+                  </TouchableOpacity>
+                ) : null}
                 <TouchableOpacity onPress={() => router.push(user ? '/profile' : '/login')} style={headerStyles.circle}
                   accessibilityRole="button" accessibilityLabel={user ? 'Profilim' : 'Giriş yap'}>
                   {user?.avatar_url ? (
@@ -97,4 +114,10 @@ const headerStyles = StyleSheet.create({
   },
   userAvatar: { width: 40, height: 40 },
   initial: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brandSoft },
+  badge: {
+    position: 'absolute', top: 5, right: 4, minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8,
+    backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: colors.surface,
+  },
+  badgeText: { fontFamily: fonts.bodyBold, fontSize: 9, lineHeight: 11, color: '#fff' },
 });
