@@ -103,6 +103,9 @@ function AppShell() {
         <Stack.Screen name="menu/[slug]" options={{ headerShown: false }} />
         <Stack.Screen name="blog/index" options={{ headerShown: false }} />
         <Stack.Screen name="blog/[slug]" options={{ headerShown: false }} />
+        {/* Mutfak Rehberi: own safe-area headers (list) and a floating top bar (article). */}
+        <Stack.Screen name="rehber/index" options={{ headerShown: false }} />
+        <Stack.Screen name="rehber/[slug]" options={{ headerShown: false }} />
         <Stack.Screen
           name="login"
           options={{
