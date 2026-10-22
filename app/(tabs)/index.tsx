@@ -357,6 +357,13 @@ export default function HomeScreen() {
                 onPress={() => router.push(`/rehber/${encodeURIComponent(guide.slug)}`)} />
             ))}
           </ScrollView>
+          <TouchableOpacity onPress={() => router.push('/rehber/araclar')} style={styles.toolsLink} hitSlop={4}
+            accessibilityRole="link" accessibilityLabel="Mutfak araçları: yumurta, makarna, kurutma ve ölçü">
+            <Ionicons name="timer-outline" size={16} color={colors.brand} />
+            <Text style={styles.toolsLinkText}>Mutfak araçları</Text>
+            <Text style={styles.toolsLinkMeta} numberOfLines={1}>Yumurta · Makarna · Kurutma · Ölçü</Text>
+            <Ionicons name="arrow-forward" size={15} color={colors.ink} />
+          </TouchableOpacity>
         </View>
       )}
 
@@ -424,6 +431,12 @@ const styles = StyleSheet.create({
   section: { marginTop: 34 },
   heading: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, paddingHorizontal: 20, marginBottom: 16 },
   sectionTitle: { fontFamily: fonts.headingBold, fontSize: 25, lineHeight: 30, letterSpacing: -0.6, color: colors.ink },
+  toolsLink: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, marginTop: 12, marginHorizontal: 20, paddingHorizontal: 14,
+    borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line,
+  },
+  toolsLinkText: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.ink },
+  toolsLinkMeta: { flex: 1, fontFamily: fonts.body, fontSize: 12, color: colors.textMuted },
   moreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingBottom: 4 },
   more: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.ink },
   rail: { gap: 12, paddingHorizontal: 20 },
