@@ -23,6 +23,9 @@ import {
   isInstagramReelLink, isTikTokShortLink, isVideoRecipeLink, needsRightsConfirmation, videoEditorFromJob,
 } from '../../lib/video-recipe-import';
 import { canonicalShareLink, expandShortLink } from '../../lib/share-link';
+import type { VideoJob } from '../../lib/video-recipe-import';
+import { positiveId } from '../../lib/notifications-core';
+import { useNotifications } from '../../components/notifications/NotificationsProvider';
 import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
 import { AccentText } from '../../components/ui/ScreenTitle';
 import { colors, fonts, radius, shadow } from '../../constants/theme';
@@ -66,9 +69,12 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
+  const { offerAfterImport } = useNotifications();
   const quotas = useQuotas(token);
   // A link or recipe text can arrive from "Paylaş → Tariften" (/share) or a deep link.
-  const params = useLocalSearchParams<{ url?: string; text?: string }>();
+  // A notification tap (recipe_review / recipe_failed) opens /recipe/aktar?job=<id>.
+  const params = useLocalSearchParams<{ url?: string; text?: string; job?: string }>();
+  const jobParam = positiveId(params.job);
   const sharedText = typeof params.text === 'string' ? params.text.slice(0, 20000) : '';
   const sharedUrl = (initialUrl || (typeof params.url === 'string' ? params.url : '')).trim().slice(0, 2048);
   const [source, setSource] = useState(sharedText);
@@ -88,6 +94,8 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
   const [videoReview, setVideoReview] = useState(false);
   const [videoWarnings, setVideoWarnings] = useState<string[]>([]);
   const [videoStatus, setVideoStatus] = useState('');
+  const [retryableFailure, setRetryableFailure] = useState(false);
+  const resumedJobRef = useRef<number | null>(null);
   const videoRequestRef = useRef<{ url: string; id: string } | null>(null);
   const [editor, setEditor] = useState<ImportEditor | null>(null);
   const [accepted, setAccepted] = useState(true);
@@ -204,6 +212,41 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
   };
 
 
+  /** Polls a Core video job until review, failure or the 5-minute window ends. */
+  const followVideoJob = async (first: VideoJob, controller: AbortController) => {
+    if (!token) return;
+    let job = first;
+    for (let n = 0; n < 100 && !controller.signal.aborted; n++) {
+      setVideoStatus(job.status);
+      if (job.status === 'needs_review') {
+        const checked = videoEditorFromJob(job);
+        setEditor(checked.editor);
+        setVideoWarnings(checked.warnings);
+        setVideoReview(true);
+        setPreview(null);
+        setStage('review');
+        setAccepted(true);
+        setReviewNotesOpen(false);
+        setFieldError(null);
+        setOpenIngredient(null);
+        setOpenStep(null);
+        requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }));
+        void quotas.refresh();
+        return;
+      }
+      if (job.status === 'failed' || job.status === 'uncertain') {
+        setRetryableFailure(job.status === 'failed' && job.retryable === true);
+        throw new Error(job.message || 'Video analiz sonucu doğrulanamadı.');
+      }
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      if (controller.signal.aborted) return;
+      job = await getVideoRecipeJob(token, job.id, controller.signal);
+    }
+    if (!controller.signal.aborted) {
+      setError('Video hâlâ işleniyor olabilir. Aynı bağlantıyla tekrar kontrol edebilirsin; yeni ücretli işlem oluşturulmaz.');
+    }
+  };
+
   const requestVideoPreview = async (url: string) => {
     if (!token || requestLock.current) return;
     requestLock.current = true;
@@ -212,6 +255,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
     setVideoReview(false);
     setVideoWarnings([]);
     setVideoStatus('queued');
+    setRetryableFailure(false);
     const previous = videoRequestRef.current;
     const requestId = previous && previous.url === url ? previous.id : randomUUID();
     videoRequestRef.current = { url, id: requestId };
@@ -229,37 +273,14 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
       if (!existing && !(state.status === 'new' && state.canStart)) {
         throw new Error('Şu anda yeni video analizi başlatılamıyor. Biraz sonra tekrar dene.');
       }
-      let job = existing && !retry
+      const started = !existing || retry;
+      const job = existing && !retry
         ? existing
         : await startVideoRecipeJob(token, url, requestId, controller.signal, instagramRightsConfirmed);
-      for (let n = 0; n < 100 && !controller.signal.aborted; n++) {
-        setVideoStatus(job.status);
-        if (job.status === 'needs_review') {
-          const checked = videoEditorFromJob(job);
-          setEditor(checked.editor);
-          setVideoWarnings(checked.warnings);
-          setVideoReview(true);
-          setPreview(null);
-          setStage('review');
-          setAccepted(true);
-          setReviewNotesOpen(false);
-          setFieldError(null);
-          setOpenIngredient(null);
-          setOpenStep(null);
-          requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }));
-          void quotas.refresh();
-          return;
-        }
-        if (job.status === 'failed' || job.status === 'uncertain') {
-          throw new Error(job.message || 'Video analiz sonucu doğrulanamadı.');
-        }
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        if (controller.signal.aborted) return;
-        job = await getVideoRecipeJob(token, job.id, controller.signal);
-      }
-      if (!controller.signal.aborted) {
-        setError('Video hâlâ işleniyor olabilir. Aynı bağlantıyla tekrar kontrol edebilirsin; yeni ücretli işlem oluşturulmaz.');
-      }
+      // The one automatic permission moment: a paid video analysis has just
+      // started and takes minutes. An in-app sheet explains first; never on launch.
+      if (started) offerAfterImport();
+      await followVideoJob(job, controller);
     } catch (cause) {
       if (cause instanceof VideoAlreadyPublished) { router.push(`/recipe/${encodeURIComponent(cause.slug)}`); return; }
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Video analiz durumu alınamadı.');
@@ -270,6 +291,45 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
       requestLock.current = false;
     }
   };
+
+  /**
+   * Opened from a notification: read the job by id (free status call, no new
+   * paid analysis), show its review or its failure. A retryable failure turns
+   * the main button into "Yeniden dene", which goes through the normal flow.
+   */
+  const resumeVideoJob = async (id: number) => {
+    if (!token || requestLock.current) return;
+    requestLock.current = true;
+    setImportMethod('social');
+    setStage('source');
+    setBusy('preview');
+    setError('');
+    setRetryableFailure(false);
+    setVideoReview(false);
+    setVideoWarnings([]);
+    setVideoStatus('queued');
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      const job = await getVideoRecipeJob(token, id, controller.signal);
+      videoRequestRef.current = null;
+      setSocialUrl(job.source_url);
+      await followVideoJob(job, controller);
+    } catch (cause) {
+      if (cause instanceof VideoAlreadyPublished) { router.replace(`/recipe/${encodeURIComponent(cause.slug)}`); return; }
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Video analiz durumu alınamadı.');
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
+      setBusy(null);
+      requestLock.current = false;
+    }
+  };
+  useEffect(() => {
+    if (!jobParam || !token || resumedJobRef.current === jobParam) return;
+    resumedJobRef.current = jobParam;
+    void resumeVideoJob(jobParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobParam, token]);
 
   const requestSocialPreview = async () => {
     if (!token) { router.push('/login'); return; }
@@ -520,7 +580,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
             </View>
             <EditorLabel>PAYLAŞIM BAĞLANTISI</EditorLabel>
             <TextInput value={socialUrl}
-              onChangeText={url => { abortRef.current?.abort(); videoRequestRef.current = null; setInstagramRightsConfirmed(true); setSocialUrl(url); setPreview(null); setVideoReview(false); setVideoWarnings([]); setVideoStatus(''); setEditor(null); setError(''); }}
+              onChangeText={url => { abortRef.current?.abort(); videoRequestRef.current = null; setInstagramRightsConfirmed(true); setSocialUrl(url); setPreview(null); setVideoReview(false); setVideoWarnings([]); setVideoStatus(''); setEditor(null); setError(''); setRetryableFailure(false); }}
               placeholder="https://www.instagram.com/reel/…"
               placeholderTextColor={colors.textFaint} autoCapitalize="none" autoCorrect={false}
               keyboardType="url" editable={!busy} maxLength={2048} style={[styles.input, styles.linkInput]} />
@@ -751,7 +811,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
           : busy === 'publish' ? 'Tarifin yayımlanıyor…'
             : publishUnknown ? 'Tariflerimde kontrol et'
             : stage === 'source'
-              ? ((preview || videoReview) && editor ? 'Düzenlenmiş tarifime dön' : importMethod === 'social' ? 'Bağlantıdan tarif oluştur' : 'Tarifimi güzelleştir')
+              ? ((preview || videoReview) && editor ? 'Düzenlenmiş tarifime dön' : importMethod === 'social' ? (retryableFailure ? 'Yeniden dene' : 'Bağlantıdan tarif oluştur') : 'Tarifimi güzelleştir')
               : 'Onayla ve yayımla'}</Text>
         {!busy && <Ionicons name="arrow-forward" size={17} color="#fff" />}
       </TouchableOpacity>

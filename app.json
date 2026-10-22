@@ -78,6 +78,14 @@
         }
       ],
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#db4c3f",
+          "defaultChannel": "default"
+        }
+      ],
+      [
         "expo-share-intent",
         {
           "iosActivationRules": {

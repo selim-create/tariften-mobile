@@ -13,6 +13,7 @@ import { View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { ShareIntentProvider } from 'expo-share-intent';
 import ShareIntentWatcher from '../components/navigation/ShareIntentWatcher';
+import { NotificationsProvider } from '../components/notifications/NotificationsProvider';
 import { colors, fonts } from '../constants/theme';
 
 // Keep the native splash (brand tile on cream) until the brand fonts are in,
@@ -44,6 +45,8 @@ function AppShell() {
     <SafeAreaProvider>
     <ErrorBoundary>
       <AuthProvider>
+      {/* Push + in-app notifications: reads (never requests) permission on launch, routes taps. */}
+      <NotificationsProvider>
         <StatusBar style="dark" />
         <ShareIntentWatcher />
         <Stack screenOptions={{
@@ -128,6 +131,13 @@ function AppShell() {
             headerTitle: 'Koleksiyonlar',
           }}
         />
+        <Stack.Screen
+          name="notifications"
+          options={{
+            headerShown: true,
+            headerTitle: 'Bildirimler',
+          }}
+        />
         {/* Kitchen profile draws its own safe-area header with progress. */}
         <Stack.Screen name="profile/kitchen" options={{ headerShown: false }} />
         <Stack.Screen
@@ -138,6 +148,7 @@ function AppShell() {
           }}
         />
         </Stack>
+      </NotificationsProvider>
       </AuthProvider>
     </ErrorBoundary>
     </SafeAreaProvider>

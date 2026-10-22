@@ -7,6 +7,7 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -28,6 +29,8 @@ import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
 import { AccentText } from '../../components/ui/ScreenTitle';
 import { colors, fonts, radius, shadow } from '../../constants/theme';
 import { takeKitchenFlash } from '../../lib/kitchen-profile';
+import { openNotificationSettings, useNotifications } from '../../components/notifications/NotificationsProvider';
+import { badgeLabel } from '../../lib/notifications-core';
 
 type ProfileTab = 'my_recipes' | 'my_menus' | 'favorites' | 'cooked';
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -43,6 +46,30 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [kitchenFlash, setKitchenFlash] = useState<string | null>(null);
+  const notifications = useNotifications();
+  const [pushBusy, setPushBusy] = useState(false);
+
+  useFocusEffect(useCallback(() => { void notifications.refreshPushStatus(); }, [notifications.refreshPushStatus]));
+
+  // The second (and last) place that may show the OS permission prompt.
+  const togglePush = async (on: boolean) => {
+    if (pushBusy) return;
+    setPushBusy(true);
+    try {
+      const result = await notifications.setPushEnabled(on);
+      if (result === 'needs_settings' || result === 'denied') {
+        Alert.alert(
+          'Bildirim izni kapalı',
+          'Tarifin hazır olduğunda haber verebilmemiz için cihaz ayarlarından Tariften bildirimlerine izin ver.',
+          [{ text: 'Vazgeç', style: 'cancel' }, { text: 'Ayarları aç', onPress: openNotificationSettings }],
+        );
+      } else if (result === 'unavailable') {
+        Alert.alert('Bildirimler bu sürümde yok', 'Uygulamanın yeni sürümünü yükleyince açabilirsin. Bildirim kutun yine de çalışır.');
+      }
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   // One short confirmation after the kitchen profile flow returns here.
   useFocusEffect(useCallback(() => {
@@ -304,6 +331,38 @@ export default function ProfileScreen() {
 
         {/* Settings Section */}
         <View style={styles.settingsSection}>
+          <Text style={styles.settingsSectionTitle}>Bildirimler</Text>
+          <View style={styles.settingsCard}>
+            <TouchableOpacity style={styles.settingsRow} onPress={() => router.push('/notifications')}
+              accessibilityRole="button"
+              accessibilityLabel={notifications.unreadCount > 0 ? `Bildirim kutusu, ${notifications.unreadCount} okunmamış` : 'Bildirim kutusu'}>
+              <View style={styles.settingsIcon}><Ionicons name="notifications-outline" size={17} color={colors.ink} /></View>
+              <Text style={styles.settingsRowText}>Bildirim kutusu</Text>
+              {badgeLabel(notifications.unreadCount) ? (
+                <View style={styles.unreadPill}><Text style={styles.unreadPillText}>{badgeLabel(notifications.unreadCount)}</Text></View>
+              ) : null}
+              <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+            </TouchableOpacity>
+            <View style={[styles.settingsRow, styles.settingsRowLine, styles.pushRow]}>
+              <View style={styles.settingsIcon}><Ionicons name="restaurant-outline" size={17} color={colors.ink} /></View>
+              <View style={{ flex: 1, minWidth: 0, paddingVertical: 10 }}>
+                <Text style={styles.settingsRowText}>Tarifim hazır olunca haber ver</Text>
+                <Text style={styles.pushHint}>
+                  {notifications.pushStatus === 'unavailable'
+                    ? 'Bu sürümde anlık bildirim yok; bildirim kutun çalışır.'
+                    : 'Videodan aktardığın tarif hazır olduğunda ya da kontrol beklediğinde.'}
+                </Text>
+              </View>
+              <Switch
+                value={notifications.pushStatus === 'on'}
+                onValueChange={value => { void togglePush(value); }}
+                disabled={pushBusy || notifications.pushStatus === 'loading' || notifications.pushStatus === 'unavailable'}
+                trackColor={{ true: colors.brand, false: colors.lineStrong }}
+                accessibilityLabel="Tarifim hazır olunca anlık bildirim gönder"
+              />
+            </View>
+          </View>
+
           <Text style={styles.settingsSectionTitle}>Yasal & Bilgilendirme</Text>
           <View style={styles.settingsCard}>
             {[
@@ -426,6 +485,10 @@ const styles = StyleSheet.create({
   settingsCard: { borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
   settingsRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, minHeight: 54 },
   settingsRowLine: { borderTopWidth: 1, borderTopColor: colors.line },
+  pushRow: { alignItems: 'center' },
+  pushHint: { fontFamily: fonts.body, fontSize: 12, lineHeight: 17, color: colors.textMuted, marginTop: 2 },
+  unreadPill: { minWidth: 22, height: 22, paddingHorizontal: 6, borderRadius: 11, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  unreadPillText: { fontFamily: fonts.bodyBold, fontSize: 11, color: '#fff' },
   settingsIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
   deleteIcon: { backgroundColor: colors.brandSoft },
   settingsRowText: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.ink },
