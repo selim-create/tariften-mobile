@@ -12,9 +12,12 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
   loginWithApple: (identityToken: string, fullName?: string) => Promise<void>;
-  register: (userData: RegisterData) => Promise<void>;
+  /** Resolves true when Core signed the new member in (token stored), false otherwise. */
+  register: (userData: RegisterData) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  /** Keeps the profile card in step after the kitchen profile screen saves. */
+  setKitchenProfileCompleted: (completed: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -76,7 +79,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const register = async (userData: RegisterData) => {
-    await apiRegister(userData);
+    const data = await apiRegister(userData);
+    const jwt = typeof data?.token === 'string' && data.token ? data.token : null;
+    // Older Core returns only {message, user_id}: the member signs in manually.
+    if (!jwt) return false;
+    // Same as login: persist, then load the account.
+    await SecureStore.setItemAsync(TOKEN_KEY, jwt);
+    setToken(jwt);
+    const me = await getMe(jwt);
+    setUser(me);
+    return true;
   };
 
   const logout = async () => {
@@ -95,8 +107,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const setKitchenProfileCompleted = useCallback((completed: boolean) => {
+    setUser(current => (current && current.kitchen_profile_completed !== completed
+      ? { ...current, kitchen_profile_completed: completed } : current));
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, loginWithGoogle, loginWithApple, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{
+      user, token, isLoading, login, loginWithGoogle, loginWithApple, register, logout, refreshUser, setKitchenProfileCompleted,
+    }}>
       {children}
     </AuthContext.Provider>
   );

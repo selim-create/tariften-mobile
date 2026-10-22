@@ -128,6 +128,8 @@ function AppShell() {
             headerTitle: 'Koleksiyonlar',
           }}
         />
+        {/* Kitchen profile draws its own safe-area header with progress. */}
+        <Stack.Screen name="profile/kitchen" options={{ headerShown: false }} />
         <Stack.Screen
           name="profile/edit"
           options={{
