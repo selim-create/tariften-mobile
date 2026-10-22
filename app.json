@@ -23,7 +23,11 @@
         "light": "./assets/icon.png",
         "dark": "./assets/icon-dark.png",
         "tinted": "./assets/icon-tinted.png"
-      }
+      },
+      "associatedDomains": [
+        "applinks:tariften.com",
+        "applinks:www.tariften.com"
+      ]
     },
     "android": {
       "edgeToEdgeEnabled": true,
@@ -40,6 +44,28 @@
         "RECORD_AUDIO",
         "INTERNET",
         "VIBRATE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "tariften.com",
+              "pathPrefix": "/rehber"
+            },
+            {
+              "scheme": "https",
+              "host": "www.tariften.com",
+              "pathPrefix": "/rehber"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "web": {
@@ -97,6 +123,14 @@
           "androidIntentFilters": [
             "text/*"
           ]
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "16.0"
+          }
         }
       ]
     ],

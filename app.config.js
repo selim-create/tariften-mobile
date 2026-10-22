@@ -22,11 +22,15 @@ module.exports = ({ config }) => {
     icon: './assets/icon-dev.png',
     ios: {
       ...config.ios,
+      // Universal links are for the store app only; the local DEV build keeps
+      // tariften-dev:// so simulator signing needs no Associated Domains.
+      associatedDomains: undefined,
       bundleIdentifier: 'com.tariften.app.dev',
       icon: { ...(config.ios && config.ios.icon), light: './assets/icon-dev.png' },
     },
     android: {
       ...config.android,
+      intentFilters: undefined,
       package: 'com.tariften.app.dev',
     },
     plugins: [
