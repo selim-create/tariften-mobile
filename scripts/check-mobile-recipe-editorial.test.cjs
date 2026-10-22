@@ -65,6 +65,6 @@ test('visual-only polish keeps interaction endpoints and rating contract intact'
   assert.match(page, /submitRating\(token, recipe\.id, rating\)/);
   assert.match(page, /toggleInteraction\(token, recipe\.id, 'favorite'\)/);
   assert.match(page, /toggleInteraction\(token, recipe\.id, 'cooked'\)/);
-  assert.match(page, /<CommentSection recipeId=\{recipe\.id\} \/>/);
+  assert.match(page, /<CommentSection recipeId=\{recipe\.id\}(?: onToast=\{setToast\})? \/>/);
   assert.match(emoji, /rating: 5/);
 });

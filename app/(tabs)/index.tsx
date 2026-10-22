@@ -14,6 +14,7 @@ import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
 import ImagePlaceholder, { isPlaceholderImage } from '../../components/ImagePlaceholder';
 import { AccentText } from '../../components/ui/ScreenTitle';
 import { useTabBarSpace } from '../../components/navigation/FloatingTabBar';
+import { useBlockFilter } from '../../hooks/useBlockFilter';
 import { colors, fonts, radius, shadow } from '../../constants/theme';
 
 // Same voice and destinations as the web home page.
@@ -144,6 +145,10 @@ export default function HomeScreen() {
   const [search, setSearch] = useState('');
   const typed = useTypewriter(PLACEHOLDERS);
   const hello = useMemo(() => greeting(), []);
+  // Blocked members' recipes never show on the home rails.
+  const { visibleRecipes } = useBlockFilter();
+  const shownPopular = useMemo(() => visibleRecipes(popular), [visibleRecipes, popular]);
+  const shownEditors = useMemo(() => visibleRecipes(editors), [visibleRecipes, editors]);
 
 
   const load = useCallback(async () => {
@@ -253,11 +258,11 @@ export default function HomeScreen() {
         <View style={styles.browseGo}><Ionicons name="arrow-forward" size={17} color="#fff" /></View>
       </Pressable>
 
-      {popular.length > 0 && (
+      {shownPopular.length > 0 && (
         <View style={styles.section}>
           <Heading kicker="Öne çıkanlar" title="Bu hafta bunları *pişiriyoruz*" onMore={() => router.push('/recipes')} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={292} decelerationRate="fast" contentContainerStyle={styles.rail}>
-            {popular.map(recipe => (
+            {shownPopular.map(recipe => (
               <View key={recipe.id} style={{ width: 280 }}>
                 <FeatureCard recipe={recipe} height={360} onPress={() => router.push(`/recipe/${recipe.slug}`)} />
               </View>
@@ -292,11 +297,11 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {editors.length > 0 && (
+      {shownEditors.length > 0 && (
         <View style={styles.section}>
           <Heading kicker="Şefin tavsiyesi" title="Editörün *seçtikleri*" onMore={() => router.push('/collections')} more="Koleksiyonlar" />
           <View style={{ gap: 12, paddingHorizontal: 20 }}>
-            {editors.map(recipe => (
+            {shownEditors.map(recipe => (
               <Pressable key={recipe.id} onPress={() => router.push(`/recipe/${recipe.slug}`)} style={styles.row}>
                 <View style={styles.rowThumb}>
                   {isPlaceholderImage(recipe.image)

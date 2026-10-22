@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   RefreshControl,
@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { getRecipes, getTerms } from '../../lib/api';
 import { Recipe } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
+import { useBlockFilter } from '../../hooks/useBlockFilter';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
 import { AccentText } from '../../components/ui/ScreenTitle';
@@ -27,6 +28,8 @@ export default function CollectionsScreen() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const { visibleRecipes } = useBlockFilter();
+  const shownRecipes = useMemo(() => visibleRecipes(recipes), [visibleRecipes, recipes]);
   const [loading, setLoading] = useState(true);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -119,7 +122,7 @@ export default function CollectionsScreen() {
     <View style={styles.container}>
       {selectedCollection ? (
         <FlatList
-          data={loadingRecipes ? [] : recipes}
+          data={loadingRecipes ? [] : shownRecipes}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => <RecipeCard recipe={item} variant="row" />}
           ListHeaderComponent={header}

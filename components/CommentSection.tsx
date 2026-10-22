@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -16,13 +17,24 @@ import { useAuth } from '../context/AuthContext';
 import { addComment, deleteComment, getComments, toggleCommentLike } from '../lib/api';
 import { Comment } from '../lib/types';
 import { LOKMA_REACTIONS } from '../lib/lokma-emoji';
+import { useBlockFilter } from '../hooks/useBlockFilter';
+import { useContentSafety } from './safety/useContentSafety';
+import { commentAuthorId } from '../lib/report-block-api';
 
 interface CommentSectionProps {
   recipeId: number;
+  /** The recipe screen's toast; an alert is used without it. */
+  onToast?: (message: string) => void;
 }
 
-export default function CommentSection({ recipeId }: CommentSectionProps) {
+export default function CommentSection({ recipeId, onToast }: CommentSectionProps) {
   const { user, token } = useAuth();
+  const notify = useCallback((message: string) => {
+    if (onToast) onToast(message); else Alert.alert('Tariften', message);
+  }, [onToast]);
+  // Blocked members' comments and comments reported in this session stay hidden.
+  const { visibleComments } = useBlockFilter();
+  const safety = useContentSafety({ onToast: notify });
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -116,8 +128,21 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
     loadComments(nextPage);
   };
 
+  const shownComments = useMemo(() => visibleComments(comments), [visibleComments, comments]);
+  const isOwn = (item: Comment) => !!user && Number(user.id) === Number(item.author?.id);
+  const openActions = (item: Comment) => {
+    const authorId = commentAuthorId(item);
+    safety.open({
+      type: 'comment',
+      id: item.id,
+      author: { id: authorId, name: String(item.author?.name || ''), avatar: item.author?.avatar ?? null },
+      title: String(item.author?.name || '').trim() || 'Yorum',
+    });
+  };
+
   const renderComment = ({ item }: { item: Comment }) => (
-    <View style={styles.commentItem}>
+    <Pressable style={styles.commentItem} onLongPress={isOwn(item) ? undefined : () => openActions(item)}
+      delayLongPress={350} accessibilityHint={isOwn(item) ? undefined : 'Basılı tutarak bildirebilir veya engelleyebilirsin'}>
       <View style={styles.commentHeader}>
         {item.author.avatar ? (
           <Image source={{ uri: item.author.avatar }} style={styles.avatar} contentFit="cover" />
@@ -137,6 +162,12 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
             <Text style={styles.deleteText}>Sil</Text>
           </TouchableOpacity>
         )}
+        {!isOwn(item) ? (
+          <TouchableOpacity onPress={() => openActions(item)} style={styles.moreButton} hitSlop={8}
+            accessibilityRole="button" accessibilityLabel={`${item.author?.name || 'Yorum'} yorumu için seçenekler`}>
+            <Ionicons name="ellipsis-horizontal" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        ) : null}
       </View>
       <Text style={styles.commentContent}>{item.content}</Text>
       <TouchableOpacity style={styles.likeButton} onPress={() => handleLike(item.id)}
@@ -144,7 +175,7 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
         <Ionicons name="heart-outline" size={14} color={colors.brand} />
         <Text style={styles.likeText}>{item.likes || 0}</Text>
       </TouchableOpacity>
-    </View>
+    </Pressable>
   );
 
   if (loading) {
@@ -160,7 +191,7 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
       <Text style={styles.kicker}>Pişirenler ne diyor</Text>
       <View style={styles.titleRow}>
         <Text style={styles.sectionTitle}>Yorumlar</Text>
-        <View style={styles.countPill}><Text style={styles.countText}>{comments.length}</Text></View>
+        <View style={styles.countPill}><Text style={styles.countText}>{shownComments.length}</Text></View>
       </View>
       {!!loadError && (
         <View style={styles.errorBox} accessibilityRole="alert">
@@ -219,7 +250,7 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
       )}
 
       <FlatList
-        data={comments}
+        data={shownComments}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderComment}
         scrollEnabled={false}
@@ -229,6 +260,7 @@ export default function CommentSection({ recipeId }: CommentSectionProps) {
           loadError ? null : <Text style={styles.emptyText}>Henüz yorum yok. İlk yorumu siz yapın!</Text>
         }
       />
+      {safety.element}
     </View>
   );
 }
@@ -285,6 +317,7 @@ const styles = StyleSheet.create({
   commentDate: { fontFamily: fonts.body, fontSize: 12, color: colors.textFaint, marginTop: 1 },
   deleteButton: { paddingVertical: 6, paddingHorizontal: 10 },
   deleteText: { fontFamily: fonts.bodySemi, fontSize: 12, color: colors.brand },
+  moreButton: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   commentContent: { fontFamily: fonts.body, fontSize: 15, color: colors.text, lineHeight: 22, marginBottom: 10 },
   likeButton: {
     alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5,

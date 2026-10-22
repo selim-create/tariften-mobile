@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -49,6 +49,12 @@ import { formatAmountTr } from '../../lib/amount-format';
 import { addRecipeToShopping, addToPlan, isInShopping, removeRecipeFromShopping, useKitchen } from '../../lib/kitchen-store';
 import { useKitchenProfile } from '../../lib/kitchen-profile';
 import { ALLERGEN_BAND_LINK, allergenBand } from '../../lib/allergen-ui';
+import { useBlockFilter } from '../../hooks/useBlockFilter';
+import { useContentSafety } from '../../components/safety/useContentSafety';
+import { unblockAndForget } from '../../lib/member-blocks';
+import {
+  BLOCKED_PLACEHOLDER_TITLE, recipeAuthorId, shouldShowBlockedPlaceholder,
+} from '../../lib/report-block-api';
 
 const RATING_ICONS = ['sad-outline', 'remove-circle-outline', 'happy-outline', 'heart-outline', 'sparkles-outline'] as const;
 // Short visual captions keep five choices aligned on narrow screens.
@@ -86,9 +92,17 @@ export default function RecipeDetailScreen() {
   const kitchen = useKitchen(user?.id);
   // Members only; one cached read per session, refreshed when the kitchen profile is saved.
   const kitchenProfile = useKitchenProfile(user ? token : null);
+  // Bildir / Engelle (Core 1.0.67): blocked members are hidden locally on every list.
+  const { blockedIds, listReady, visibleRecipes } = useBlockFilter();
+  const safety = useContentSafety({ onToast: setToast });
+  const [revealedBlocked, setRevealedBlocked] = useState(false);
+  const [unblockBusy, setUnblockBusy] = useState(false);
+  const shownSimilar = useMemo(() => visibleRecipes(similarRecipes), [visibleRecipes, similarRecipes]);
+  useEffect(() => { setRevealedBlocked(false); }, [slug]);
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(''), 2600);
+    // Longer server sentences (report confirmations) stay a little longer.
+    const timer = setTimeout(() => setToast(''), toast.length > 40 ? 4200 : 2600);
     return () => clearTimeout(timer);
   }, [toast]);
 
@@ -249,6 +263,55 @@ export default function RecipeDetailScreen() {
     );
   }
 
+  const toastView = toast ? (
+    <View style={[styles.toast, { bottom: Math.max(insets.bottom, 14) + 74 }]} pointerEvents="none" accessibilityLiveRegion="polite">
+      <Ionicons name="checkmark-circle" size={18} color="#ffffff" />
+      <Text style={styles.toastText}>{toast}</Text>
+    </View>
+  ) : null;
+
+  const authorId = recipeAuthorId(recipe);
+  const ownRecipe = !!user && authorId !== null && authorId === Number(user.id);
+
+  // A blocked member's recipe: a calm placeholder until "Yine de göster" (Core: author_blocked).
+  if (shouldShowBlockedPlaceholder({ recipe, blockedIds, listReady, revealed: revealedBlocked, viewerId: user?.id ?? null })) {
+    const unblock = async () => {
+      if (!token || !user || authorId === null || unblockBusy) { if (!user) router.push('/login'); return; }
+      setUnblockBusy(true);
+      try {
+        await unblockAndForget(token, authorId);
+        setRecipe(prev => (prev ? { ...prev, author_blocked: false } : prev));
+        setToast('Engel kaldırıldı');
+      } catch (error: unknown) {
+        Alert.alert('Engel kaldırılamadı', error instanceof Error ? error.message : 'Birazdan tekrar dene.');
+      } finally {
+        setUnblockBusy(false);
+      }
+    };
+    return (
+      <View style={styles.blockedScreen}>
+        <StatusBar style="dark" />
+        <TouchableOpacity style={[styles.heroBack, { top: Math.max(insets.top + 8, 20) }]}
+          onPress={handleBack} accessibilityRole="button" accessibilityLabel="Tariflere geri dön" activeOpacity={0.8}>
+          <Ionicons name="chevron-back" size={22} color={colors.ink} />
+        </TouchableOpacity>
+        <View style={styles.blockedCard}>
+          <View style={styles.blockedIcon}><Ionicons name="eye-off-outline" size={24} color={colors.textMuted} /></View>
+          <Text style={styles.blockedTitle}>{BLOCKED_PLACEHOLDER_TITLE}</Text>
+          <Text style={styles.blockedText}>Bu tarif engellediğin bir üyeye ait. Tariflerini ve yorumlarını görmüyorsun.</Text>
+          <TouchableOpacity style={styles.blockedSecondary} onPress={() => setRevealedBlocked(true)} accessibilityRole="button">
+            <Text style={styles.blockedSecondaryText}>Yine de göster</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.blockedLink} onPress={() => { void unblock(); }} disabled={unblockBusy} accessibilityRole="button"
+            accessibilityState={{ busy: unblockBusy }}>
+            <Text style={styles.blockedLinkText}>{unblockBusy ? 'Engel kaldırılıyor…' : 'Engeli kaldır'}</Text>
+          </TouchableOpacity>
+        </View>
+        {toastView}
+      </View>
+    );
+  }
+
   // Never fabricate macronutrients from calories: only checked values are shown.
   const verifiedMacros = recipe.nutrition_status === 'verified'
     && recipe.nutrition != null
@@ -321,6 +384,16 @@ export default function RecipeDetailScreen() {
             {!isPrivateRecipe(recipe) ? (
               <TouchableOpacity onPress={handleShare} style={styles.heroCircle} accessibilityRole="button" accessibilityLabel="Tarifi paylaş">
                 <Ionicons name="share-outline" size={20} color={colors.ink} />
+              </TouchableOpacity>
+            ) : null}
+            {/* Bildir / Engelle for recipes the viewer did not write (guests: Bildir → giriş). */}
+            {!ownRecipe && !isPrivateRecipe(recipe) ? (
+              <TouchableOpacity style={styles.heroCircle} accessibilityRole="button" accessibilityLabel="Tarif seçenekleri: bildir veya engelle"
+                onPress={() => safety.open({
+                  type: 'recipe', id: recipe.id, title: recipe.title,
+                  author: { id: authorId, name: String(recipe.author?.name || ''), avatar: recipe.author?.avatar ?? null },
+                })}>
+                <Ionicons name="ellipsis-horizontal" size={20} color={colors.ink} />
               </TouchableOpacity>
             ) : null}
           </View>
@@ -585,7 +658,7 @@ export default function RecipeDetailScreen() {
         )}
 
         {/* Similar Recipes */}
-        {similarRecipes.length > 0 && (
+        {shownSimilar.length > 0 && (
           <View style={styles.sectionWide}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>Bunu sevenler <Text style={styles.sectionAccent}>şunlara da</Text> bayıldı</Text>
@@ -596,7 +669,7 @@ export default function RecipeDetailScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.similarList}>
-              {similarRecipes.map((r) => (
+              {shownSimilar.map((r) => (
                 <RecipeCard key={r.id} recipe={r} horizontal />
               ))}
             </ScrollView>
@@ -612,7 +685,7 @@ export default function RecipeDetailScreen() {
 
         {/* Comments */}
         <View style={styles.block}>
-          <CommentSection recipeId={recipe.id} />
+          <CommentSection recipeId={recipe.id} onToast={setToast} />
         </View>
       </View>
 
@@ -654,12 +727,8 @@ export default function RecipeDetailScreen() {
         </TouchableOpacity>
       </View>
 
-      {toast ? (
-        <View style={[styles.toast, { bottom: Math.max(insets.bottom, 14) + 74 }]} pointerEvents="none" accessibilityLiveRegion="polite">
-          <Ionicons name="checkmark-circle" size={18} color="#ffffff" />
-          <Text style={styles.toastText}>{toast}</Text>
-        </View>
-      ) : null}
+      {toastView}
+      {safety.element}
 
       <WeekPickerSheet visible={weekPickerVisible} title={recipe.title} onClose={() => setWeekPickerVisible(false)} onPick={pickDay} />
     </>
@@ -816,10 +885,25 @@ const styles = StyleSheet.create({
   },
   cookButtonText: { fontFamily: fonts.bodySemi, fontSize: 17, color: '#ffffff' },
   toast: {
-    position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 16, height: 42, borderRadius: radius.pill, backgroundColor: colors.ink,
+    position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '90%',
+    paddingHorizontal: 16, paddingVertical: 11, minHeight: 42, borderRadius: radius.pill, backgroundColor: colors.ink,
   },
-  toastText: { fontFamily: fonts.bodySemi, fontSize: 14, color: '#ffffff' },
+  toastText: { flexShrink: 1, fontFamily: fonts.bodySemi, fontSize: 14, lineHeight: 19, color: '#ffffff' },
+  blockedScreen: { flex: 1, backgroundColor: colors.canvas, justifyContent: 'center', paddingHorizontal: 24 },
+  blockedCard: {
+    alignItems: 'center', padding: 24, borderRadius: radius.xl, backgroundColor: colors.surface,
+    borderWidth: 1, borderColor: colors.line,
+  },
+  blockedIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  blockedTitle: { fontFamily: fonts.headingBold, fontSize: 20, lineHeight: 26, color: colors.ink, textAlign: 'center' },
+  blockedText: { fontFamily: fonts.body, fontSize: 14, lineHeight: 21, color: colors.textMuted, textAlign: 'center', marginTop: 6 },
+  blockedSecondary: {
+    alignSelf: 'stretch', height: 48, marginTop: 20, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.lineStrong,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface,
+  },
+  blockedSecondaryText: { fontFamily: fonts.bodySemi, fontSize: 15, color: colors.ink },
+  blockedLink: { minHeight: 44, marginTop: 6, paddingHorizontal: 16, justifyContent: 'center' },
+  blockedLinkText: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.brand },
   errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, backgroundColor: colors.canvas },
   errorText: { fontFamily: fonts.heading, fontSize: 18, color: colors.ink },
   errorBack: { height: 44, paddingHorizontal: 20, borderRadius: radius.pill, backgroundColor: colors.ink, justifyContent: 'center' },

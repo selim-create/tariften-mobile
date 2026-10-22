@@ -9,6 +9,7 @@ import SocialBadge from './recipe/SocialBadge';
 import AiEstimatedBadge, { PrivateBadge } from './recipe/AiEstimatedBadge';
 import { isPrivateRecipe, showAiEstimatedBadge } from '../lib/recipe-visibility';
 import { useResponsive } from '../hooks/useResponsive';
+import { useBlockFilter } from '../hooks/useBlockFilter';
 import { colors, fonts, radius } from '../constants/theme';
 
 interface RecipeCardProps {
@@ -39,6 +40,9 @@ function metaLine(recipe: Recipe) {
 export default function RecipeCard({ recipe, horizontal = false, badge, fullWidth = false, variant = 'card' }: RecipeCardProps) {
   const router = useRouter();
   const { isTablet, cardWidth } = useResponsive();
+  // Safety net: lists filter blocked members first; a card that slips through never renders.
+  const { isRecipeHidden } = useBlockFilter();
+  if (isRecipeHidden(recipe)) return null;
   const photo = !isPlaceholderImage(recipe.image);
   const kicker = recipe.cuisine?.[0] || recipe.meal_type?.[0] || null;
   const meta = metaLine(recipe);

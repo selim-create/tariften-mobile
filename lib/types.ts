@@ -60,6 +60,10 @@ export interface Recipe {
   visibility?: 'private' | 'public';
   /** Core 1.0.58+: 'photo' | 'notebook' for the photo flows, '' otherwise. */
   source_kind?: 'photo' | 'notebook' | '' | string;
+  /** Some list payloads carry the author's id flat (Core 1.0.67 local block filtering reads both). */
+  author_id?: number;
+  /** Core 1.0.67+: true on a detail read when the signed-in member blocked the author. */
+  author_blocked?: boolean;
 }
 
 /** Where an imported recipe came from; metrics are a snapshot taken at import time. */
