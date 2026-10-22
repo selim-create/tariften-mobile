@@ -5,6 +5,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getBlogPosts, getMenus, getRecipes } from '../../lib/api';
+import { fetchGuides } from '../../lib/guides-api';
+import type { GuideSummary } from '../../lib/guides';
+import GuideCard from '../../components/guide/GuideCard';
 import { BlogPost, Menu, Recipe } from '../../lib/types';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
@@ -134,6 +137,7 @@ export default function HomeScreen() {
   const [cuisines, setCuisines] = useState<{ cover: string | null; count: number }[]>([]);
   const [blog, setBlog] = useState<BlogPost[]>([]);
   const [menus, setMenus] = useState<Menu[]>([]);
+  const [guides, setGuides] = useState<GuideSummary[]>([]);
   const [recipeTotal, setRecipeTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -143,6 +147,8 @@ export default function HomeScreen() {
 
 
   const load = useCallback(async () => {
+    // Mutfak Rehberi is a bonus row: its failure never blocks the home feed.
+    const guidesRequest = fetchGuides({ perPage: 5 }).then(page => page.items).catch(() => [] as GuideSummary[]);
     try {
       const [all, pop, ed, blogData, menuData, ...cuisineData] = await Promise.all([
         getRecipes({}),
@@ -158,6 +164,7 @@ export default function HomeScreen() {
       setEditors((ed.data || []).slice(0, 4));
       setBlog(blogData.data || []);
       setMenus(menuData.slice(0, 4));
+      setGuides(await guidesRequest);
       setCuisines(cuisineData.map(r => ({
         cover: (r.data || []).find((x: Recipe) => !isPlaceholderImage(x.image))?.image || null,
         count: r.count || 0,
@@ -336,6 +343,18 @@ export default function HomeScreen() {
                 <Text style={styles.menuTitle} numberOfLines={2}>{menu.title}</Text>
                 {Number(menu.guest_count) > 0 ? <Text style={styles.rowMeta}>{menu.guest_count} kişilik</Text> : null}
               </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {guides.length > 0 && (
+        <View style={styles.section}>
+          <Heading kicker="Mutfak Rehberi" title="Mutfağın *el kitabı*" onMore={() => router.push('/rehber')} />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={248} decelerationRate="fast" contentContainerStyle={styles.rail}>
+            {guides.map(guide => (
+              <GuideCard key={guide.id} guide={guide} variant="rail"
+                onPress={() => router.push(`/rehber/${encodeURIComponent(guide.slug)}`)} />
             ))}
           </ScrollView>
         </View>

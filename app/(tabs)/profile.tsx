@@ -331,6 +331,15 @@ export default function ProfileScreen() {
 
         {/* Settings Section */}
         <View style={styles.settingsSection}>
+          <Text style={styles.settingsSectionTitle}>Mutfak</Text>
+          <View style={styles.settingsCard}>
+            <TouchableOpacity style={styles.settingsRow} onPress={() => router.push('/rehber')} accessibilityRole="link">
+              <View style={styles.settingsIcon}><Ionicons name="library-outline" size={17} color={colors.ink} /></View>
+              <Text style={styles.settingsRowText}>Mutfak Rehberi</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+            </TouchableOpacity>
+          </View>
+
           <Text style={styles.settingsSectionTitle}>Bildirimler</Text>
           <View style={styles.settingsCard}>
             <TouchableOpacity style={styles.settingsRow} onPress={() => router.push('/notifications')}
