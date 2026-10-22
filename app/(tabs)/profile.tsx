@@ -338,6 +338,12 @@ export default function ProfileScreen() {
               <Text style={styles.settingsRowText}>Mutfak Rehberi</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
             </TouchableOpacity>
+            <TouchableOpacity style={[styles.settingsRow, styles.settingsRowLine]} onPress={() => router.push('/profile/notes')}
+              accessibilityRole="button" accessibilityLabel="Notlarım, yalnızca senin görebildiğin tarif notları">
+              <View style={styles.settingsIcon}><Ionicons name="create-outline" size={17} color={colors.ink} /></View>
+              <Text style={styles.settingsRowText}>Notlarım</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+            </TouchableOpacity>
           </View>
 
           <Text style={styles.settingsSectionTitle}>Bildirimler</Text>

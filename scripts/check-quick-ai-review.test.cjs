@@ -30,7 +30,7 @@ test('Mobile AI candidate is auto-published after quota+validation, duplicate al
  const flow=read('app/(tabs)/recipes.tsx');
  const generate=flow.slice(flow.indexOf('const handleGenerateAI = useCallback('),flow.indexOf('const handlePublishQuickRecipe ='));
  const publish=flow.slice(flow.indexOf('const publishGeneratedRecipe = useCallback('),flow.indexOf('const handleGenerateAI = useCallback('));
- assert.match(generate,/await generateAIRecipe\(token, searchQuery\)/);
+ assert.match(generate,/await generateAIRecipe\(token, searchQuery[,)]/);
  assert.match(generate,/quickRecipeFromAI\(aiResponse\.recipe\)/);
  assert.match(generate,/if \(duplicateId\)/);
  assert.match(generate,/setReviewVisible\(true\)/);

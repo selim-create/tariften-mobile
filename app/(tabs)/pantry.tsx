@@ -18,6 +18,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { analyzePantry, createRecipe, generateAIRecipe, getPantry, updatePantry } from '../../lib/api';
+import HouseholdAdaptToggle, { useHouseholdAdaptSize } from '../../components/recipe/HouseholdAdaptToggle';
+import { shouldAdaptHousehold } from '../../lib/household-adapt';
 import { PantryItem } from '../../lib/types';
 import { AIAllergenConflictError, allergenWarningFrom } from '../../lib/allergen-ui';
 import { afterModalDismiss, confirmAllergenWarning, showAllergenConflict } from '../../lib/allergen-alerts';
@@ -97,8 +99,11 @@ const calculateStatus = (expiryDateString: string | null | undefined): { status:
 
 export default function PantryScreen() {
   const tabSpace = useTabBarSpace();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const router = useRouter();
+  // "Evime göre uyarla (N kişi)": members with a household size only; off by default.
+  const householdSize = useHouseholdAdaptSize(user ? token : null);
+  const [adaptHousehold, setAdaptHousehold] = useState(false);
 
   const [items, setItems] = useState<PantryItem[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -352,7 +357,9 @@ export default function PantryScreen() {
     setShowAIModal(true);
 
     try {
-      const aiResponse = await generateAIRecipe(token, prompt);
+      const aiResponse = await generateAIRecipe(token, prompt, {
+        adaptHousehold: shouldAdaptHousehold(householdSize, adaptHousehold),
+      });
       if (aiResponse?.success && aiResponse?.recipe) {
         // 'possible' hits on the member's allergens: ask before the recipe is saved.
         const allergenWarning = allergenWarningFrom(aiResponse);
@@ -569,6 +576,8 @@ export default function PantryScreen() {
             <Text style={styles.suggestButtonSub}>Dolaptakilerle ne yapabilirim?</Text>
           </Pressable>
         </View>
+        <HouseholdAdaptToggle size={householdSize} value={adaptHousehold} onValueChange={setAdaptHousehold}
+          disabled={aiStatus.loading && showAIModal} style={styles.householdToggle} />
 
         {/* Item List */}
         <View style={styles.listHead}>
@@ -806,6 +815,7 @@ const styles = StyleSheet.create({
   sectionKicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', color: colors.brand, marginTop: 30 },
   sectionTitle: { fontFamily: fonts.headingBold, fontSize: 25, lineHeight: 30, letterSpacing: -0.6, color: colors.ink, marginTop: 6 },
   aiRow: { flexDirection: 'row', gap: 12, marginTop: 14 },
+  householdToggle: { marginTop: 12 },
   rescueButton: { flex: 1, padding: 16, borderRadius: radius.xl, backgroundColor: colors.ink, gap: 4 },
   rescueIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   rescueButtonTitle: { fontFamily: fonts.heading, color: '#fff', fontSize: 15, lineHeight: 20 },

@@ -75,6 +75,8 @@ jobs:
         run: node --test scripts/check-kitchen-sync.test.cjs
       - name: Recipe allergen band and AI allergen conflict handling
         run: node --test scripts/check-allergen-ui.test.cjs
+      - name: Private recipe notes (Notlarım) and optional household adaptation for AI recipes
+        run: node --test scripts/check-recipe-notes.test.cjs
       - name: Push + in-app notifications (routing, never-on-launch permission, token lifecycle)
         run: node --test scripts/check-notifications.test.cjs
       - name: Mutfak Rehberi (API mapping, TOC, callouts, tables, video cards, routes)

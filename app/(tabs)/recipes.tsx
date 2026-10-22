@@ -36,6 +36,8 @@ import { useAuth } from '../../context/AuthContext';
 import { fetchAccountQuotas, reached, resetDate, useQuotas } from '../../lib/quotas';
 import { AIAllergenConflictError, allergenWarningFrom } from '../../lib/allergen-ui';
 import { afterModalDismiss, confirmAllergenWarning, showAllergenConflict } from '../../lib/allergen-alerts';
+import HouseholdAdaptToggle, { useHouseholdAdaptSize } from '../../components/recipe/HouseholdAdaptToggle';
+import { shouldAdaptHousehold } from '../../lib/household-adapt';
 
 const AI_LOADING_MESSAGES = [
   'Şef malzemeleri kokluyor... 👃',
@@ -57,8 +59,11 @@ export default function RecipesScreen() {
     quick?: string;
   }>();
   const router = useRouter();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const quotas = useQuotas(token);
+  // "Evime göre uyarla (N kişi)": members with a household size only; off by default.
+  const householdSize = useHouseholdAdaptSize(user ? token : null);
+  const [adaptHousehold, setAdaptHousehold] = useState(false);
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [total, setTotal] = useState<number | null>(null);
@@ -278,7 +283,9 @@ export default function RecipesScreen() {
         setAiLoadingMessage(AI_LOADING_MESSAGES[msgIdx]);
       }, 2000);
 
-      const aiResponse = await generateAIRecipe(token, searchQuery);
+      const aiResponse = await generateAIRecipe(token, searchQuery, {
+        adaptHousehold: shouldAdaptHousehold(householdSize, adaptHousehold),
+      });
       setUsageNotice("AI tarif oluşturma denemen kullanıldı. Kalan hakların Profil'de.");
       void quotas.refresh();
       if (!aiResponse.success || !aiResponse.recipe) {
@@ -333,7 +340,7 @@ export default function RecipesScreen() {
       quickCreateInFlightRef.current = false;
     }
   }, [token, filters.query, query, router, quotas.refresh, reviewDraft, reviewExistingId,
-      reviewSaving, reviewUncertain, publishGeneratedRecipe]);
+      reviewSaving, reviewUncertain, publishGeneratedRecipe, householdSize, adaptHousehold]);
 
   const handlePublishQuickRecipe = useCallback(async () => {
     if (!reviewDraft || !token) return;
@@ -408,7 +415,12 @@ export default function RecipesScreen() {
   const searchedFor = (filters.query || '').trim();
   const countLabel = total !== null ? `${total.toLocaleString('tr-TR')} tarif` : null;
 
+  const householdToggle = (
+    <HouseholdAdaptToggle size={householdSize} value={adaptHousehold} onValueChange={setAdaptHousehold}
+      disabled={aiLoading} />
+  );
   const aiCard = (
+    <View style={styles.aiCardWrap}>
     <Pressable
       style={({ pressed }) => [styles.aiCard, pressed && { opacity: 0.92 }]}
       accessibilityRole="button"
@@ -424,6 +436,8 @@ export default function RecipesScreen() {
           : 'Tarif adını ya da elindeki malzemeleri yaz; AI Şef senin için yazsın.'}
       </Text>
     </Pressable>
+    {householdToggle}
+    </View>
   );
 
   const header = (
@@ -581,6 +595,7 @@ export default function RecipesScreen() {
               accessibilityLabel="Tarif adı veya malzemeler" multiline
               placeholder="Örn. Fırında tavuk veya patates, biber, peynir..."
               placeholderTextColor={colors.textFaint} style={styles.quickInput} />
+            {!reviewDraft ? householdToggle : null}
             <TouchableOpacity accessibilityRole="button" style={styles.quickAction}
               disabled={!reviewDraft && !quickPromptText.trim()} onPress={() => {
                 const prompt = quickPromptText.trim();
@@ -680,6 +695,7 @@ const styles = StyleSheet.create({
   emptySubtext: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted, marginBottom: 18, textAlign: 'center' },
   footer: { paddingTop: 26, gap: 12 },
   footerLine: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted, textAlign: 'center' },
+  aiCardWrap: { width: '100%', gap: 10 },
   aiCard: { backgroundColor: colors.ink, borderRadius: radius.xl, padding: 20, width: '100%', gap: 6 },
   aiCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   aiCardIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },

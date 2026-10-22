@@ -38,6 +38,7 @@ import AuthorCard from '../../components/AuthorCard';
 import SocialSourceCard, { PLATFORM_ICON, watchSocialVideo } from '../../components/recipe/SocialSourceCard';
 import { creatorLabel, PLATFORM_COPY } from '../../lib/social-format';
 import WeekPickerSheet from '../../components/recipe/WeekPickerSheet';
+import RecipeNoteCard from '../../components/recipe/RecipeNoteCard';
 import { colors, fonts, radius, shadow } from '../../constants/theme';
 import { formatAmountTr } from '../../lib/amount-format';
 import { addRecipeToShopping, addToPlan, isInShopping, removeRecipeFromShopping, useKitchen } from '../../lib/kitchen-store';
@@ -483,6 +484,9 @@ export default function RecipeDetailScreen() {
             ) : null}
           </View>
         )}
+
+        {/* Notum: private note, fetched separately (never part of the public recipe payload). */}
+        <RecipeNoteCard recipeId={recipe.id} onToast={setToast} />
 
         {/* Nutrition: checked values only */}
         {verifiedMacros && (
