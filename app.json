@@ -81,7 +81,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Sesli tarif arama için mikrofon erişimi gereklidir.",
+          "microphonePermission": "Pişirme rehberinde eller serbest sesli komutları algılamak için mikrofon erişimi gereklidir.",
           "recordAudioAndroid": false,
           "enableBackgroundPlayback": false,
           "enableBackgroundRecording": false
