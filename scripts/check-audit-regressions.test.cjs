@@ -9,8 +9,8 @@ function baselineReport() {
   for (const name of BASELINE.highPackages) {
     vulnerabilities[name] = { severity: 'high', via: [] };
   }
-  for (let index = 0; index < BASELINE.moderate; index++) {
-    vulnerabilities['known-moderate-' + index] = { severity: 'moderate', via: [] };
+  for (const name of BASELINE.moderatePackages) {
+    vulnerabilities[name] = { severity: 'moderate', via: [] };
   }
   return {
     metadata: {
@@ -45,6 +45,20 @@ test('rejects a new high package even if an old high was removed', () => {
   const result = checkAuditRegression(report);
   assert.equal(result.ok, false);
   assert.match(result.errors.join(' '), /unknown-risk-package/);
+});
+
+test('baseline lists exactly as many moderate packages as the moderate budget', () => {
+  assert.equal(BASELINE.moderatePackages.length, BASELINE.moderate);
+  assert.equal(BASELINE.highPackages.length, BASELINE.high);
+});
+
+test('rejects a new moderate package even if an old moderate was removed', () => {
+  const report = baselineReport();
+  delete report.vulnerabilities['sprintf-js'];
+  report.vulnerabilities['unknown-moderate-package'] = { severity: 'moderate', via: [] };
+  const result = checkAuditRegression(report);
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(' '), /moderate-severity affected packages: unknown-moderate-package/);
 });
 
 test('rejects growth in high or moderate counts', () => {

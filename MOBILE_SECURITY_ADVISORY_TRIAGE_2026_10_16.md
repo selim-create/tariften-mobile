@@ -93,3 +93,42 @@
 - The `scripts/check-known-advisories.cjs` allowlist is an **explicit review record**, not an npm-audit ignore feature. It does not remove or suppress advisories; CI continues producing `npm-audit-production.json`. Updating the allowlist requires a deliberate reviewed PR to assess severity, affected range, provenance, exploitation conditions and available fixes.
 - Scope limit: GitHub advisory IDs are the source of truth for this check. Non-GHSA reporting channels, a new vulnerability inside already-allowed GHSA, and newly malicious code without an advisory remain outside this guard. Manually inspect dependencies and test signed release builds ahead of launch.
 - **Go/no-go:** Expo SDK 55, TypeScript, URI/UUID tests and full CI must pass before merging. Physical iOS/Android UX, sign-in, recipe detail, profile, Dolap, deep links, quotas and EAS signed builds have not been verified from GitHub CI. This security phase does not certify an App Store-ready release.
+
+## P25 — Expo SDK 55 advisory re-review (2026-10-22)
+
+Branch `chore/mobile-security-eas-20261022`, fresh `npm ci` on Node 22 / npm 10, Expo `55.0.32` (latest SDK 55 patch), React Native `0.83.10`, Expo Router `55.0.18`.
+
+### Before / after
+
+| | critical | high | moderate | entries |
+| --- | --- | --- | --- | --- |
+| `main` @ `e29ce59` | 0 | 22 | 8 | 30 |
+| this branch | 0 | 22 | 8 | 30 |
+
+The count is unchanged because **no root advisory has a fix that can be applied inside SDK 55** (details below). The 30 entries are npm dependency nodes that trace back to the same **four GHSA roots** already allowlisted in `scripts/check-known-advisories.cjs`; 26 of the 30 entries are propagation (`"via": ["<package>"]`).
+
+### What was checked and done
+
+- **Expo SDK 55 alignment:** every direct dependency was compared with `node_modules/expo/bundledNativeModules.json` (the React Native Directory API used by `npx expo install --check` is blocked by the sandbox proxy; `EXPO_OFFLINE=1` reports "up to date" but is unreliable). All Expo-managed modules already match the SDK 55 expected range; `expo@55.0.32` is the newest `sdk-55` tag. No native module was bumped.
+- **Registry check for patched releases:** `braces@3.0.3`, `node-forge@1.4.0` and `sprintf-js@1.1.3` are the newest published versions and are all inside the affected ranges. `decode-uri-component@0.5.0` is patched but ESM-only, while `query-string@7.1.3` (the newest 7.x, still used by Expo Router 55–58.0.12) loads it with CommonJS `require()`. `@expo/code-signing-certificates@0.0.7` still depends on `node-forge@^1.4.0`. Therefore **no semver-compatible, non-native `overrides` entry exists** for any root; `npm audit fix` (non-force) changes nothing.
+- **Unused dependency removed:** `expo-auth-session` had zero imports, no config plugin and no native code (`grep` across `app/ components/ lib/ hooks/ context/ utils/ app.json app.config.js`). Its dependencies stay installed through other packages (`expo-application` via `expo-notifications`, `expo-crypto`/`expo-web-browser`/`expo-linking` are direct), so autolinked native modules and `expo config --type introspect` are unchanged. This does not change the audit count; it shrinks the attack/maintenance surface. Re-add with `npx expo install expo-auth-session` if native Google sign-in is built.
+- **Bundle reachability evidence:** `npx expo export --platform ios --dump-sourcemap` → of the vulnerable packages only `query-string` and `decode-uri-component` appear in the Hermes bundle sourcemap. `braces`, `micromatch`, `node-forge`, `@expo/code-signing-certificates`, `sprintf-js`, `argparse`, `js-yaml`, `metro*`, `babel-jest`, `@jest/*` are **not** in the shipped bundle.
+- **Guard hardening:** `scripts/check-audit-regressions.cjs` now also allowlists the eight moderate affected package names, so a new moderate package can no longer replace a removed one at equal count. High (22) / moderate (8) budgets and the GHSA allowlist are unchanged and still pass on the fresh tree.
+
+### Remaining advisories (per root)
+
+| GHSA / severity | Root package (installed) | Path | Ships in app bundle? | Exploitability for Tariften | Plan |
+| --- | --- | --- | --- | --- | --- |
+| [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) high | `braces@3.0.3` | `expo` → `@expo/metro` → `metro-file-map` → `micromatch@4.0.8` → `braces`; also `react-native` → `babel-jest`/`@jest/transform` → `jest-haste-map`/`jest-message-util` → `micromatch` | No — Metro/Jest, runs on the developer machine / EAS builder | Needs an attacker-controlled, deeply nested glob pattern given to Metro/Jest. Our globs come from repo config only. Build-time DoS at worst. | No upstream patch yet. SDK 56 still uses `metro-file-map@0.84` → `micromatch@^4`. Watch for `braces@3.0.4`; then a scoped override is possible. |
+| [GHSA-86w9-cpqp-85rv](https://github.com/advisories/GHSA-86w9-cpqp-85rv) high | `node-forge@1.4.0` | `expo` → `@expo/cli` → `node-forge` and `@expo/cli` → `@expo/code-signing-certificates@0.0.6` → `node-forge` | No — Expo CLI only | Affects RSA PKCS#1 v1.5 **signature verification**. Expo CLI uses it for expo-updates code-signing and dev-server certificates. Tariften does not use `expo-updates`, so no update-manifest signature is ever verified with it. | No upstream patch. Still present in `@expo/cli` 56 and 58. Do not swap crypto libraries by hand; re-check on each SDK upgrade. |
+| [GHSA-hp3w-g68c-fv3c](https://github.com/advisories/GHSA-hp3w-g68c-fv3c) moderate | `sprintf-js@1.0.3` | `react-native` → `babel-jest@29.7.0` → `babel-plugin-istanbul@6.1.1` → `@istanbuljs/load-nyc-config` → `js-yaml@3.15.2` → `argparse@1.0.10` → `sprintf-js` | No — Jest coverage tooling (the app has no Jest suite) | Needs attacker-controlled format precision inside coverage config parsing. Not reachable from the app. | No patched `sprintf-js` exists (all versions ≤1.1.3 are affected). **SDK 56 (RN 0.85) removes `babel-jest`/`jest-environment-node` from `react-native`'s dependencies**, which should drop this chain and the Jest high entries. Verify with a fresh audit after the upgrade. |
+| [GHSA-vcc3-ghjq-m6fr](https://github.com/advisories/GHSA-vcc3-ghjq-m6fr) moderate | `decode-uri-component@0.2.2` | `expo-router@55.0.18` → `query-string@7.1.3` → `decode-uri-component` | **Yes** — in the Hermes bundle | Expo Router 55 only calls `queryString.stringify()`; the `parse()` path that decodes untrusted percent-encoding is commented out (guarded by `scripts/check-router-uri-surface.test.cjs`). Deep links / shared URLs therefore do not reach the vulnerable decoder through Router. | Do not force 0.5.0 (ESM vs CJS). Expo Router ≥ `58.0.13` (SDK 58) no longer depends on `query-string`; SDK 56/57 Router still do. Re-check when the SDK upgrade reaches 58. |
+
+Propagated high entries (no advisory of their own): `@expo/cli`, `@expo/code-signing-certificates`, `@expo/metro`, `@expo/metro-config`, `@jest/environment`, `@jest/fake-timers`, `@jest/transform`, `@react-native/community-cli-plugin`, `babel-jest`, `expo`, `expo-share-intent` (peer `expo` only), `jest-environment-node`, `jest-haste-map`, `jest-message-util`, `metro`, `metro-config`, `metro-file-map`, `metro-transform-worker`, `micromatch`, `react-native`. Propagated moderate entries: `@istanbuljs/load-nyc-config`, `argparse`, `babel-plugin-istanbul`, `expo-router`, `js-yaml`, `query-string`.
+
+### Upgrade plan (SDK 56 package)
+
+1. `npx expo install expo@^56 --fix`, then `npx expo install --check` (with network access), `npm ci`, full CI.
+2. Expected effect (from the published SDK 56 manifests, to be confirmed by a fresh audit): the `sprintf-js` and Jest chains disappear; `braces`, `node-forge` and `decode-uri-component` remain until upstream patches or Router 58.
+3. After the audit, **lower** `BASELINE.high`/`moderate`, remove names from `highPackages`/`moderatePackages`, and drop resolved GHSA IDs from `REVIEWED` in the same reviewed PR. Never raise a budget to make CI pass.
+4. Still prohibited: `npm audit fix --force` (it proposes React Native 0.88 / Expo Router 58 jumps outside the SDK).

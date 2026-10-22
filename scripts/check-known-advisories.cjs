@@ -11,6 +11,10 @@ const path = require('node:path');
  * When a new advisory affects a package that was already high-risk, the
  * package-name/count gate cannot necessarily detect it. This checker can.
  * Only add a GHSA after reviewing its affected range, exposure and mitigation.
+ *
+ * Re-reviewed 2026-10-22 (P25): all four still have no semver-compatible fix
+ * inside Expo SDK 55; per-advisory exposure and the upgrade plan live in
+ * MOBILE_SECURITY_ADVISORY_TRIAGE_2026_10_16.md ("P25").
  */
 const REVIEWED = Object.freeze({
   'GHSA-vfj7-8cjw-p6xm': 'braces',

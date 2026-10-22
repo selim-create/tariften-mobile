@@ -14,6 +14,15 @@ const { resolve } = require('node:path');
  * 2026-10-21 review: expo-share-intent (Paylaş → Tariften) is listed only
  * because npm attributes its peer `expo` advisories to it ("via": ["expo"]).
  * It adds no advisory ID of its own (check-known-advisories still passes).
+ *
+ * 2026-10-22 review (P25, chore/mobile-security-eas-20261022): fresh npm ci +
+ * npm audit --omit=dev still reports 22 high / 8 moderate / 0 critical from the
+ * same four GHSA roots. None has a semver-compatible patched release inside
+ * Expo SDK 55 (braces, node-forge, sprintf-js: no patch published at all;
+ * decode-uri-component: patch is ESM-only, query-string@7 is CommonJS). See
+ * MOBILE_SECURITY_ADVISORY_TRIAGE_2026_10_16.md "P25" for the per-advisory
+ * table. Moderate affected package NAMES are now allowlisted too, so a new
+ * moderate package cannot slip in by replacing a removed one at equal count.
  */
 const BASELINE = Object.freeze({
   high: 22,
@@ -41,6 +50,16 @@ const BASELINE = Object.freeze({
     'micromatch',
     'node-forge',
     'react-native',
+  ]),
+  moderatePackages: Object.freeze([
+    '@istanbuljs/load-nyc-config',
+    'argparse',
+    'babel-plugin-istanbul',
+    'decode-uri-component',
+    'expo-router',
+    'js-yaml',
+    'query-string',
+    'sprintf-js',
   ]),
 });
 
@@ -88,6 +107,11 @@ function checkAuditRegression(report) {
   const unreviewedHigh = highNames.filter((name) => !acceptedNames.has(name));
   if (unreviewedHigh.length > 0) {
     errors.push('New/unreviewed high-severity affected packages: ' + unreviewedHigh.join(', '));
+  }
+  const acceptedModerate = new Set(BASELINE.moderatePackages);
+  const unreviewedModerate = moderateNames.filter((name) => !acceptedModerate.has(name)).sort();
+  if (unreviewedModerate.length > 0) {
+    errors.push('New/unreviewed moderate-severity affected packages: ' + unreviewedModerate.join(', '));
   }
 
   return {
