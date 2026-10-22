@@ -1,6 +1,7 @@
 import { APIResponse, Recipe, PantryItem, Menu, BlogPost, RecipeFilters } from './types';
 import { parseIngredients, parseSteps } from './recipeUtils';
 import { RecipeCreateUnconfirmedError } from './recipe-publish';
+import { allergenConflictFrom } from './allergen-ui';
 
 const API_URL = 'https://api.tariften.com/wp-json';
 
@@ -113,8 +114,11 @@ export async function generateAIRecipe(token: string, ingredients: string) {
     body: JSON.stringify({ ingredients, type: 'suggest' }),
   });
 
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'AI yanıt vermedi.');
+  const data = await res.json().catch(() => null);
+  // 422 ai_allergen_conflict: Core refused the recipe (none in the body).
+  const conflict = allergenConflictFrom(res.status, data);
+  if (conflict) throw conflict;
+  if (!res.ok || !data) throw new Error(data?.message || 'AI yanıt vermedi.');
   return data;
 }
 

@@ -52,6 +52,8 @@ export interface Recipe {
   /** 'verified' only when macros were checked; anything else is never shown as fact. */
   nutrition_status?: 'unverified' | 'verified' | string;
   social_source?: RecipeSocialSource | null;
+  /** Core 1.0.51+: EU-14 keys detected from ingredient names (see lib/allergen-ui.ts). */
+  allergens?: { contains: string[]; possible: string[] };
 }
 
 /** Where an imported recipe came from; metrics are a snapshot taken at import time. */

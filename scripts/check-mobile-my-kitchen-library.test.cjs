@@ -22,6 +22,7 @@ function harness(data, status = 200) {
     m, m.exports, id => {
       if (id === './recipeUtils') return { parseIngredients: x => x, parseSteps: x => x };
       if (id === './recipe-publish') return { RecipeCreateUnconfirmedError: class extends Error {} };
+      if (id === './allergen-ui') return { allergenConflictFrom: () => null };
       throw new Error('Unexpected import ' + id);
     }, (...args) => capturedFetch(...args), false);
   return { api: m.exports, calls };

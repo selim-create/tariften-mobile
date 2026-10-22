@@ -41,6 +41,8 @@ import WeekPickerSheet from '../../components/recipe/WeekPickerSheet';
 import { colors, fonts, radius, shadow } from '../../constants/theme';
 import { formatAmountTr } from '../../lib/amount-format';
 import { addRecipeToShopping, addToPlan, isInShopping, removeRecipeFromShopping, useKitchen } from '../../lib/kitchen-store';
+import { useKitchenProfile } from '../../lib/kitchen-profile';
+import { ALLERGEN_BAND_LINK, allergenBand } from '../../lib/allergen-ui';
 
 const RATING_ICONS = ['sad-outline', 'remove-circle-outline', 'happy-outline', 'heart-outline', 'sparkles-outline'] as const;
 // Short visual captions keep five choices aligned on narrow screens.
@@ -75,6 +77,8 @@ export default function RecipeDetailScreen() {
   const [weekPickerVisible, setWeekPickerVisible] = useState(false);
   const [toast, setToast] = useState('');
   const kitchen = useKitchen(user?.id);
+  // Members only; one cached read per session, refreshed when the kitchen profile is saved.
+  const kitchenProfile = useKitchenProfile(user ? token : null);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(''), 2600);
@@ -230,6 +234,9 @@ export default function RecipeDetailScreen() {
   ].filter(Boolean) as string[];
   const tags = [...(recipe.cuisine || []).map(v => ({ v, key: 'cuisine' })), ...(recipe.meal_type || []).map(v => ({ v, key: 'mealType' })), ...(recipe.diet || []).map(v => ({ v, key: 'diet' }))];
   const inList = isInShopping(recipe.id, kitchen);
+  const allergenNotice = user && kitchenProfile
+    ? allergenBand(recipe.allergens, kitchenProfile.profile, kitchenProfile.options.allergens)
+    : null;
 
   const toggleShopping = () => {
     if (inList) { removeRecipeFromShopping(recipe.id); setToast('Alışveriş listesinden çıkarıldı'); return; }
@@ -347,6 +354,24 @@ export default function RecipeDetailScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        {allergenNotice ? (
+          <View style={styles.allergenBand}>
+            <View accessible accessibilityLabel={allergenNotice.accessibilityLabel} style={styles.allergenBody}>
+              <Ionicons name={allergenNotice.tone === 'contains' ? 'alert-circle-outline' : 'information-circle-outline'}
+                size={20} color={colors.warning} style={styles.allergenIcon} />
+              <View style={styles.allergenCopy}>
+                {allergenNotice.lines.map(line => <Text key={line} style={styles.allergenText}>{line}</Text>)}
+                <Text style={styles.allergenNote}>{allergenNotice.note}</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => router.push('/profile/kitchen')} style={styles.allergenLink}
+              accessibilityRole="link" accessibilityLabel={ALLERGEN_BAND_LINK} hitSlop={{ top: 4, bottom: 4 }}>
+              <Text style={styles.allergenLinkText}>{ALLERGEN_BAND_LINK}</Text>
+              <Ionicons name="chevron-forward" size={15} color={colors.warning} />
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <View style={styles.segment} accessibilityRole="tablist">
           {(['ingredients', 'steps'] as const).map(key => (
@@ -638,6 +663,17 @@ const styles = StyleSheet.create({
   quickIconPrimary: { backgroundColor: colors.brand, borderColor: colors.brand },
   quickIconActive: { backgroundColor: colors.ink, borderColor: colors.ink },
   quickLabel: { fontFamily: fonts.bodyMedium, fontSize: 12, lineHeight: 15, color: colors.text, textAlign: 'center' },
+  allergenBand: {
+    marginHorizontal: 20, marginTop: 22, paddingTop: 14, paddingBottom: 4, paddingHorizontal: 14,
+    borderRadius: radius.lg, backgroundColor: colors.warningSoft,
+  },
+  allergenBody: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  allergenIcon: { marginTop: 1 },
+  allergenCopy: { flex: 1, minWidth: 0, gap: 4 },
+  allergenText: { fontFamily: fonts.bodySemi, fontSize: 14, lineHeight: 20, color: colors.ink },
+  allergenNote: { fontFamily: fonts.body, fontSize: 12, lineHeight: 17, color: colors.textMuted, marginTop: 2 },
+  allergenLink: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', minHeight: 40, marginLeft: 30 },
+  allergenLinkText: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.warning },
   segment: { flexDirection: 'row', gap: 4, padding: 4, marginHorizontal: 20, marginTop: 26, borderRadius: radius.pill, backgroundColor: colors.cream },
   segmentItem: { flex: 1, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   segmentActive: { backgroundColor: colors.brand },

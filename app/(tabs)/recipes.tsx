@@ -34,6 +34,8 @@ import { colors, fonts, radius, shadow } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { fetchAccountQuotas, reached, resetDate, useQuotas } from '../../lib/quotas';
+import { AIAllergenConflictError, allergenWarningFrom } from '../../lib/allergen-ui';
+import { afterModalDismiss, confirmAllergenWarning, showAllergenConflict } from '../../lib/allergen-alerts';
 
 const AI_LOADING_MESSAGES = [
   'Şef malzemeleri kokluyor... 👃',
@@ -284,6 +286,15 @@ export default function RecipesScreen() {
         return;
       }
 
+      // 'possible' hits on the member's allergens: ask before anything is published.
+      const allergenWarning = allergenWarningFrom(aiResponse);
+      if (allergenWarning) {
+        setAiModalVisible(false);
+        await afterModalDismiss();
+        if (!(await confirmAllergenWarning(allergenWarning, 'Yayımla'))) return;
+        setAiModalVisible(true);
+      }
+
       const draft = quickRecipeFromAI(aiResponse.recipe);
       setReviewDraft(draft);
       const existingId = aiResponse.existing_recipe_id;
@@ -303,6 +314,14 @@ export default function RecipesScreen() {
         await publishGeneratedRecipe(draft, token);
       }
     } catch (error: unknown) {
+      if (error instanceof AIAllergenConflictError) {
+        // Refused by Core: nothing to save. The attempt still counted.
+        void quotas.refresh();
+        setAiModalVisible(false);
+        await afterModalDismiss();
+        showAllergenConflict(error, () => router.push('/profile/kitchen'));
+        return;
+      }
       Alert.alert('Hata', error instanceof Error ? error.message : 'AI tarif oluşturulamadı.');
     } finally {
       if (aiMsgIntervalRef.current) {
