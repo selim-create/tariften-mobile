@@ -115,6 +115,16 @@ export default function GuideListScreen() {
       <AccentText style={styles.title}>{'Mutfağın *el kitabı.*'}</AccentText>
       <Text style={styles.subtitle}>Teknikler, pişirme süreleri, saklama ve ölçüler. Mutfakta işine yarayacak her şey, adım adım.</Text>
 
+      <Pressable onPress={() => router.push('/rehber/araclar')} style={({ pressed }) => [styles.tools, pressed && { opacity: 0.85 }]}
+        accessibilityRole="link" accessibilityLabel="Mutfak araçları: yumurta, makarna, kurutma ve ölçü çevirici">
+        <View style={styles.toolsIcon}><Ionicons name="timer-outline" size={19} color={colors.brand} /></View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.toolsTitle}>Mutfak araçları</Text>
+          <Text style={styles.toolsText} numberOfLines={2}>Yumurta ve makarna zamanlayıcı, kurutma rehberi, ölçü çevirici</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      </Pressable>
+
       {topics.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll} contentContainerStyle={styles.chips}>
           <Chip label="Tümü" count={allCount} selected={!topic} onPress={() => setTopic(null)} />
@@ -224,6 +234,13 @@ const styles = StyleSheet.create({
   kicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', color: colors.brand },
   title: { fontFamily: fonts.headingBold, fontSize: 36, lineHeight: 40, letterSpacing: -1.2, color: colors.ink, marginTop: 10 },
   subtitle: { fontFamily: fonts.body, fontSize: 16, lineHeight: 24, color: colors.textMuted, marginTop: 12 },
+  tools: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, paddingVertical: 12, paddingHorizontal: 14,
+    borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line,
+  },
+  toolsIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
+  toolsTitle: { fontFamily: fonts.heading, fontSize: 15, lineHeight: 20, color: colors.ink },
+  toolsText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.textMuted, marginTop: 1 },
   chipsScroll: { marginHorizontal: -20, marginTop: 22 },
   subScroll: { marginHorizontal: -20, marginTop: 10 },
   chips: { gap: 8, paddingHorizontal: 20 },

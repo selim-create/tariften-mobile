@@ -54,9 +54,12 @@ export function normalizeTarget(input: unknown): NotificationTarget {
   };
 }
 
-/** Only the two app routes Core may point at; anything else is ignored. */
+/** Only known app routes (recipe, import job, kitchen tools); anything else is ignored. */
 function safeRelativeUrl(url: string | null): string | null {
   if (!url) return null;
+  // Local kitchen-timer notification (Mutfak Rehberi tools): back to the tool.
+  const tool = /^\/rehber\/araclar(?:\?arac=(yumurta|makarna|kurutma|olcu))?$/.exec(url);
+  if (tool) return tool[1] ? `/rehber/araclar?arac=${tool[1]}` : '/rehber/araclar';
   const job = /^\/recipe\/aktar\?job=([1-9]\d{0,15})$/.exec(url);
   if (job) return `/recipe/aktar?job=${job[1]}`;
   const recipe = /^\/recipe\/([^/?#]+)$/.exec(url);

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, Pressable, ScrollView, Share, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
+  ActivityIndicator, Animated, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -15,6 +15,8 @@ import GuideArticle from '../../components/guide/GuideArticle';
 import GuideTocSheet, { TocList } from '../../components/guide/GuideTocSheet';
 import { LevelMeter } from '../../components/guide/GuideCard';
 import { openExternal } from '../../components/guide/openExternal';
+import GuideToolCard from '../../components/guide-tools/GuideToolCard';
+import { guideTool } from '../../lib/guide-tools';
 import ImagePlaceholder from '../../components/ImagePlaceholder';
 import { AccentText } from '../../components/ui/ScreenTitle';
 import { colors, fonts, radius, shadow } from '../../constants/theme';
@@ -169,6 +171,8 @@ export default function GuideDetailScreen() {
   const byline = [guide.authorName, updated ? `Güncellendi: ${updated}` : published].filter(Boolean).join('  ·  ');
   const reviewed = guide.foodSafety ? guideDateTr(guide.foodSafety.reviewedAt) : '';
   const tocShown = tocExpanded || toc.length <= TOC_PREVIEW ? toc : toc.slice(0, TOC_PREVIEW - 1);
+  // P23: a known `tool` key puts the interactive tool right after the meta/TOC; unknown keys are ignored.
+  const tool = guideTool(guide.tool);
 
   return (
     <View style={styles.screen}>
@@ -177,6 +181,9 @@ export default function GuideDetailScreen() {
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="never"
         scrollEventThrottle={16}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        automaticallyAdjustKeyboardInsets
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
         contentContainerStyle={{ paddingTop: topSpace, paddingBottom: insets.bottom + 48 }}>
         <View style={styles.column} onLayout={e => { columnY.current = e.nativeEvent.layout.y; }}>
@@ -241,6 +248,13 @@ export default function GuideDetailScreen() {
                   <Ionicons name="chevron-down" size={15} color={colors.ink} />
                 </TouchableOpacity>
               ) : null}
+            </View>
+          ) : null}
+
+          {tool ? (
+            <View style={styles.tool}>
+              <GuideToolCard tool={tool}
+                onAllTools={() => router.push({ pathname: '/rehber/araclar', params: { arac: tool.slug } })} />
             </View>
           ) : null}
 
@@ -353,6 +367,7 @@ const styles = StyleSheet.create({
   tocCount: { fontFamily: fonts.body, fontSize: 12, color: colors.textFaint },
   tocMore: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44, borderTopWidth: 1, borderTopColor: colors.line },
   tocMoreText: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.ink },
+  tool: { marginHorizontal: SIDE, marginTop: 24 },
   article: { paddingHorizontal: SIDE, paddingTop: ARTICLE_TOP },
   emptyBody: { fontFamily: fonts.body, fontSize: 15, color: colors.textMuted },
   sectionKicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', color: colors.brand },
