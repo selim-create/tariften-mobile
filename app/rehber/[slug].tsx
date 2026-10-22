@@ -211,6 +211,15 @@ export default function GuideDetailScreen() {
                 </View>
               </View>
             ) : null}
+            {guide.foodSafetyWarning ? (
+              <View style={styles.warn} accessible accessibilityRole="text" accessibilityLabel={`Uzman incelemesi bekleniyor. ${guide.foodSafetyWarning}`}>
+                <Ionicons name="alert-circle-outline" size={18} color={colors.warning} style={{ marginTop: 1 }} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.warnTitle}>Uzman incelemesi bekleniyor</Text>
+                  <Text style={styles.warnText}>{guide.foodSafetyWarning}</Text>
+                </View>
+              </View>
+            ) : null}
           </View>
 
           {guide.image ? (
@@ -331,6 +340,9 @@ const styles = StyleSheet.create({
   safetyIcon: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   safetyTitle: { fontFamily: fonts.bodySemi, fontSize: 13, lineHeight: 18, color: colors.ink },
   safetyDate: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted, marginTop: 1 },
+  warn: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 16, padding: 14, borderRadius: radius.md, backgroundColor: colors.warningSoft },
+  warnTitle: { fontFamily: fonts.bodySemi, fontSize: 13, lineHeight: 18, color: colors.ink },
+  warnText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: colors.ink, marginTop: 3 },
   figure: { marginHorizontal: SIDE, aspectRatio: 16 / 10, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.cream },
   tocCard: {
     marginHorizontal: SIDE, marginTop: 24, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6,
