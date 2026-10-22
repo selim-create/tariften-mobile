@@ -46,6 +46,21 @@ export function embedUrl(source: Pick<RecipeSocialSource, 'platform' | 'video_id
   return null;
 }
 
+/**
+ * Tariften's own dark player page (web route /video/[platform]/[id]) for a
+ * validated id. It frames the platform's player full-screen instead of the
+ * raw embed page; `u` (original post) and `n` (creator) are only display
+ * hints and are re-validated by the page. Null when the id is not safe.
+ */
+export function playerPageUrl(source: RecipeSocialSource): string | null {
+  if (!embedUrl(source)) return null;
+  const params: string[] = [];
+  if (typeof source.url === 'string' && /^https:\/\//.test(source.url)) params.push(`u=${encodeURIComponent(source.url)}`);
+  const { primary } = creatorLabel(source);
+  if (primary) params.push(`n=${encodeURIComponent(primary)}`);
+  return `https://tariften.com/video/${source.platform}/${encodeURIComponent(String(source.video_id))}${params.length ? `?${params.join('&')}` : ''}`;
+}
+
 /** YouTube's own still for the video; other platforms publish none we can use. */
 export function videoPoster(source: Pick<RecipeSocialSource, 'platform' | 'video_id'>): string | null {
   const id = String(source.video_id || '');
