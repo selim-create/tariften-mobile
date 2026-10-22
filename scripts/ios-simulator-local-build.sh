@@ -70,8 +70,8 @@ if [[ ! -d ios ]]; then echo 'Expo ios/ projesini üretemedi.' >&2; exit 1; fi
 echo 'CocoaPods bağımlılıkları kuruluyor...'
 (cd ios && pod install)
 
-# Xcode 27 requires iOS 15+ for every generated Pods target. Some older
-# transitive pods (e.g. SDWebImage) still set 9.0; fix generated Pods only.
+# Xcode 27 needs iOS 16+ for every generated Pods target (old pods set 9.0;
+# expo-router 55 uses UIAction.subtitle, iOS 16+ in the iOS 27 SDK). Generated Pods only.
 node "$PWD/scripts/ios-xcode27-pods-min-target.cjs" "$PWD/ios/Pods/Pods.xcodeproj"
 
 WORKSPACE="$(find ios -maxdepth 1 -name '*.xcworkspace' -type d -print -quit)"
@@ -123,6 +123,10 @@ show_build_errors() {
   fi
 }
 
+# One deployment target for the app, its share extension and every pod in
+# this local simulator build: Swift refuses to import a module built for a
+# newer iOS than the importing target, so raising only the pods is not enough.
+SIM_IOS_MIN="16.0"
 echo "iOS simülatör için yerel derleme: $SCHEME"
 echo "Derleniyor… İlk derleme birkaç dakika sürebilir. Ayrıntılı kayıt: $LOG"
 # Ad-hoc "Sign to Run Locally" embeds the App Group entitlement the share
@@ -132,6 +136,7 @@ if ! xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
   -configuration Debug -sdk iphonesimulator \
   -destination "platform=iOS Simulator,id=$DEVICE_ID" \
   -derivedDataPath "$DERIVED" \
+  IPHONEOS_DEPLOYMENT_TARGET="$SIM_IOS_MIN" \
   CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= build >> "$LOG" 2>&1; then
   echo 'İmzalı simülatör derlemesi olmadı; imzasız deneniyor (Paylaş → Tariften simülatörde veri alamayabilir).' >&2
   echo '----- imzasız deneme -----' >> "$LOG"
@@ -139,6 +144,7 @@ if ! xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
     -configuration Debug -sdk iphonesimulator \
     -destination "platform=iOS Simulator,id=$DEVICE_ID" \
     -derivedDataPath "$DERIVED" \
+    IPHONEOS_DEPLOYMENT_TARGET="$SIM_IOS_MIN" \
     CODE_SIGNING_ALLOWED=NO build >> "$LOG" 2>&1; then
     show_build_errors
     exit 1

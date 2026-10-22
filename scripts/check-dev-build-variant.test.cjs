@@ -100,17 +100,19 @@ test('legacy CocoaPods targets are normalized only when lower than Xcode 27 iOS 
     'IPHONEOS_DEPLOYMENT_TARGET = 9.0;',
     'IPHONEOS_DEPLOYMENT_TARGET = "12.4";',
     'IPHONEOS_DEPLOYMENT_TARGET = 15.1;',
-    'IPHONEOS_DEPLOYMENT_TARGET = 15.10;',
     'IPHONEOS_DEPLOYMENT_TARGET = 16.0;',
+    'IPHONEOS_DEPLOYMENT_TARGET = 16.10;',
+    'IPHONEOS_DEPLOYMENT_TARGET = 17.0;',
   ].join('\n'));
   const out = execFileSync(process.execPath, [script, proj], { encoding: 'utf8' });
-  assert.match(out, /2 configurations updated to iOS 15\.1/);
+  assert.match(out, /3 configurations updated to iOS 16\.0/);
   assert.deepEqual(fs.readFileSync(pbx, 'utf8').split('\n'), [
-    'IPHONEOS_DEPLOYMENT_TARGET = 15.1;',
-    'IPHONEOS_DEPLOYMENT_TARGET = 15.1;',
-    'IPHONEOS_DEPLOYMENT_TARGET = 15.1;',
-    'IPHONEOS_DEPLOYMENT_TARGET = 15.10;',
     'IPHONEOS_DEPLOYMENT_TARGET = 16.0;',
+    'IPHONEOS_DEPLOYMENT_TARGET = 16.0;',
+    'IPHONEOS_DEPLOYMENT_TARGET = 16.0;',
+    'IPHONEOS_DEPLOYMENT_TARGET = 16.0;',
+    'IPHONEOS_DEPLOYMENT_TARGET = 16.10;',
+    'IPHONEOS_DEPLOYMENT_TARGET = 17.0;',
   ]);
   // Unchanged project is not rewritten; any other path is refused.
   const before = fs.statSync(pbx).mtimeMs;
@@ -149,4 +151,15 @@ test('build output goes to a log file and failures print the real compiler error
   fs.writeFileSync(log, 'line a\nline b\n** BUILD FAILED **\n');
   assert.match(run(log), /son satırları:[\s\S]*BUILD FAILED/);
   fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test('local simulator build compiles app, extension and pods for the same iOS 16 minimum', () => {
+  const shell = fs.readFileSync(path.join(root, 'scripts/ios-simulator-local-build.sh'), 'utf8');
+  const cjs = fs.readFileSync(path.join(root, 'scripts/ios-xcode27-pods-min-target.cjs'), 'utf8');
+  assert.match(shell, /SIM_IOS_MIN="16\.0"/);
+  assert.equal((shell.match(/IPHONEOS_DEPLOYMENT_TARGET="\$SIM_IOS_MIN"/g) || []).length, 2, 'both xcodebuild runs override the target');
+  assert.match(cjs, /const MINIMUM = '16\.0';/, 'pods repair uses the same minimum');
+  // app.json (production builds) is untouched by this local-only change.
+  const app = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
+  assert.equal(JSON.stringify(app).includes('"deploymentTarget":"16.0"'), false);
 });
