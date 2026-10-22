@@ -118,6 +118,13 @@ test('GET /guides/<slug> maps related recipes, sources, author and food safety',
   const approved = g.parseGuideDetail({ ...DETAIL, food_safety: { status: 'approved', reviewed_at: '2026-10-19T12:00:00Z' } });
   assert.deepEqual(approved.foodSafety, { reviewedAt: '2026-10-19T12:00:00Z' });
   assert.equal(g.parseGuideDetail({ ...DETAIL, food_safety: { status: 'pending' } }).foodSafety, null);
+  // Core 1.0.57: unreviewed food-safety guides are published with a warning.
+  const warned = g.parseGuideDetail({ ...DETAIL, food_safety: null, food_safety_review: 'unreviewed', food_safety_warning: 'Uzman incelemesi yok.' });
+  assert.equal(warned.foodSafety, null);
+  assert.equal(warned.foodSafetyReview, 'unreviewed');
+  assert.equal(warned.foodSafetyWarning, 'Uzman incelemesi yok.');
+  assert.equal(g.parseGuideDetail({ ...DETAIL, food_safety_review: 'unreviewed' }).foodSafetyWarning, g.GUIDE_UNREVIEWED_WARNING);
+  assert.equal(g.parseGuideDetail({ ...DETAIL, food_safety: { status: 'approved', reviewed_at: null }, food_safety_review: 'approved', food_safety_warning: 'x' }).foodSafetyWarning, null);
 
   const messy = g.parseGuideDetail({
     ...DETAIL,
