@@ -45,7 +45,7 @@ test('mobile quick AI guards offline quotas, double taps and uncertain saves',()
  assert.match(flow,/quickCreateInFlightRef\.current = true/);
  assert.match(flow,/await fetchAccountQuotas\(token\)/);
  assert.match(flow,/catch \{\s*Alert\.alert\('Şu anda oluşturulamıyor'/);
- assert.ok(flow.indexOf('await fetchAccountQuotas(token)') < flow.indexOf('await generateAIRecipe(token, searchQuery)'));
+ assert.ok(flow.indexOf('await fetchAccountQuotas(token)') < flow.indexOf('await generateAIRecipe(token, searchQuery'));
  assert.match(flow,/finally \{[\s\S]*quickCreateInFlightRef\.current = false;/);
  assert.doesNotMatch(flow,/fetchAccountQuotas\(token\)\.catch\(\(\) => null\)/);
  assert.match(list,/error instanceof RecipeCreateUnconfirmedError/);

@@ -144,6 +144,14 @@ function AppShell() {
         />
         {/* Kitchen profile draws its own safe-area header with progress. */}
         <Stack.Screen name="profile/kitchen" options={{ headerShown: false }} />
+        {/* Notlarım: private recipe notes (Core 1.0.59). */}
+        <Stack.Screen
+          name="profile/notes"
+          options={{
+            headerShown: true,
+            headerTitle: 'Notlarım',
+          }}
+        />
         <Stack.Screen
           name="profile/edit"
           options={{

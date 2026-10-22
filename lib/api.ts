@@ -107,11 +107,22 @@ export async function getRecipeById(id: number): Promise<Recipe | null> {
   return data && data.data && data.data.length > 0 ? data.data[0] : null;
 }
 
-export async function generateAIRecipe(token: string, ingredients: string) {
+export interface GenerateAIRecipeOptions {
+  /**
+   * "Evime göre uyarla (N kişi)" (Core 1.0.62): write the recipe for the
+   * kitchen profile's household. Sent only when true; otherwise omitted so
+   * Core keeps its standard four-person recipe.
+   */
+  adaptHousehold?: boolean;
+}
+
+export async function generateAIRecipe(token: string, ingredients: string, options?: GenerateAIRecipeOptions) {
+  const body: Record<string, unknown> = { ingredients, type: 'suggest' };
+  if (options?.adaptHousehold === true) body.adapt_household = true;
   const res = await fetch(`${API_URL}/tariften/v1/ai/generate`, {
     method: 'POST',
     headers: authHeaders(token),
-    body: JSON.stringify({ ingredients, type: 'suggest' }),
+    body: JSON.stringify(body),
   });
 
   const data = await res.json().catch(() => null);
