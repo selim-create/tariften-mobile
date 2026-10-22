@@ -42,8 +42,14 @@ test('video players and stills are built only from validated ids', () => {
   assert.equal(embedUrl({ platform: 'instagram', video_id: 'C5ToOyqIZvb' }), 'https://www.instagram.com/reel/C5ToOyqIZvb/embed/');
   assert.equal(videoPoster({ platform: 'youtube', video_id: 'dQw4w9WgXcQ' }), 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg');
   assert.equal(videoPoster(base), null, 'no invented thumbnail for TikTok or Instagram');
+  const { playerPageUrl } = load('lib/social-format.ts');
+  assert.equal(
+    playerPageUrl({ ...base, creator_name: null, creator_handle: 'lezzet', url: 'https://www.tiktok.com/@lezzet/video/7083514528025136386' }),
+    'https://tariften.com/video/tiktok/7083514528025136386?u=https%3A%2F%2Fwww.tiktok.com%2F%40lezzet%2Fvideo%2F7083514528025136386&n=%40lezzet',
+  );
+  assert.equal(playerPageUrl({ ...base, video_id: '12' }), null, 'unsafe ids never reach the player page');
   const card = read('components/recipe/SocialSourceCard.tsx');
-  assert.match(card, /embedUrl\(source\) \|\| source\.url/);
+  assert.match(card, /playerPageUrl\(source\) \|\| embedUrl\(source\) \|\| source\.url/);
   assert.match(card, /Canlı istatistik değildir/);
   assert.match(card, /Videoyu izle/);
   assert.doesNotMatch(card, /avatar|profile_image|profile_pic/i, 'no creator photo is fetched or invented');

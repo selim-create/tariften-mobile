@@ -6,7 +6,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import type { RecipeSocialSource } from '../../lib/types';
 import {
-  capturedDateTr, creatorLabel, embedUrl, PLATFORM_COPY, profileUrl, trustedMetrics, videoPoster,
+  capturedDateTr, creatorLabel, embedUrl, PLATFORM_COPY, playerPageUrl, profileUrl, trustedMetrics, videoPoster,
 } from '../../lib/social-format';
 import { colors, fonts, radius } from '../../constants/theme';
 
@@ -20,14 +20,20 @@ const METRIC_ICON: Record<string, IconName> = {
   followers: 'people-outline', views: 'eye-outline', likes: 'heart-outline', comments: 'chatbubble-outline',
 };
 
-/** Opens the platform's own player in an in-app sheet; the original link is the fallback. */
+/**
+ * Opens Tariften's dark player page (the platform's own player, framed to the
+ * video's shape) in an in-app sheet; the original link is the fallback.
+ */
 export async function watchSocialVideo(source: RecipeSocialSource) {
-  const url = embedUrl(source) || source.url;
+  const url = playerPageUrl(source) || embedUrl(source) || source.url;
   try {
     await WebBrowser.openBrowserAsync(url, {
       presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-      controlsColor: colors.brand,
-      toolbarColor: colors.ink,
+      controlsColor: '#ffffff',
+      toolbarColor: '#120f0d',
+      secondaryToolbarColor: '#120f0d',
+      enableBarCollapsing: true,
+      dismissButtonStyle: 'close',
     });
   } catch {
     void Linking.openURL(source.url);
@@ -73,7 +79,12 @@ export default function SocialSourceCard({ source }: { source: RecipeSocialSourc
           accessibilityLabel={profile ? `${primary || copy.name} profilini ${copy.at} aç` : undefined}>
           <View style={styles.monogram}><Text style={styles.monogramText}>{monogram}</Text></View>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.name} numberOfLines={1}>{primary || `${copy.name} videosu`}</Text>
+            <View style={styles.nameRow}>
+              <Text style={styles.name} numberOfLines={1}>{primary || `${copy.name} videosu`}</Text>
+              {source.creator_verified === true ? (
+                <Ionicons name="checkmark-circle" size={16} color="#7cc4ff" accessibilityLabel="Doğrulanmış hesap" />
+              ) : null}
+            </View>
             {handle ? <Text style={styles.handle} numberOfLines={1}>{handle}</Text> : null}
           </View>
           {profile ? (
@@ -136,7 +147,8 @@ const styles = StyleSheet.create({
   creator: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   monogram: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   monogramText: { fontFamily: fonts.headingBold, fontSize: 19, color: '#fff' },
-  name: { fontFamily: fonts.headingBold, fontSize: 18, lineHeight: 23, color: '#fff' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  name: { flexShrink: 1, fontFamily: fonts.headingBold, fontSize: 18, lineHeight: 23, color: '#fff' },
   handle: { fontFamily: fonts.body, fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 1 },
   profileChip: {
     flexDirection: 'row', alignItems: 'center', gap: 3, height: 32, paddingHorizontal: 12, borderRadius: radius.pill,
