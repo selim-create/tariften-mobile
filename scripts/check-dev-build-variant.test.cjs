@@ -119,3 +119,34 @@ test('legacy CocoaPods targets are normalized only when lower than Xcode 27 iOS 
   assert.throws(() => execFileSync(process.execPath, [script, path.join(tmp, 'ios/App.xcodeproj')], { stdio: 'pipe' }));
   fs.rmSync(tmp, { recursive: true, force: true });
 });
+
+test('build output goes to a log file and failures print the real compiler errors', () => {
+  const os = require('os');
+  const { execFileSync } = require('child_process');
+  const shell = fs.readFileSync(path.join(root, 'scripts/ios-simulator-local-build.sh'), 'utf8');
+  assert.match(shell, /LOG="\$DERIVED\/xcodebuild\.log"/);
+  assert.equal((shell.match(/ build >> "\$LOG" 2>&1/g) || []).length, 2, 'both xcodebuild runs write to the log');
+  // Only the build cache is cleared on rebuild, never ios/ or anything else.
+  assert.match(shell, /TARIFTEN_REGENERATE_IOS:-0\}" == "1" && -d "\$DERIVED" && "\$DERIVED" == \*\/\.expo\/ios-local-build \]\]; then\n  rm -rf "\$DERIVED"/);
+  assert.equal((shell.match(/rm -rf/g) || []).length, 1);
+
+  const fn = shell.match(/show_build_errors\(\) \{[\s\S]*?\n\}/)[0];
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'xclog-'));
+  const log = path.join(tmp, 'xcodebuild.log');
+  fs.writeFileSync(log, [
+    'CompileSwift normal arm64 -Werror=foo',
+    '/x/LinkPreviewNativeView.swift:12:5: error: cannot find type \'UIFoo\' in scope',
+    '/x/LinkPreviewNativeView.swift:12:5: error: cannot find type \'UIFoo\' in scope',
+    'error: Sandbox: rsync deny',
+    '** BUILD FAILED **',
+  ].join('\n'));
+  const run = (file) => execFileSync('bash', ['-c', `LOG="${file}"; ${fn}; show_build_errors 2>&1`], { encoding: 'utf8' });
+  const out = run(log);
+  assert.match(out, /İlk hatalar:/);
+  assert.equal((out.match(/cannot find type 'UIFoo'/g) || []).length, 1, 'duplicates collapsed');
+  assert.match(out, /error: Sandbox: rsync deny/);
+  assert.doesNotMatch(out, /-Werror/);
+  fs.writeFileSync(log, 'line a\nline b\n** BUILD FAILED **\n');
+  assert.match(run(log), /son satırları:[\s\S]*BUILD FAILED/);
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
