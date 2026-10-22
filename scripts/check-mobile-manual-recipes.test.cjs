@@ -95,7 +95,7 @@ test('native create and edit share one staged editor, preserve author permission
   assert.match(details,/router.push\(`\/recipe\/edit\/\$\{recipe.id\}`\)/);
   assert.match(editor,/Number\(existing.author\?\.id\) !== Number\(user.id\)/);
   assert.match(editor,/approvedManualPayload\(draft, image\)/);
-  assert.match(editor,/getRecipeById\(Number\(recipeId\)\)/);
+  assert.match(editor,/getRecipeById\(Number\(recipeId\), token\)/);
   assert.match(editor,/fetchAccountQuotas\(token, signal\)/);
   assert.match(editor,/!editing/);
   assert.equal(editor.includes('uploadManualRecipePhoto(token, photo, signal)'), true);

@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { getOwnedMenusPage, getOwnedRecipesPage } from '../../lib/api';
 import type { Menu, Recipe } from '../../lib/types';
+import { isPrivateRecipe, showAiEstimatedBadge } from '../../lib/recipe-visibility';
+import AiEstimatedBadge, { PrivateBadge } from '../recipe/AiEstimatedBadge';
 import ImagePlaceholder, { isPlaceholderImage } from '../ImagePlaceholder';
 import { colors, fonts, radius, shadow } from '../../constants/theme';
 
@@ -138,6 +140,10 @@ export default function MyKitchenLibrary({ kind, token, userId }: {
               : <View style={styles.fallback}><Ionicons name="restaurant-outline" size={28} color={colors.brand} /></View>}
           <View style={styles.entryText}>
             <Text numberOfLines={2} style={styles.entryTitle}>{item.title}</Text>
+            {recipe && (isPrivateRecipe(recipe) || showAiEstimatedBadge(recipe)) ? <View style={styles.badgeRow}>
+              {isPrivateRecipe(recipe) ? <PrivateBadge /> : null}
+              {showAiEstimatedBadge(recipe) ? <AiEstimatedBadge /> : null}
+            </View> : null}
             <Text numberOfLines={2} style={styles.entrySubtitle}>
               {recipe?.excerpt || menu?.description || (isRecipe ? 'Ev yapımı tarifin' : 'Özenle hazırlanmış sofran')}
             </Text>
@@ -203,6 +209,7 @@ const styles = StyleSheet.create({
   entrySubtitle: { fontFamily: fonts.body, color: colors.textMuted, fontSize: 13, lineHeight: 18 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   metaText: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginVertical: 2 },
   entryFooter: { minHeight: 44, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     borderTopWidth: 1, borderTopColor: colors.line, paddingHorizontal: 14, backgroundColor: colors.canvas },
   footerLink: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },

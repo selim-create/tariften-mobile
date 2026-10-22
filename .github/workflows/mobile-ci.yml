@@ -83,6 +83,8 @@ jobs:
         run: node --test scripts/check-kitchen-guide.test.cjs
       - name: Mutfak araçları (egg, pasta, drying, converter; safe ranges, timers)
         run: node --test scripts/check-guide-tools.test.cjs
+      - name: Photo, notebook and own-video recipes (multipart clients, private default, badges, menu)
+        run: node --test scripts/check-photo-video-recipe.test.cjs
       - name: Guard Expo Router URI parsing compatibility
         run: node --test scripts/check-router-uri-surface.test.cjs
       - name: Verify xcode PBX ids (xcode@4 without uuid, or patched uuid for xcode@3)

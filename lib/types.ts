@@ -54,6 +54,12 @@ export interface Recipe {
   social_source?: RecipeSocialSource | null;
   /** Core 1.0.51+: EU-14 keys detected from ingredient names (see lib/allergen-ui.ts). */
   allergens?: { contains: string[]; possible: string[] };
+  /** Core 1.0.58+: estimated from a dish photo; shows the "AI Tahmini Tarif" badge. */
+  ai_estimated?: boolean;
+  /** Core 1.0.58+: private recipes are only returned to their owner (with the token). */
+  visibility?: 'private' | 'public';
+  /** Core 1.0.58+: 'photo' | 'notebook' for the photo flows, '' otherwise. */
+  source_kind?: 'photo' | 'notebook' | '' | string;
 }
 
 /** Where an imported recipe came from; metrics are a snapshot taken at import time. */

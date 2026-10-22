@@ -20,8 +20,9 @@ import {
   previewRecipeSocial, previewRecipeText, resolveVideoSource, startVideoRecipeJob, getVideoRecipeJob, VideoAlreadyPublished,
 } from '../../lib/recipe-import-api';
 import {
-  isInstagramReelLink, isTikTokShortLink, isVideoRecipeLink, needsRightsConfirmation, videoEditorFromJob,
+  isInstagramReelLink, isOwnVideoJob, isTikTokShortLink, isVideoRecipeLink, needsRightsConfirmation, videoEditorFromJob,
 } from '../../lib/video-recipe-import';
+import { publishOwnVideoRecipe } from '../../lib/own-video-api';
 import { canonicalShareLink, expandShortLink } from '../../lib/share-link';
 import type { VideoJob } from '../../lib/video-recipe-import';
 import { positiveId } from '../../lib/notifications-core';
@@ -95,6 +96,10 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
   const [videoWarnings, setVideoWarnings] = useState<string[]>([]);
   const [videoStatus, setVideoStatus] = useState('');
   const [retryableFailure, setRetryableFailure] = useState(false);
+  // Own uploaded video (Core P19): opened as /recipe/aktar?job=<id>. Its
+  // source_url is an opaque id that is never shown; a failure means a new upload.
+  const [ownVideoJobId, setOwnVideoJobId] = useState<number | null>(null);
+  const [ownVideoFailed, setOwnVideoFailed] = useState(false);
   const resumedJobRef = useRef<number | null>(null);
   const videoRequestRef = useRef<{ url: string; id: string } | null>(null);
   const [editor, setEditor] = useState<ImportEditor | null>(null);
@@ -235,7 +240,8 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
         return;
       }
       if (job.status === 'failed' || job.status === 'uncertain') {
-        setRetryableFailure(job.status === 'failed' && job.retryable === true);
+        if (isOwnVideoJob(job)) setOwnVideoFailed(true);
+        setRetryableFailure(job.status === 'failed' && job.retryable === true && !isOwnVideoJob(job));
         throw new Error(job.message || 'Video analiz sonucu doğrulanamadı.');
       }
       await new Promise(resolve => setTimeout(resolve, 3000));
@@ -243,7 +249,9 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
       job = await getVideoRecipeJob(token, job.id, controller.signal);
     }
     if (!controller.signal.aborted) {
-      setError('Video hâlâ işleniyor olabilir. Aynı bağlantıyla tekrar kontrol edebilirsin; yeni ücretli işlem oluşturulmaz.');
+      setError(isOwnVideoJob(job)
+        ? 'Videon hâlâ işleniyor olabilir. Durumunu buradan yeniden kontrol edebilirsin; yeni hak kullanılmaz.'
+        : 'Video hâlâ işleniyor olabilir. Aynı bağlantıyla tekrar kontrol edebilirsin; yeni ücretli işlem oluşturulmaz.');
     }
   };
 
@@ -313,7 +321,15 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
     try {
       const job = await getVideoRecipeJob(token, id, controller.signal);
       videoRequestRef.current = null;
-      setSocialUrl(job.source_url);
+      if (isOwnVideoJob(job)) {
+        // Never put the upload reference into the link field or anywhere visible.
+        setOwnVideoJobId(job.id);
+        setOwnVideoFailed(false);
+        setSocialUrl('');
+      } else {
+        setOwnVideoJobId(null);
+        setSocialUrl(job.source_url);
+      }
       await followVideoJob(job, controller);
     } catch (cause) {
       if (cause instanceof VideoAlreadyPublished) { router.replace(`/recipe/${encodeURIComponent(cause.slug)}`); return; }
@@ -414,7 +430,10 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
       // outcome: the server might have published despite a missing response.
       postStarted = true;
       const result = await withDeadline(
-        signal => createRecipe(token, buildApprovedRecipe(editor), signal),
+        signal => ownVideoJobId && videoReview
+          // Own video: the existing video publish keeps the upload private and adds the frame cover.
+          ? publishOwnVideoRecipe(token, ownVideoJobId, buildApprovedRecipe(editor), signal)
+          : createRecipe(token, buildApprovedRecipe(editor), signal),
         45000,
       );
       const slug: unknown = result?.slug || result?.data?.slug;
@@ -532,6 +551,34 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
     <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       {stage === 'source' ? <>
+        {ownVideoJobId ? <>
+          <View style={styles.hero}>
+            <Text style={styles.kicker}>Kendi videon</Text>
+            <AccentText style={styles.heading}>{'Videon *tarife* dönüşüyor.'}</AccentText>
+            <Text style={styles.subtitle}>
+              Malzemeler ve adımlar videondan çıkarılıyor. Hazır olunca kontrol eder, istersen düzenler, sonra yayımlarsın. Video iş bitince silinir.
+            </Text>
+            <View style={styles.stageRow}>
+              <Text style={styles.stageActive}>1 · Videon</Text>
+              <Ionicons name="arrow-forward" size={14} color={colors.textFaint} />
+              <Text style={styles.stageInactive}>2 · Tarifini kontrol et</Text>
+            </View>
+          </View>
+          <View style={styles.card}>
+            <View style={styles.detected}>
+              <Ionicons name="videocam-outline" size={14} color={colors.success} />
+              <Text style={styles.detectedText}>Kendi videon</Text>
+            </View>
+            <View style={styles.statusRow}>
+              {busy === 'preview' ? <ActivityIndicator size="small" color={BRAND} />
+                : <Ionicons name={ownVideoFailed ? 'alert-circle-outline' : 'time-outline'} size={16} color={ownVideoFailed ? colors.warning : colors.textMuted} />}
+              <Text style={styles.statusText} accessibilityRole="text">{busy === 'preview'
+                ? (videoStatus === 'queued' ? 'Videon analiz sırasına alındı…' : 'Videon inceleniyor… Genellikle 1–2 dakika sürer.')
+                : ownVideoFailed ? 'Bu videodan tarif çıkarılamadı. Video silindi; yeni bir video yükleyebilirsin.'
+                  : 'Hazır olduğunda bildirim gelir. Durumu buradan da kontrol edebilirsin.'}</Text>
+            </View>
+          </View>
+        </> : <>
         <View style={styles.hero}>
           <Text style={styles.kicker}>{importMethod === 'social' ? 'Reels · TikTok · Shorts' : 'Mutfak notların'}</Text>
           <AccentText style={styles.heading}>{importMethod === 'social' ? 'Videoyu *tarife* çevir.' : 'Notlarını *tarife* çevir.'}</AccentText>
@@ -634,10 +681,11 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
             ))}
           </View>
         ) : null}
+        </>}
       </> : editor && (preview || videoReview) ? <>
         <View style={styles.reviewHero}>
           <View style={styles.reviewStep}><Ionicons name="checkmark-circle" size={16} color={colors.success} />
-            <Text style={styles.reviewStepText}>NOTLARIN DÜZENLENDİ</Text></View>
+            <Text style={styles.reviewStepText}>{ownVideoJobId ? 'KENDİ VİDEONDAN HAZIRLANDI' : 'NOTLARIN DÜZENLENDİ'}</Text></View>
           <AccentText style={styles.heading}>{'Şimdi birlikte *gözden geçirelim.*'}</AccentText>
           <View style={styles.reviewOverview}>
             <View style={styles.reviewOverviewItem}><Ionicons name="basket-outline" size={16} color={BRAND} />
@@ -795,6 +843,12 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
             return;
           }
           if (stage === 'review') { confirmPublish(); return; }
+          if (ownVideoJobId && !(videoReview && editor)) {
+            // No paid retry for an own video: its file is deleted when the job ends.
+            if (ownVideoFailed) router.replace('/recipe/kendi-video');
+            else void resumeVideoJob(ownVideoJobId);
+            return;
+          }
           if ((preview || videoReview) && editor) {
             setStage('review'); // Return to saved preview at no extra AI cost.
             setError('');
@@ -804,14 +858,14 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
             else { void requestPreview(); }
           }
         }}
-        accessibilityRole="button" accessibilityLabel={publishUnknown ? 'Tariflerim bölümünde kontrol et' : stage === 'source' ? (importMethod === 'social' ? 'Bağlantıdan tarif oluştur' : 'Tarifimi güzelleştir') : 'Onayla ve yayımla'}>
+        accessibilityRole="button" accessibilityLabel={publishUnknown ? 'Tariflerim bölümünde kontrol et' : stage === 'source' ? (ownVideoJobId && !(videoReview && editor) ? (ownVideoFailed ? 'Yeni video yükle' : 'Video durumunu kontrol et') : importMethod === 'social' ? 'Bağlantıdan tarif oluştur' : 'Tarifimi güzelleştir') : 'Onayla ve yayımla'}>
         {busy ? <ActivityIndicator color="#fff" />
           : <Ionicons name={publishUnknown ? 'search-outline' : stage === 'source' ? 'sparkles' : 'checkmark-circle-outline'} size={19} color="#fff" />}
-        <Text style={styles.mainButtonText}>{busy === 'preview' ? (importMethod === 'social' && (isVideoRecipeLink(socialUrl) || isTikTokShortLink(socialUrl)) ? 'Videon inceleniyor…' : 'Tarifini düzenliyoruz…')
+        <Text style={styles.mainButtonText}>{busy === 'preview' ? (ownVideoJobId || (importMethod === 'social' && (isVideoRecipeLink(socialUrl) || isTikTokShortLink(socialUrl))) ? 'Videon inceleniyor…' : 'Tarifini düzenliyoruz…')
           : busy === 'publish' ? 'Tarifin yayımlanıyor…'
             : publishUnknown ? 'Tariflerimde kontrol et'
             : stage === 'source'
-              ? ((preview || videoReview) && editor ? 'Düzenlenmiş tarifime dön' : importMethod === 'social' ? (retryableFailure ? 'Yeniden dene' : 'Bağlantıdan tarif oluştur') : 'Tarifimi güzelleştir')
+              ? ((preview || videoReview) && editor ? 'Düzenlenmiş tarifime dön' : ownVideoJobId ? (ownVideoFailed ? 'Yeni video yükle' : 'Durumu kontrol et') : importMethod === 'social' ? (retryableFailure ? 'Yeniden dene' : 'Bağlantıdan tarif oluştur') : 'Tarifimi güzelleştir')
               : 'Onayla ve yayımla'}</Text>
         {!busy && <Ionicons name="arrow-forward" size={17} color="#fff" />}
       </TouchableOpacity>

@@ -16,7 +16,19 @@ export type VideoJob = {
   error_code?: string;
   retryable?: boolean;
   refunded?: boolean;
+  /** Core P19: "upload" for the member's own video; its source_url is an opaque id, never a link. */
+  source_kind?: string;
 };
+
+/** Opaque Core reference of an uploaded video ("upload:<32 hex>"). */
+export function isUploadSourceRef(value: unknown): boolean {
+  return typeof value === "string" && /^upload:[a-f0-9]{32}$/.test(value);
+}
+
+/** The member's own uploaded video (never shown as a link, never retried). */
+export function isOwnVideoJob(job: Pick<VideoJob, "source_kind" | "source_url"> | null | undefined): boolean {
+  return !!job && job.source_kind === "upload" && isUploadSourceRef(job.source_url);
+}
 
 export function isYouTubeVideoLink(value: string): boolean {
   try {
@@ -79,7 +91,8 @@ export function isVideoRecipeLink(value: string): boolean {
 export function parseVideoJob(value: unknown): VideoJob {
   if (!object(value) || value.success !== true || !Number.isSafeInteger(value.id) || Number(value.id) < 1
       || !statuses.includes(value.status as VideoJobStatus) || !str(value.source_url)
-      || !isVideoRecipeLink(value.source_url) || !str(value.message) || value.requires_approval !== true) {
+      || !(isVideoRecipeLink(value.source_url) || (value.source_kind === "upload" && isUploadSourceRef(value.source_url)))
+      || !str(value.message) || value.requires_approval !== true) {
     throw new Error("Video analiz işi sunucudan beklenen biçimde dönmedi.");
   }
   return value as VideoJob;
