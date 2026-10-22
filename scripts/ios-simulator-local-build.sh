@@ -9,7 +9,7 @@ export APP_VARIANT=development
 export LANG="${LANG:-en_US.UTF-8}"
 export LC_ALL="${LC_ALL:-en_US.UTF-8}"
 
-for tool in xcrun xcodebuild node pod ruby; do
+for tool in xcrun xcodebuild node pod; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "Eksik araç: $tool. Xcode, Node ve CocoaPods kurulumunu kontrol et." >&2
     exit 1
@@ -72,7 +72,7 @@ echo 'CocoaPods bağımlılıkları kuruluyor...'
 
 # Xcode 27 requires iOS 15+ for every generated Pods target. Some older
 # transitive pods (e.g. SDWebImage) still set 9.0; fix generated Pods only.
-ruby "$PWD/scripts/ios-xcode27-pods-min-target.rb" "$PWD/ios/Pods/Pods.xcodeproj"
+node "$PWD/scripts/ios-xcode27-pods-min-target.cjs" "$PWD/ios/Pods/Pods.xcodeproj"
 
 WORKSPACE="$(find ios -maxdepth 1 -name '*.xcworkspace' -type d -print -quit)"
 if [[ -z "$WORKSPACE" ]]; then

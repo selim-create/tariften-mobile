@@ -80,17 +80,42 @@ test('Xcode 27 installer chooses app scheme instead of Pods-TariftenDEV', () => 
   assert.match(shell, /apps=all\.filter\(s=>!\/\^Pods/);
   assert.match(shell, /\^TariftenDEV\$/);
   assert.match(shell, /process\.stdout\.write\(preferred\|\|""\)/, 'Never default to a Pods scheme');
-  assert.match(shell, /ios-xcode27-pods-min-target\.rb/);
+  assert.match(shell, /node "\$PWD\/scripts\/ios-xcode27-pods-min-target\.cjs"/);
+  assert.doesNotMatch(shell, /ios-xcode27-pods-min-target\.rb/, 'Ruby helper needed the xcodeproj gem outside CocoaPods');
   assert.match(shell, /pod install/);
   assert.match(shell, /CODE_SIGNING_ALLOWED=NO build/);
 });
 
 test('legacy CocoaPods targets are normalized only when lower than Xcode 27 iOS minimum', () => {
-  const ruby = fs.readFileSync(path.join(root, 'scripts/ios-xcode27-pods-min-target.rb'), 'utf8');
-  assert.match(ruby, /15\.1/);
-  assert.match(ruby, /Gem::Version/);
-  assert.match(ruby, /project\.targets\.each/);
-  assert.match(ruby, /ios\/Pods\/Pods\.xcodeproj/);
-  assert.match(ruby, /project\.save if updated > 0/);
-  assert.doesNotMatch(ruby, /rm -rf|File\.delete|system\(/);
+  const os = require('os');
+  const { execFileSync } = require('child_process');
+  const script = path.join(root, 'scripts/ios-xcode27-pods-min-target.cjs');
+  const source = fs.readFileSync(script, 'utf8');
+  assert.doesNotMatch(source, /require\(['"]child_process|rmSync|unlinkSync|rimraf/);
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pods-'));
+  const proj = path.join(tmp, 'ios/Pods/Pods.xcodeproj');
+  fs.mkdirSync(proj, { recursive: true });
+  const pbx = path.join(proj, 'project.pbxproj');
+  fs.writeFileSync(pbx, [
+    'IPHONEOS_DEPLOYMENT_TARGET = 9.0;',
+    'IPHONEOS_DEPLOYMENT_TARGET = "12.4";',
+    'IPHONEOS_DEPLOYMENT_TARGET = 15.1;',
+    'IPHONEOS_DEPLOYMENT_TARGET = 15.10;',
+    'IPHONEOS_DEPLOYMENT_TARGET = 16.0;',
+  ].join('\n'));
+  const out = execFileSync(process.execPath, [script, proj], { encoding: 'utf8' });
+  assert.match(out, /2 configurations updated to iOS 15\.1/);
+  assert.deepEqual(fs.readFileSync(pbx, 'utf8').split('\n'), [
+    'IPHONEOS_DEPLOYMENT_TARGET = 15.1;',
+    'IPHONEOS_DEPLOYMENT_TARGET = 15.1;',
+    'IPHONEOS_DEPLOYMENT_TARGET = 15.1;',
+    'IPHONEOS_DEPLOYMENT_TARGET = 15.10;',
+    'IPHONEOS_DEPLOYMENT_TARGET = 16.0;',
+  ]);
+  // Unchanged project is not rewritten; any other path is refused.
+  const before = fs.statSync(pbx).mtimeMs;
+  assert.match(execFileSync(process.execPath, [script, proj], { encoding: 'utf8' }), /0 configurations/);
+  assert.equal(fs.statSync(pbx).mtimeMs, before);
+  assert.throws(() => execFileSync(process.execPath, [script, path.join(tmp, 'ios/App.xcodeproj')], { stdio: 'pipe' }));
+  fs.rmSync(tmp, { recursive: true, force: true });
 });
