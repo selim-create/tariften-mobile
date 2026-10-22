@@ -48,13 +48,15 @@ test('recipe detail credits the creator, keeps one rating control and real actio
   assert.match(card, /tarihinde, Tariften'e aktarıldığı anki değerler/);
 });
 
-test('kitchen store keeps plan and list on device and rebuilds rows from recipe ingredients', () => {
+test('kitchen store keeps plan and list on device first and rebuilds rows from recipe ingredients', () => {
   const store = read('lib/kitchen-store.ts');
   assert.match(store, /buildShoppingList\(s\.shopping\.map/);
   assert.match(store, /FileSystem\.documentDirectory/);
-  assert.doesNotMatch(store, /fetch\(/, 'no network: nothing is synced or inferred');
-  assert.match(read('app/(tabs)/alisveris.tsx'), /Liste bu cihazda saklanır/);
-  assert.match(read('app/(tabs)/bu-hafta.tsx'), /Planın bu cihazda saklanır/);
+  // The only network call is the member's own /me/kitchen document; nothing is inferred.
+  assert.equal((store.match(/fetch\(/g) || []).length, 1);
+  assert.match(store, /fetch\(KITCHEN_API/);
+  assert.match(read('app/(tabs)/alisveris.tsx'), /Liste bu cihazda saklanır; giriş yapınca hesabına taşınır/);
+  assert.match(read('app/(tabs)/bu-hafta.tsx'), /Planın hesabına kaydedilir/);
 });
 
 test('brand foundation: tokens, fonts and new logo are in place', () => {

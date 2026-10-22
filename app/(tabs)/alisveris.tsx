@@ -115,7 +115,7 @@ export default function ShoppingScreen() {
           </View>
         )}
 
-        <Text style={styles.footnote}>Liste bu cihazda saklanır. Miktarlar tariflerde yazdığı gibidir; kişi sayısına göre ölçeklenmez.</Text>
+        <Text style={styles.footnote}>{user ? 'Liste hesabına kaydedilir; tariften.com\'da da aynısını görürsün.' : 'Liste bu cihazda saklanır; giriş yapınca hesabına taşınır.'} Miktarlar tariflerde yazdığı gibidir; kişi sayısına göre ölçeklenmez.</Text>
       </ScrollView>
     </SafeAreaView>
   );

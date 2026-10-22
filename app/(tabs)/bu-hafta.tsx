@@ -137,7 +137,7 @@ export default function WeekScreen() {
           </TouchableOpacity>
         )}
 
-        <Text style={styles.footnote}>Planın bu cihazda saklanır.</Text>
+        <Text style={styles.footnote}>{user ? 'Planın hesabına kaydedilir; tariften.com\'da da aynısını görürsün.' : 'Planın bu cihazda saklanır; giriş yapınca hesabına taşınır.'}</Text>
       </ScrollView>
     </SafeAreaView>
   );
