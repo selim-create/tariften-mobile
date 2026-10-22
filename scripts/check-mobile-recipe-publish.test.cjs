@@ -24,6 +24,7 @@ const guard = loadTS('lib/recipe-publish.ts');
 const api = loadTS('lib/api.ts', {
   './recipeUtils': { parseIngredients: list => list, parseSteps: list => list },
   './recipe-publish': guard,
+  './allergen-ui': loadTS('lib/allergen-ui.ts'),
 });
 const publishUrl = 'https://api.tariften.com/wp-json/tariften/v1/recipes/create';
 

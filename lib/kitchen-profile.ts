@@ -1,12 +1,15 @@
 /**
  * Kitchen profile ("Mutfağını tanıyalım"): types, the authenticated Core
- * calls and the pure helpers the screen is built on.
+ * calls, the pure helpers the screen is built on and a tiny in-memory
+ * session cache (useKitchenProfile) for screens that only read it.
  *
- * Nothing in here imports React Native, so scripts/check-kitchen-profile.test.cjs
- * can load it with plain Node. Option lists and their Turkish labels always
+ * Nothing in here imports React Native (only React's hook, used lazily), so
+ * scripts/check-kitchen-profile.test.cjs can load it with plain Node. Option lists and their Turkish labels always
  * come from Core (GET /me/kitchen-profile → options); the app never keeps its
  * own copy, so a new diet or allergen shows up without an app release.
  */
+
+import { useEffect, useSyncExternalStore } from 'react';
 
 const KITCHEN_PROFILE_URL = 'https://api.tariften.com/wp-json/tariften/v1/me/kitchen-profile';
 
@@ -486,9 +489,120 @@ export async function getKitchenProfile(token: string): Promise<{ profile: Kitch
 export async function updateKitchenProfile(token: string, payload: KitchenProfileWrite): Promise<KitchenProfile> {
   const data = await request(token, 'PUT', payload);
   if (!isRecord(data.profile)) throw new KitchenProfileError('Kaydedilen profil geri okunamadı. Tekrar dene.', 'bad_response');
-  return normaliseProfile(data.profile);
+  const profile = normaliseProfile(data.profile);
+  // Every save refreshes the session cache, so the recipe allergen band
+  // never shows an allergen the member has just removed (or misses a new one).
+  primeKitchenProfileCache(token, profile);
+  return profile;
 }
 
 export async function deleteKitchenProfile(token: string): Promise<void> {
   await request(token, 'DELETE');
+  invalidateKitchenProfileCache();
+}
+
+// --- Session cache (read-only screens: recipe allergen band) ---------------------------
+
+export interface KitchenProfileSnapshot {
+  profile: KitchenProfile;
+  options: KitchenProfileOptions;
+}
+
+interface CacheEntry {
+  token: string;
+  data: KitchenProfileSnapshot | null;
+  promise: Promise<KitchenProfileSnapshot | null> | null;
+  failedAt: number;
+}
+
+/** After a failed read, other screens wait this long before asking Core again. */
+export const KITCHEN_PROFILE_RETRY_MS = 60_000;
+
+let cache: CacheEntry | null = null;
+const cacheListeners = new Set<() => void>();
+const emitCache = () => { cacheListeners.forEach(listener => listener()); };
+
+export function subscribeKitchenProfile(listener: () => void): () => void {
+  cacheListeners.add(listener);
+  return () => { cacheListeners.delete(listener); };
+}
+
+/** The cached profile for this token, or null. Same object until it changes. */
+export function peekKitchenProfile(token: string | null | undefined): KitchenProfileSnapshot | null {
+  return token && cache && cache.token === token ? cache.data : null;
+}
+
+/**
+ * One GET per session and token. Concurrent callers share the request; a
+ * failure resolves to null (callers show nothing) and is retried only after
+ * KITCHEN_PROFILE_RETRY_MS. A result that arrives after an invalidation is
+ * dropped, so a save can never be overwritten by an older read.
+ */
+export function loadKitchenProfileOnce(token: string, now: number = Date.now()): Promise<KitchenProfileSnapshot | null> {
+  if (!token) return Promise.resolve(null);
+  if (!cache || cache.token !== token) cache = { token, data: null, promise: null, failedAt: 0 };
+  const entry = cache;
+  if (entry.data) return Promise.resolve(entry.data);
+  if (entry.promise) return entry.promise;
+  if (entry.failedAt && now - entry.failedAt < KITCHEN_PROFILE_RETRY_MS) return Promise.resolve(null);
+  const promise = getKitchenProfile(token).then(
+    data => {
+      if (cache !== entry) return null;
+      entry.data = data;
+      entry.promise = null;
+      emitCache();
+      return data;
+    },
+    () => {
+      if (cache === entry) {
+        entry.failedAt = Date.now();
+        entry.promise = null;
+      }
+      return null;
+    },
+  );
+  entry.promise = promise;
+  return promise;
+}
+
+/** Applies a freshly saved profile; without a cached copy (or mid-read) it invalidates. */
+export function primeKitchenProfileCache(token: string, profile: KitchenProfile) {
+  if (cache && cache.token === token && cache.data) {
+    cache = { token, data: { profile, options: cache.data.options }, promise: null, failedAt: 0 };
+    emitCache();
+    return;
+  }
+  invalidateKitchenProfileCache();
+}
+
+/** Drops a stale profile (profile deleted, save during a read); mounted readers fetch again. */
+export function invalidateKitchenProfileCache() {
+  if (!cache) return;
+  cache = null;
+  emitCache();
+}
+
+/**
+ * Sign-out: forgets the profile without notifying readers, so nothing
+ * re-fetches with the old token. Screens drop it as soon as auth re-renders.
+ */
+export function forgetKitchenProfileCache() {
+  cache = null;
+}
+
+/**
+ * The signed-in member's kitchen profile for read-only UI, or null while
+ * loading, signed out or unavailable. Pass null for guests: nothing is fetched.
+ */
+export function useKitchenProfile(token: string | null | undefined): KitchenProfileSnapshot | null {
+  const data = useSyncExternalStore(subscribeKitchenProfile, () => peekKitchenProfile(token));
+  useEffect(() => {
+    if (!token) return undefined;
+    // Re-checked on every store change: an invalidation while a read is in
+    // flight leaves the snapshot null (no re-render), but must still re-fetch.
+    const ensure = () => { if (!peekKitchenProfile(token)) void loadKitchenProfileOnce(token); };
+    ensure();
+    return subscribeKitchenProfile(ensure);
+  }, [token]);
+  return data;
 }

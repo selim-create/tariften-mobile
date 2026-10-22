@@ -19,6 +19,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { analyzePantry, createRecipe, generateAIRecipe, getPantry, updatePantry } from '../../lib/api';
 import { PantryItem } from '../../lib/types';
+import { AIAllergenConflictError, allergenWarningFrom } from '../../lib/allergen-ui';
+import { afterModalDismiss, confirmAllergenWarning, showAllergenConflict } from '../../lib/allergen-alerts';
 import { useTabBarSpace } from '../../components/navigation/FloatingTabBar';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
@@ -352,6 +354,15 @@ export default function PantryScreen() {
     try {
       const aiResponse = await generateAIRecipe(token, prompt);
       if (aiResponse?.success && aiResponse?.recipe) {
+        // 'possible' hits on the member's allergens: ask before the recipe is saved.
+        const allergenWarning = allergenWarningFrom(aiResponse);
+        if (allergenWarning) {
+          setShowAIModal(false);
+          await afterModalDismiss();
+          if (!(await confirmAllergenWarning(allergenWarning, 'Kaydet'))) return;
+          setAiStatus({ loading: true, message: 'Tarif kaydediliyor...' });
+          setShowAIModal(true);
+        }
         const saveResponse = await createRecipe(token, aiResponse.recipe);
         setShowAIModal(false);
         if (saveResponse?.success) {
@@ -363,8 +374,14 @@ export default function PantryScreen() {
         setShowAIModal(false);
         showModalMessage('error', 'Yapay zeka yanıt veremedi.');
       }
-    } catch {
+    } catch (error) {
       setShowAIModal(false);
+      if (error instanceof AIAllergenConflictError) {
+        // Refused by Core: no recipe to save. Explain and offer the kitchen profile.
+        await afterModalDismiss();
+        showAllergenConflict(error, () => router.push('/profile/kitchen'));
+        return;
+      }
       showModalMessage('error', 'Bir hata oluştu.');
     }
   };

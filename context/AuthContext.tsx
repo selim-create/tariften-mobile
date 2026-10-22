@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { User } from '../lib/types';
 import { getMe, login as apiLogin, register as apiRegister, googleAuth, appleAuth, RegisterData } from '../lib/api';
 import { setKitchenAuth } from '../lib/kitchen-store';
+import { forgetKitchenProfileCache } from '../lib/kitchen-profile';
 
 const TOKEN_KEY = 'auth_token';
 
@@ -97,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     await SecureStore.deleteItemAsync(TOKEN_KEY);
+    forgetKitchenProfileCache(); // allergens are health data: never outlive the session
     setToken(null);
     setUser(null);
   };
