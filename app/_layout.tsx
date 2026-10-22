@@ -164,6 +164,14 @@ function AppShell() {
             headerTitle: 'Notlarım',
           }}
         />
+        {/* Engellenen üyeler: the member's block list (Core 1.0.67). */}
+        <Stack.Screen
+          name="profile/blocks"
+          options={{
+            headerShown: true,
+            headerTitle: 'Engellenen üyeler',
+          }}
+        />
         <Stack.Screen
           name="profile/edit"
           options={{

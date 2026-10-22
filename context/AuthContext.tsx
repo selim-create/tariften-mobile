@@ -4,6 +4,7 @@ import { User } from '../lib/types';
 import { getMe, login as apiLogin, register as apiRegister, googleAuth, appleAuth, RegisterData } from '../lib/api';
 import { setKitchenAuth } from '../lib/kitchen-store';
 import { forgetKitchenProfileCache } from '../lib/kitchen-profile';
+import { forgetMemberBlocks } from '../lib/member-blocks';
 import { unregisterPushOnSignOut } from '../lib/notifications';
 
 const TOKEN_KEY = 'auth_token';
@@ -103,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // device never receives the previous member's notifications.
     await unregisterPushOnSignOut(token);
     await SecureStore.deleteItemAsync(TOKEN_KEY);
+    forgetMemberBlocks(); // the next member on this device starts with their own block list
     forgetKitchenProfileCache(); // allergens are health data: never outlive the session
     setToken(null);
     setUser(null);

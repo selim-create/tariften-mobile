@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,6 +21,7 @@ import SimilarRecipeChoice from '../../components/recipe/SimilarRecipeChoice';
 import { quickRecipeFromAI, validateQuickRecipe, approvedQuickRecipe, type QuickRecipeDraft } from '../../lib/quick-recipe-review';
 import { Recipe, RecipeFilters } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
+import { useBlockFilter } from '../../hooks/useBlockFilter';
 import { useTabBarSpace } from '../../components/navigation/FloatingTabBar';
 import SearchBar from '../../components/SearchBar';
 import FilterSheet from '../../components/FilterSheet';
@@ -66,6 +67,9 @@ export default function RecipesScreen() {
   const [adaptHousehold, setAdaptHousehold] = useState(false);
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  // Blocked members' recipes are hidden locally (lists are served without a token).
+  const { visibleRecipes } = useBlockFilter();
+  const shownRecipes = useMemo(() => visibleRecipes(recipes), [visibleRecipes, recipes]);
   const [total, setTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -532,7 +536,7 @@ export default function RecipesScreen() {
         </View>
       ) : (
         <ResponsiveGrid
-          data={recipes}
+          data={shownRecipes}
           minColumns={2}
           gap={GAP}
           keyExtractor={(item) => (item as Recipe).id.toString()}
