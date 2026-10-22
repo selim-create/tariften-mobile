@@ -18,7 +18,7 @@ import { colors, fonts, radius } from '../../constants/theme';
 
 const DIET_OPTIONS = [
   { value: '', label: 'Seçiniz' },
-  { value: 'omnivore', label: 'Hepçil' },
+  { value: 'none', label: 'Hepçil' },
   { value: 'vegan', label: 'Vegan' },
   { value: 'vegetarian', label: 'Vejetaryen' },
   { value: 'gluten_free', label: 'Glutensiz' },
@@ -29,7 +29,7 @@ const EXPERIENCE_OPTIONS = [
   { value: '', label: 'Seçiniz' },
   { value: 'beginner', label: 'Acemi' },
   { value: 'intermediate', label: 'Orta' },
-  { value: 'expert', label: 'Usta' },
+  { value: 'pro', label: 'Usta' },
 ];
 
 export default function ProfileEditScreen() {
@@ -51,8 +51,9 @@ export default function ProfileEditScreen() {
       setFullname(user.user_display_name || '');
       setEmail(user.user_email || '');
       setBio(user.bio || '');
-      setDiet(user.diet || '');
-      setExperience(user.experience || '');
+      // Older app builds saved 'omnivore' / 'expert'; Core and the web use 'none' / 'pro'.
+      setDiet(user.diet === 'omnivore' ? 'none' : (user.diet || ''));
+      setExperience(user.experience === 'expert' ? 'pro' : (user.experience || ''));
     }
   }, [user]);
 
