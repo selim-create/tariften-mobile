@@ -28,6 +28,7 @@ module.exports = ({ config }) => {
     android: {
       ...config.android,
       package: 'com.tariften.app.dev',
+      googleServicesFile: undefined,
     },
     plugins: [
       ...plugins,
