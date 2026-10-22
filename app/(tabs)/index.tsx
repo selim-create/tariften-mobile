@@ -287,7 +287,7 @@ export default function HomeScreen() {
 
       {editors.length > 0 && (
         <View style={styles.section}>
-          <Heading kicker="Şefin tavsiyesi" title="Editörün *seçtikleri*" onMore={() => router.push('/recipes')} more="Daha fazlası" />
+          <Heading kicker="Şefin tavsiyesi" title="Editörün *seçtikleri*" onMore={() => router.push('/collections')} more="Koleksiyonlar" />
           <View style={{ gap: 12, paddingHorizontal: 20 }}>
             {editors.map(recipe => (
               <Pressable key={recipe.id} onPress={() => router.push(`/recipe/${recipe.slug}`)} style={styles.row}>
