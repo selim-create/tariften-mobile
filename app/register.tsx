@@ -72,8 +72,13 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      await register(formData);
-      setShowModal(true);
+      const signedIn = await register(formData);
+      if (signedIn) {
+        // Core signed the new member in: straight to the optional kitchen profile.
+        router.replace({ pathname: '/profile/kitchen', params: { welcome: '1' } });
+      } else {
+        setShowModal(true);
+      }
     } catch (error: unknown) {
       const rawMessage = error instanceof Error ? error.message : '';
       const cleanMessage = rawMessage.replace(/<[^>]*>/g, '').trim();

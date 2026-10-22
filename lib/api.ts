@@ -301,7 +301,15 @@ export interface RegisterData {
   level?: string;
 }
 
-export async function register(userData: RegisterData) {
+/** Core 1.0.47+ also signs the new member in (success, token, user). */
+export interface RegisterResult {
+  message?: string;
+  user_id?: number;
+  success?: boolean;
+  token?: string;
+}
+
+export async function register(userData: RegisterData): Promise<RegisterResult> {
   const res = await fetch(`${API_URL}/tariften/v1/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -370,6 +378,7 @@ export async function getMe(token: string): Promise<import('./types').User | nul
     diet: u.diet || '',
     experience: u.experience || '',
     bio: u.bio || '',
+    kitchen_profile_completed: u.kitchen_profile_completed === true,
     token,
   };
 }

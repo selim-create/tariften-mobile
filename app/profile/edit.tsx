@@ -18,7 +18,7 @@ import { colors, fonts, radius } from '../../constants/theme';
 
 const DIET_OPTIONS = [
   { value: '', label: 'Seçiniz' },
-  { value: 'omnivore', label: 'Hepçil' },
+  { value: 'none', label: 'Hepçil' },
   { value: 'vegan', label: 'Vegan' },
   { value: 'vegetarian', label: 'Vejetaryen' },
   { value: 'gluten_free', label: 'Glutensiz' },
@@ -29,7 +29,7 @@ const EXPERIENCE_OPTIONS = [
   { value: '', label: 'Seçiniz' },
   { value: 'beginner', label: 'Acemi' },
   { value: 'intermediate', label: 'Orta' },
-  { value: 'expert', label: 'Usta' },
+  { value: 'pro', label: 'Usta' },
 ];
 
 export default function ProfileEditScreen() {
@@ -51,8 +51,9 @@ export default function ProfileEditScreen() {
       setFullname(user.user_display_name || '');
       setEmail(user.user_email || '');
       setBio(user.bio || '');
-      setDiet(user.diet || '');
-      setExperience(user.experience || '');
+      // Older app builds saved 'omnivore' / 'expert'; Core and the web use 'none' / 'pro'.
+      setDiet(user.diet === 'omnivore' ? 'none' : (user.diet || ''));
+      setExperience(user.experience === 'expert' ? 'pro' : (user.experience || ''));
     }
   }, [user]);
 
@@ -215,6 +216,16 @@ export default function ProfileEditScreen() {
 
         <Text style={[styles.label, { marginTop: 16 }]}>Mutfak Deneyimi</Text>
         {chips(EXPERIENCE_OPTIONS, experience, setExperience)}
+
+        {/* Diet and experience here stay in sync with the kitchen profile on Core. */}
+        <TouchableOpacity style={styles.kitchenLink} onPress={() => router.push('/profile/kitchen')}
+          accessibilityRole="button" accessibilityLabel="Mutfak profilinin tamamını düzenle">
+          <View style={{ flex: 1 }}>
+            <Text style={styles.kitchenLinkTitle}>Mutfak profilinin tamamı</Text>
+            <Text style={styles.kitchenLinkText}>Hane, sevmediklerin, ekipman ve alerjiler</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.ink} />
+        </TouchableOpacity>
       </View>
 
       {/* Şifre Değiştirme */}
@@ -294,6 +305,12 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
   chipText: { fontFamily: fonts.bodyMedium, fontSize: 14, color: colors.text },
   chipTextActive: { color: '#fff' },
+  kitchenLink: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 56, marginTop: 18, paddingHorizontal: 14, paddingVertical: 10,
+    borderRadius: radius.lg, backgroundColor: colors.cream,
+  },
+  kitchenLinkTitle: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.ink },
+  kitchenLinkText: { fontFamily: fonts.body, fontSize: 12, lineHeight: 17, color: colors.textMuted, marginTop: 1 },
   saveButton: { marginTop: 8, backgroundColor: colors.brand, borderRadius: radius.pill, height: 54, alignItems: 'center', justifyContent: 'center' },
   saveButtonDisabled: { opacity: 0.6 },
   saveButtonText: { fontFamily: fonts.bodySemi, color: '#ffffff', fontSize: 16 },

@@ -27,6 +27,7 @@ import { useTabBarSpace } from '../../components/navigation/FloatingTabBar';
 import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
 import { AccentText } from '../../components/ui/ScreenTitle';
 import { colors, fonts, radius, shadow } from '../../constants/theme';
+import { takeKitchenFlash } from '../../lib/kitchen-profile';
 
 type ProfileTab = 'my_recipes' | 'my_menus' | 'favorites' | 'cooked';
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -41,6 +42,16 @@ export default function ProfileScreen() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [kitchenFlash, setKitchenFlash] = useState<string | null>(null);
+
+  // One short confirmation after the kitchen profile flow returns here.
+  useFocusEffect(useCallback(() => {
+    const message = takeKitchenFlash();
+    if (!message) return undefined;
+    setKitchenFlash(message);
+    const timer = setTimeout(() => setKitchenFlash(null), 5000);
+    return () => clearTimeout(timer);
+  }, []));
 
   const loadRecipes = useCallback(
     async (tab: ProfileTab) => {
@@ -201,6 +212,40 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Kitchen profile: optional, so it reads as an invitation until finished. */}
+        {kitchenFlash ? (
+          <View style={styles.flash} accessibilityLiveRegion="polite" accessibilityRole="alert">
+            <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+            <Text style={styles.flashText}>{kitchenFlash}</Text>
+          </View>
+        ) : null}
+        <Pressable onPress={() => router.push('/profile/kitchen')}
+          style={({ pressed }) => [styles.kitchenCard, pressed && { opacity: 0.9 }]}
+          accessibilityRole="button"
+          accessibilityLabel={user.kitchen_profile_completed ? 'Mutfak profilim, tamamlandı. Düzenle' : 'Mutfak profilim, tamamlanmadı. Başla'}>
+          <View style={styles.kitchenArt} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            {['domates', 'fesleğen'].map(name => (
+              <View key={name} style={styles.kitchenDot}><LokmaIngredientIcon name={name} size={20} /></View>
+            ))}
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.kitchenTitle}>Mutfak profilim</Text>
+            <Text style={styles.kitchenLine} numberOfLines={2}>
+              {user.kitchen_profile_completed
+                ? 'Hane, beslenme, ekipman ve alerjilerin kayıtlı.'
+                : 'Birkaç kısa soruyla önerileri sana göre ayarlayalım.'}
+            </Text>
+          </View>
+          {user.kitchen_profile_completed ? (
+            <View style={styles.kitchenDone}>
+              <Ionicons name="checkmark" size={13} color={colors.success} />
+              <Text style={styles.kitchenDoneText}>Tamam</Text>
+            </View>
+          ) : (
+            <View style={styles.kitchenGo}><Ionicons name="arrow-forward" size={17} color="#fff" /></View>
+          )}
+        </Pressable>
+
         <QuotaCard data={quotas.data} error={quotas.error} loading={quotas.loading} />
 
         {/* Tabs */}
@@ -323,6 +368,28 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.lineStrong,
   },
   pillText: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.ink },
+  flash: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginTop: 22, paddingHorizontal: 14, paddingVertical: 12,
+    borderRadius: radius.lg, backgroundColor: colors.successSoft,
+  },
+  flashText: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 14, lineHeight: 19, color: colors.ink },
+  kitchenCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14, marginHorizontal: 20, marginTop: 22, padding: 14, paddingRight: 12,
+    minHeight: 72, borderRadius: radius.xl, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, ...shadow.card,
+  },
+  kitchenArt: { flexDirection: 'row' },
+  kitchenDot: {
+    width: 38, height: 38, borderRadius: 19, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: colors.surface, marginRight: -10,
+  },
+  kitchenTitle: { fontFamily: fonts.heading, fontSize: 16, color: colors.ink, marginLeft: 6 },
+  kitchenLine: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.textMuted, marginTop: 2, marginLeft: 6 },
+  kitchenGo: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  kitchenDone: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, height: 28, paddingHorizontal: 10, borderRadius: radius.pill,
+    backgroundColor: colors.successSoft,
+  },
+  kitchenDoneText: { fontFamily: fonts.bodySemi, fontSize: 12, color: colors.success },
   tabsContainer: { gap: 8, paddingHorizontal: 20, paddingTop: 26, paddingBottom: 4 },
   tab: {
     flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 15, borderRadius: radius.pill,
