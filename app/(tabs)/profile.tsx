@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -22,6 +22,7 @@ import { useQuotas } from '../../lib/quotas';
 import { deleteAccount, getInteractions } from '../../lib/api';
 import { Recipe } from '../../lib/types';
 import RecipeCard from '../../components/RecipeCard';
+import { useBlockFilter } from '../../hooks/useBlockFilter';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import MyKitchenLibrary from '../../components/account/MyKitchenLibrary';
 import { useTabBarSpace } from '../../components/navigation/FloatingTabBar';
@@ -33,6 +34,12 @@ import { openNotificationSettings, useNotifications } from '../../components/not
 import { badgeLabel } from '../../lib/notifications-core';
 
 type ProfileTab = 'my_recipes' | 'my_menus' | 'favorites' | 'cooked';
+
+/** Core 1.0.67: published recipes stay, anonymously, under the community account. */
+const ACCOUNT_DELETE_CONFIRM = 'Hesabını silmek istediğine emin misin? Bu işlem geri alınamaz.\n\n'
+  + 'Yayındaki tariflerin sitede anonim olarak "Tariften Topluluğu" adıyla kalmaya devam eder. '
+  + 'Taslakların, özel tariflerin, menülerin ve diğer kişisel içeriklerin silinir; yorumların anonimleştirilir.';
+const ACCOUNT_DELETED_MESSAGE = 'Hesabın silindi. Yayındaki tariflerin anonim olarak sitede kalmaya devam edecek.';
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 export default function ProfileScreen() {
@@ -43,6 +50,8 @@ export default function ProfileScreen() {
   const quotas = useQuotas(token);
   const [activeTab, setActiveTab] = useState<ProfileTab>('my_recipes');
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const { visibleRecipes, blocks } = useBlockFilter();
+  const shownRecipes = useMemo(() => visibleRecipes(recipes), [visibleRecipes, recipes]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [kitchenFlash, setKitchenFlash] = useState<string | null>(null);
@@ -132,7 +141,7 @@ export default function ProfileScreen() {
   const handleDeleteAccount = () => {
     Alert.alert(
       'Hesabı Sil',
-      'Hesabınızı silmek istediğinize emin misiniz? Bu işlem geri alınamaz.',
+      ACCOUNT_DELETE_CONFIRM,
       [
         { text: 'İptal', style: 'cancel' },
         {
@@ -141,8 +150,10 @@ export default function ProfileScreen() {
           onPress: async () => {
             if (!token) return;
             try {
-              await deleteAccount(token);
-              logout();
+              const result = await deleteAccount(token);
+              await logout();
+              const message = typeof result?.message === 'string' && result.message.trim() ? result.message.trim() : ACCOUNT_DELETED_MESSAGE;
+              Alert.alert('Hesabın silindi', message);
             } catch (error) {
               Alert.alert('Hata', error instanceof Error ? error.message : 'Hesap silinemedi.');
             }
@@ -302,7 +313,7 @@ export default function ProfileScreen() {
           <LoadingSpinner />
         ) : (
           <FlatList
-            data={recipes}
+            data={shownRecipes}
             keyExtractor={(item) => item.id.toString()}
             renderItem={({ item }) => <RecipeCard recipe={item} variant="row" />}
             contentContainerStyle={styles.recipesList}
@@ -336,6 +347,12 @@ export default function ProfileScreen() {
             <TouchableOpacity style={styles.settingsRow} onPress={() => router.push('/rehber')} accessibilityRole="link">
               <View style={styles.settingsIcon}><Ionicons name="library-outline" size={17} color={colors.ink} /></View>
               <Text style={styles.settingsRowText}>Mutfak Rehberi</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.settingsRow, styles.settingsRowLine]} onPress={() => router.push('/profile/notes')}
+              accessibilityRole="button" accessibilityLabel="Notlarım, yalnızca senin görebildiğin tarif notları">
+              <View style={styles.settingsIcon}><Ionicons name="create-outline" size={17} color={colors.ink} /></View>
+              <Text style={styles.settingsRowText}>Notlarım</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
             </TouchableOpacity>
           </View>
@@ -392,6 +409,18 @@ export default function ProfileScreen() {
                 <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
               </TouchableOpacity>
             ))}
+          </View>
+
+          <Text style={styles.settingsSectionTitle}>Gizlilik</Text>
+          <View style={styles.settingsCard}>
+            <TouchableOpacity style={styles.settingsRow} onPress={() => router.push('/profile/blocks')}
+              accessibilityRole="button"
+              accessibilityLabel={blocks.ids.size > 0 ? `Engellenen üyeler, ${blocks.ids.size} üye` : 'Engellenen üyeler'}>
+              <View style={styles.settingsIcon}><Ionicons name="hand-left-outline" size={17} color={colors.ink} /></View>
+              <Text style={styles.settingsRowText}>Engellenen üyeler</Text>
+              {blocks.ids.size > 0 ? <Text style={styles.settingsRowMeta}>{blocks.ids.size.toLocaleString('tr-TR')}</Text> : null}
+              <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+            </TouchableOpacity>
           </View>
 
           <Text style={styles.settingsSectionTitle}>Hesap İşlemleri</Text>
@@ -501,6 +530,7 @@ const styles = StyleSheet.create({
   settingsIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center' },
   deleteIcon: { backgroundColor: colors.brandSoft },
   settingsRowText: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 15, color: colors.ink },
+  settingsRowMeta: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted },
   deleteText: { color: colors.brand },
   versionText: { fontFamily: fonts.body, textAlign: 'center', fontSize: 12, color: colors.textFaint, paddingVertical: 24 },
 });

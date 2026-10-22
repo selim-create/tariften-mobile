@@ -22,7 +22,7 @@ function isPlaceholder(url?: string) {
 
 export default function WeekScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const kitchen = useKitchen(user?.id);
   const bottom = useTabBarSpace();
   const [offset, setOffset] = useState(0);
@@ -52,7 +52,7 @@ export default function WeekScreen() {
       const unique = [...new Map(weekEntries.map(e => [e.slug, e])).values()];
       let added = 0;
       for (const entry of unique) {
-        const recipe = await getRecipe(entry.slug);
+        const recipe = await getRecipe(entry.slug, token);
         if (recipe?.ingredients?.length) {
           addRecipeToShopping({ id: recipe.id, slug: recipe.slug, title: recipe.title, ingredients: recipe.ingredients });
           added += 1;

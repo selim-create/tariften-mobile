@@ -24,6 +24,24 @@ type Props = {
   onClose: () => void;
   onNew: () => void;
   onPublish: () => void;
+  /**
+   * Optional: lets other preview flows (photo / notebook) reuse this editor
+   * with their own header, rules and footer. Defaults keep the AI Şef behaviour.
+   */
+  kicker?: string;
+  heading?: string;
+  subtitle?: string;
+  /** Rendered above the form (badges, detected dish, warnings). */
+  header?: React.ReactNode;
+  /** Rendered after the chef tip (visibility, cover, confirmations). */
+  footer?: React.ReactNode;
+  validate?: (draft: QuickRecipeDraft) => string | null;
+  primaryLabel?: string;
+  savingLabel?: string;
+  secondaryLabel?: string;
+  /** Yellow highlight + note for rows that still need the member's check. */
+  ingredientNote?: (row: QuickRecipeDraft['ingredients'][number], index: number) => string | null;
+  stepNote?: (step: string, index: number) => string | null;
 };
 
 function FormField({ label, value, onChange, numeric, multiline, placeholder }: {
@@ -42,19 +60,22 @@ function FormField({ label, value, onChange, numeric, multiline, placeholder }: 
 
 export default function QuickRecipeReview({
   visible, draft, onChange, existingRecipeId, cuisineOptions, mealOptions, saving, uncertain, error,
-  onClose, onNew, onPublish,
+  onClose, onNew, onPublish, kicker = 'AI Şef', heading = 'Tarifin hazır. Son dokunuş *sende.*',
+  subtitle = 'Malzemeleri ve adımları kontrol et. Tarif henüz yayımlanmadı.', header, footer,
+  validate = validateQuickRecipe, primaryLabel = 'Kontrol ettim, yayımla', savingLabel = 'Yayımlanıyor…',
+  secondaryLabel = 'Yeni tarif yaz', ingredientNote, stepNote,
 }: Props) {
   const patch = (fields: Partial<QuickRecipeDraft>) => onChange(current => ({ ...current, ...fields }));
-  const validation = validateQuickRecipe(draft);
+  const validation = validate(draft);
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={() => { if (!saving) onClose(); }}>
       <SafeAreaView style={styles.page}>
         <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.header}>
             <View style={styles.headerCopy}>
-              <Text style={styles.kicker}>AI Şef</Text>
-              <AccentText style={styles.title}>{'Tarifin hazır. Son dokunuş *sende.*'}</AccentText>
-              <Text style={styles.subtitle}>Malzemeleri ve adımları kontrol et. Tarif henüz yayımlanmadı.</Text>
+              <Text style={styles.kicker}>{kicker}</Text>
+              <AccentText style={styles.title}>{heading}</AccentText>
+              <Text style={styles.subtitle}>{subtitle}</Text>
             </View>
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Tarif önizlemesini kapat"
               onPress={onClose} disabled={saving} style={styles.close}>
@@ -62,6 +83,7 @@ export default function QuickRecipeReview({
             </TouchableOpacity>
           </View>
           <ScrollView style={styles.flex} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+            {header}
             {existingRecipeId ? <View style={styles.notice}>
               <Text style={styles.noticeText}>Benzer isimli bir tarif zaten var. İstersen kendi tarifini ayrıca yayımlayabilirsin.</Text>
             </View> : null}
@@ -94,7 +116,8 @@ export default function QuickRecipeReview({
                 <Text style={styles.addText}>+ Malzeme ekle</Text>
               </TouchableOpacity>
             </View>
-            {draft.ingredients.map((row, i) => <View key={i} style={styles.card}>
+            {draft.ingredients.map((row, i) => { const note = ingredientNote?.(row, i) ?? null; return <View key={i} style={[styles.card, note !== null && styles.cardUncertain]}>
+              {note !== null ? <Text style={styles.uncertainNote} accessibilityRole="alert">Kontrol et · {note}</Text> : null}
               <FormField label={`${i + 1}. malzeme`} value={row.name}
                 onChange={v => patch({ ingredients: draft.ingredients.map((r, j) => j === i ? { ...r, name: v } : r) })} />
               <View style={styles.twoCol}>
@@ -110,21 +133,23 @@ export default function QuickRecipeReview({
                 onPress={() => patch({ ingredients: draft.ingredients.filter((_, j) => j !== i) })}>
                 <Text style={styles.removeText}>Malzemeyi kaldır</Text>
               </TouchableOpacity>
-            </View>)}
+            </View>; })}
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Hazırlanış</Text>
               <TouchableOpacity accessibilityRole="button" disabled={draft.steps.length >= 40}
                 onPress={() => patch({ steps: [...draft.steps, ''] })}><Text style={styles.addText}>+ Adım ekle</Text></TouchableOpacity>
             </View>
-            {draft.steps.map((step, i) => <View key={i} style={styles.card}>
+            {draft.steps.map((step, i) => { const note = stepNote?.(step, i) ?? null; return <View key={i} style={[styles.card, note !== null && styles.cardUncertain]}>
+              {note !== null ? <Text style={styles.uncertainNote} accessibilityRole="alert">Kontrol et · {note}</Text> : null}
               <FormField label={`${i + 1}. adım`} multiline value={step}
                 onChange={v => patch({ steps: draft.steps.map((r, j) => j === i ? v : r) })} />
               <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${i + 1}. adımı kaldır`}
                 onPress={() => patch({ steps: draft.steps.filter((_, j) => j !== i) })}>
                 <Text style={styles.removeText}>Adımı kaldır</Text>
               </TouchableOpacity>
-            </View>)}
+            </View>; })}
             <FormField label="Şefin ipucu" multiline value={draft.chef_tip} onChange={v => patch({ chef_tip: v })} />
+            {footer}
           </ScrollView>
           <View style={styles.footer}>
             {!!(error || validation) && <Text accessibilityRole="alert" style={styles.error}>{error || validation}</Text>}
@@ -133,11 +158,11 @@ export default function QuickRecipeReview({
             </Text>}
             <View style={styles.footerActions}>
               <TouchableOpacity accessibilityRole="button" onPress={onNew} disabled={saving || uncertain} style={styles.secondary}>
-                <Text style={styles.secondaryText}>Yeni tarif yaz</Text>
+                <Text style={styles.secondaryText}>{secondaryLabel}</Text>
               </TouchableOpacity>
               <TouchableOpacity accessibilityRole="button" onPress={onPublish} disabled={saving || uncertain || !!validation}
                 style={[styles.primary, (saving || uncertain || !!validation) && styles.disabled]}>
-                <Text style={styles.primaryText}>{saving ? 'Yayımlanıyor…' : 'Kontrol ettim, yayımla'}</Text>
+                <Text style={styles.primaryText}>{saving ? savingLabel : primaryLabel}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -177,6 +202,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, overflow: 'hidden',
   },
   card: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: radius.lg, padding: 14, gap: 12, ...shadow.card },
+  cardUncertain: { backgroundColor: '#fffaeb', borderColor: '#f3cf7a' },
+  uncertainNote: { fontFamily: fonts.bodySemi, color: colors.warning, fontSize: 12, lineHeight: 17 },
   removeText: { fontFamily: fonts.bodySemi, alignSelf: 'flex-end', color: '#c0564b', fontSize: 12 },
   notice: { backgroundColor: colors.warningSoft, borderRadius: radius.md, padding: 13 },
   noticeText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: '#835c2e' },

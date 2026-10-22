@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import ScreenTitle from '../../components/ui/ScreenTitle';
 import MyKitchenLibrary from '../../components/account/MyKitchenLibrary';
 import RecipeCard from '../../components/RecipeCard';
+import { useBlockFilter } from '../../hooks/useBlockFilter';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
 import { useTabBarSpace } from '../../components/navigation/FloatingTabBar';
@@ -34,6 +35,8 @@ export default function NotebookScreen() {
   const bottom = useTabBarSpace();
   const [shelf, setShelf] = useState<Shelf>('recipes');
   const [items, setItems] = useState<Recipe[]>([]);
+  const { visibleRecipes } = useBlockFilter();
+  const shownItems = useMemo(() => visibleRecipes(items), [visibleRecipes, items]);
   const [loading, setLoading] = useState(false);
 
   useFocusEffect(useCallback(() => {
@@ -115,7 +118,7 @@ export default function NotebookScreen() {
             <LoadingSpinner />
           ) : (
             <FlatList
-              data={items}
+              data={shownItems}
               keyExtractor={item => String(item.id)}
               renderItem={({ item }) => <RecipeCard recipe={item} />}
               scrollEnabled={false}

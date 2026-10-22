@@ -119,6 +119,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       const content = notification.request.content;
       void refreshUnread();
       if (pathRef.current === INBOX_PATH) return; // the list itself refreshes
+      // A kitchen timer finishing while its tool is on screen already shows "Süre doldu" there.
+      if ((content.data as { type?: unknown } | undefined)?.type === 'kitchen_timer' && pathRef.current.startsWith('/rehber')) return;
       setBanner({
         key: notification.request.identifier,
         title: content.title || 'Tariften',

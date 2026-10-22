@@ -6,7 +6,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Recipe } from '../lib/types';
 import ImagePlaceholder, { isPlaceholderImage } from './ImagePlaceholder';
 import SocialBadge from './recipe/SocialBadge';
+import AiEstimatedBadge, { PrivateBadge } from './recipe/AiEstimatedBadge';
+import { isPrivateRecipe, showAiEstimatedBadge } from '../lib/recipe-visibility';
 import { useResponsive } from '../hooks/useResponsive';
+import { useBlockFilter } from '../hooks/useBlockFilter';
 import { colors, fonts, radius } from '../constants/theme';
 
 interface RecipeCardProps {
@@ -37,12 +40,17 @@ function metaLine(recipe: Recipe) {
 export default function RecipeCard({ recipe, horizontal = false, badge, fullWidth = false, variant = 'card' }: RecipeCardProps) {
   const router = useRouter();
   const { isTablet, cardWidth } = useResponsive();
+  // Safety net: lists filter blocked members first; a card that slips through never renders.
+  const { isRecipeHidden } = useBlockFilter();
+  if (isRecipeHidden(recipe)) return null;
   const photo = !isPlaceholderImage(recipe.image);
   const kicker = recipe.cuisine?.[0] || recipe.meal_type?.[0] || null;
   const meta = metaLine(recipe);
   const rating = typeof recipe.average_rating === 'number' && recipe.average_rating > 0 ? recipe.average_rating : 0;
   const platform = recipe.social_source?.platform;
   const open = () => router.push(`/recipe/${recipe.slug}`);
+  const aiEstimated = showAiEstimatedBadge(recipe);
+  const privateRecipe = isPrivateRecipe(recipe);
 
   if (variant === 'row') {
     return (
@@ -56,6 +64,10 @@ export default function RecipeCard({ recipe, horizontal = false, badge, fullWidt
         <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
           {kicker ? <Text style={styles.kicker} numberOfLines={1}>{kicker}</Text> : null}
           <Text style={styles.rowTitle} numberOfLines={2}>{recipe.title}</Text>
+          {aiEstimated || privateRecipe ? <View style={styles.rowBadges}>
+            {privateRecipe ? <PrivateBadge /> : null}
+            {aiEstimated ? <AiEstimatedBadge /> : null}
+          </View> : null}
           {meta ? <Text style={styles.meta}>{meta}</Text> : null}
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
@@ -78,6 +90,8 @@ export default function RecipeCard({ recipe, horizontal = false, badge, fullWidt
         <View style={styles.badges} pointerEvents="none">
           {badge ? <View style={styles.badge}><Text style={styles.badgeText}>{badge}</Text></View> : null}
           {platform ? <SocialBadge platform={platform} label={tile || horizontal ? '' : undefined} /> : null}
+          {privateRecipe ? <PrivateBadge onPhoto label={tile || horizontal ? '' : undefined} /> : null}
+          {aiEstimated ? <AiEstimatedBadge onPhoto /> : null}
         </View>
         {rating > 0 ? (
           <View style={styles.rating} pointerEvents="none">
@@ -103,7 +117,8 @@ const styles = StyleSheet.create({
   mediaCard: { aspectRatio: 16 / 11 },
   mediaRail: { height: 150 },
   mediaTile: { aspectRatio: 0.84 },
-  badges: { position: 'absolute', top: 10, left: 10, right: 10, flexDirection: 'row', gap: 6 },
+  badges: { position: 'absolute', top: 10, left: 10, right: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  rowBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   badge: { height: 26, paddingHorizontal: 9, borderRadius: radius.pill, backgroundColor: colors.brand, justifyContent: 'center' },
   badgeText: { fontFamily: fonts.bodySemi, fontSize: 11, color: '#fff' },
   rating: {

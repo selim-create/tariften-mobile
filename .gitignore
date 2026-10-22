@@ -42,3 +42,6 @@ yarn-error.*
 
 # IDE
 .idea/
+
+# Store submission keys (Google Play service account JSON, App Store Connect .p8)
+/secrets/

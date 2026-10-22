@@ -85,6 +85,18 @@ function AppShell() {
           }}
         />
         <Stack.Screen
+          name="recipe/fotograf"
+          options={{ headerShown: true, headerTitle: 'Fotoğraftan Tarif' }}
+        />
+        <Stack.Screen
+          name="recipe/defter"
+          options={{ headerShown: true, headerTitle: 'Defterden Tarif' }}
+        />
+        <Stack.Screen
+          name="recipe/kendi-video"
+          options={{ headerShown: true, headerTitle: 'Kendi Videondan Tarif' }}
+        />
+        <Stack.Screen
           name="recipe/[slug]"
           options={{
             // Full-bleed editorial hero: the recipe itself renders its own
@@ -103,9 +115,10 @@ function AppShell() {
         <Stack.Screen name="menu/[slug]" options={{ headerShown: false }} />
         <Stack.Screen name="blog/index" options={{ headerShown: false }} />
         <Stack.Screen name="blog/[slug]" options={{ headerShown: false }} />
-        {/* Mutfak Rehberi: own safe-area headers (list) and a floating top bar (article). */}
+        {/* Mutfak Rehberi: own safe-area headers (list, tools) and a floating top bar (article). */}
         <Stack.Screen name="rehber/index" options={{ headerShown: false }} />
         <Stack.Screen name="rehber/[slug]" options={{ headerShown: false }} />
+        <Stack.Screen name="rehber/araclar" options={{ headerShown: false }} />
         <Stack.Screen
           name="login"
           options={{
@@ -143,6 +156,22 @@ function AppShell() {
         />
         {/* Kitchen profile draws its own safe-area header with progress. */}
         <Stack.Screen name="profile/kitchen" options={{ headerShown: false }} />
+        {/* Notlarım: private recipe notes (Core 1.0.59). */}
+        <Stack.Screen
+          name="profile/notes"
+          options={{
+            headerShown: true,
+            headerTitle: 'Notlarım',
+          }}
+        />
+        {/* Engellenen üyeler: the member's block list (Core 1.0.67). */}
+        <Stack.Screen
+          name="profile/blocks"
+          options={{
+            headerShown: true,
+            headerTitle: 'Engellenen üyeler',
+          }}
+        />
         <Stack.Screen
           name="profile/edit"
           options={{

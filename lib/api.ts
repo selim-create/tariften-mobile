@@ -90,8 +90,16 @@ export async function getRecipes(filters: RecipeFilters | string = {}): Promise<
   return data || { source: 'error', count: 0, data: [] };
 }
 
-export async function getRecipe(slug: string): Promise<Recipe | null> {
-  const data = await fetchData(`${API_URL}/tariften/v1/recipes/search?${/^[1-9]\d*$/.test(slug) ? `id=${encodeURIComponent(slug)}` : `slug=${encodeURIComponent(slug)}`}`);
+/**
+ * A private recipe (photo/notebook flows) is only returned to its owner, so a
+ * signed-in read sends the token and never uses a cached public response.
+ */
+function recipeReadOptions(token?: string | null): RequestInit | undefined {
+  return token ? { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' } : undefined;
+}
+
+export async function getRecipe(slug: string, token?: string | null): Promise<Recipe | null> {
+  const data = await fetchData(`${API_URL}/tariften/v1/recipes/search?${/^[1-9]\d*$/.test(slug) ? `id=${encodeURIComponent(slug)}` : `slug=${encodeURIComponent(slug)}`}`, recipeReadOptions(token));
 
   if (!data || !data.data || data.data.length === 0) return null;
 
@@ -102,16 +110,62 @@ export async function getRecipe(slug: string): Promise<Recipe | null> {
   return recipe;
 }
 
-export async function getRecipeById(id: number): Promise<Recipe | null> {
-  const data = await fetchData(`${API_URL}/tariften/v1/recipes/search?id=${id}`);
+export async function getRecipeById(id: number, token?: string | null): Promise<Recipe | null> {
+  const data = await fetchData(`${API_URL}/tariften/v1/recipes/search?id=${id}`, recipeReadOptions(token));
   return data && data.data && data.data.length > 0 ? data.data[0] : null;
 }
 
-export async function generateAIRecipe(token: string, ingredients: string) {
+/**
+ * Core 1.0.58: owner switches a photo/notebook recipe between private and public.
+ * Publishing keeps the "AI Tahmini Tarif" label.
+ */
+export async function setRecipeVisibility(
+  token: string, id: number, visibility: 'private' | 'public',
+): Promise<{ id: number; slug: string; visibility: 'private' | 'public' }> {
+  if (!token) throw new Error('Bu işlem için giriş yapmalısın.');
+  if (!Number.isSafeInteger(id) || id < 1 || (visibility !== 'private' && visibility !== 'public')) {
+    throw new Error('Görünürlük ayarı geçersiz.');
+  }
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/tariften/v1/recipes/visibility`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ id, visibility }),
+    });
+  } catch {
+    throw new Error('Bağlantı kurulamadı. Tekrar dene.');
+  }
+  const json: unknown = await res.json().catch(() => null);
+  const data = json && typeof json === 'object' ? json as Record<string, unknown> : {};
+  if (!res.ok || data.success !== true) {
+    if (data.code === 'recipe_visibility_unsupported') throw new Error('Bu tarifin görünürlüğü buradan değiştirilemez.');
+    if (res.status === 404) throw new Error('Tarif bulunamadı.');
+    throw new Error(typeof data.message === 'string' && data.message ? data.message : 'Görünürlük değiştirilemedi.');
+  }
+  return {
+    id: Number(data.id) || id,
+    slug: typeof data.slug === 'string' ? data.slug : '',
+    visibility: data.visibility === 'public' ? 'public' : 'private',
+  };
+}
+
+export interface GenerateAIRecipeOptions {
+  /**
+   * "Evime göre uyarla (N kişi)" (Core 1.0.62): write the recipe for the
+   * kitchen profile's household. Sent only when true; otherwise omitted so
+   * Core keeps its standard four-person recipe.
+   */
+  adaptHousehold?: boolean;
+}
+
+export async function generateAIRecipe(token: string, ingredients: string, options?: GenerateAIRecipeOptions) {
+  const body: Record<string, unknown> = { ingredients, type: 'suggest' };
+  if (options?.adaptHousehold === true) body.adapt_household = true;
   const res = await fetch(`${API_URL}/tariften/v1/ai/generate`, {
     method: 'POST',
     headers: authHeaders(token),
-    body: JSON.stringify({ ingredients, type: 'suggest' }),
+    body: JSON.stringify(body),
   });
 
   const data = await res.json().catch(() => null);

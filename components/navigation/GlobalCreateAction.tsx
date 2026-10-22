@@ -4,12 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
+import { isFeatureUnavailable, useFeatureAvailability, type MediaFeature } from '../../lib/feature-availability';
 import { colors, fonts, radius, type } from '../../constants/theme';
 
-type Destination = '/recipe/create' | '/recipe/aktar' | '/menu/create' | '/(tabs)/recipes?quick=1';
+type Destination = '/recipe/create' | '/recipe/aktar' | '/recipe/fotograf' | '/recipe/defter' | '/recipe/kendi-video'
+  | '/menu/create' | '/(tabs)/recipes?quick=1';
 type Icon = React.ComponentProps<typeof Ionicons>['name'];
 
-const ACTIONS: { route: Destination; title: string; description: string; icon: Icon; tint: string; tile: string }[] = [
+const ACTIONS: { route: Destination; title: string; description: string; icon: Icon; tint: string; tile: string; feature?: MediaFeature }[] = [
   {
     route: '/recipe/aktar',
     title: 'Tarif Aktar',
@@ -17,6 +19,33 @@ const ACTIONS: { route: Destination; title: string; description: string; icon: I
     icon: 'link',
     tint: colors.brand,
     tile: '#fdecE6',
+  },
+  {
+    route: '/recipe/fotograf',
+    title: 'Fotoğraftan Tarif',
+    description: 'Bir yemeğin fotoğrafını çek; tahmini tarifini hazırlayalım.',
+    icon: 'camera',
+    tint: '#c2571a',
+    tile: '#fdeee2',
+    feature: 'photo',
+  },
+  {
+    route: '/recipe/defter',
+    title: 'Defterden Tarif',
+    description: 'Tarif defterinin sayfalarını çek; olduğu gibi yazıya dökelim.',
+    icon: 'book',
+    tint: '#8a6431',
+    tile: '#f5ecdf',
+    feature: 'notebook',
+  },
+  {
+    route: '/recipe/kendi-video',
+    title: 'Kendi Videondan Tarif',
+    description: 'Mutfakta çektiğin videoyu yükle; tarifini çıkaralım.',
+    icon: 'videocam',
+    tint: '#6b4fa3',
+    tile: '#efeaf8',
+    feature: 'own_video',
   },
   {
     route: '/(tabs)/recipes?quick=1',
@@ -53,6 +82,8 @@ export default function GlobalCreateAction({ visible, onClose }: { visible: bool
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const navigationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Core said "feature off" earlier in this session: show "Yakında" instead of a dead end.
+  useFeatureAvailability();
 
   useEffect(() => () => {
     if (navigationTimer.current) clearTimeout(navigationTimer.current);
@@ -98,15 +129,19 @@ export default function GlobalCreateAction({ visible, onClose }: { visible: bool
             </TouchableOpacity>
           </View>
           <ScrollView style={styles.optionScroll} contentContainerStyle={styles.options} showsVerticalScrollIndicator={false}>
-            {ACTIONS.map((action, index) => (
+            {ACTIONS.map((action, index) => {
+              const soon = !!action.feature && isFeatureUnavailable(action.feature);
+              return (
               <TouchableOpacity
                 key={action.route}
                 onPress={() => navigate(action.route)}
+                disabled={soon}
                 accessibilityRole="button"
-                accessibilityLabel={action.title}
+                accessibilityLabel={soon ? `${action.title}, yakında` : action.title}
                 accessibilityHint={action.description}
+                accessibilityState={{ disabled: soon }}
                 activeOpacity={0.8}
-                style={[styles.option, index === 0 && styles.primaryOption]}>
+                style={[styles.option, index === 0 && styles.primaryOption, soon && styles.soonOption]}>
                 <View style={[styles.iconTile, { backgroundColor: action.tile }]}>
                   <Ionicons name={action.icon} size={22} color={action.tint} />
                 </View>
@@ -114,9 +149,11 @@ export default function GlobalCreateAction({ visible, onClose }: { visible: bool
                   <Text style={styles.optionTitle}>{action.title}</Text>
                   <Text style={styles.optionDesc}>{action.description}</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
+                {soon ? <View style={styles.soonPill}><Text style={styles.soonText}>Yakında</Text></View>
+                  : <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />}
               </TouchableOpacity>
-            ))}
+              );
+            })}
           </ScrollView>
         </View>
       </View>
@@ -145,6 +182,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 13, gap: 13,
   },
   primaryOption: { borderColor: '#f0c8bd' },
+  soonOption: { opacity: 0.6 },
+  soonPill: { height: 24, paddingHorizontal: 9, borderRadius: radius.pill, backgroundColor: colors.cream, justifyContent: 'center' },
+  soonText: { fontFamily: fonts.bodySemi, fontSize: 11, color: colors.textMuted },
   iconTile: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   optionCopy: { flex: 1, minWidth: 0, gap: 3 },
   optionTitle: { fontFamily: fonts.heading, fontSize: 15, lineHeight: 20, color: colors.ink },

@@ -65,6 +65,8 @@ jobs:
         run: node --test scripts/check-mobile-archive-screens.test.cjs
       - name: Paylaş → Tariften, icon set, splash and safe iOS rebuild
         run: node --test scripts/check-share-to-tariften.test.cjs
+      - name: Release prep (EAS profiles, submit placeholders, share extension identity, purpose strings)
+        run: node --test scripts/check-release-prep.test.cjs
       - name: Verify mobile membership, servings and profile navigation parity
         run: node --test scripts/check-mobile-content-parity.test.cjs
       - name: Kitchen profile flow, allergen consent and sign-in after registration
@@ -73,10 +75,18 @@ jobs:
         run: node --test scripts/check-kitchen-sync.test.cjs
       - name: Recipe allergen band and AI allergen conflict handling
         run: node --test scripts/check-allergen-ui.test.cjs
+      - name: Private recipe notes (Notlarım) and optional household adaptation for AI recipes
+        run: node --test scripts/check-recipe-notes.test.cjs
       - name: Push + in-app notifications (routing, never-on-launch permission, token lifecycle)
         run: node --test scripts/check-notifications.test.cjs
       - name: Mutfak Rehberi (API mapping, TOC, callouts, tables, video cards, routes)
         run: node --test scripts/check-kitchen-guide.test.cjs
+      - name: Mutfak araçları (egg, pasta, drying, converter; safe ranges, timers)
+        run: node --test scripts/check-guide-tools.test.cjs
+      - name: Photo, notebook and own-video recipes (multipart clients, private default, badges, menu)
+        run: node --test scripts/check-photo-video-recipe.test.cjs
+      - name: Bildir / Engelle (report API, block list, local filtering, placeholder, Engellenen üyeler, deletion copy)
+        run: node --test scripts/check-report-block.test.cjs
       - name: Guard Expo Router URI parsing compatibility
         run: node --test scripts/check-router-uri-surface.test.cjs
       - name: Verify xcode PBX ids (xcode@4 without uuid, or patched uuid for xcode@3)

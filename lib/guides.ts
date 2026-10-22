@@ -22,8 +22,13 @@ export interface GuideSummary {
   level: GuideTerm | null;
   readingMinutes: number | null;
   tool: string | null;
+  /** "approved" | "unreviewed" (food-safety topic without expert review) | null. */
+  foodSafetyReview: 'approved' | 'unreviewed' | null;
   updatedAt: string | null;
 }
+
+/** Fallback copy if Core flags a guide unreviewed without sending the text. */
+export const GUIDE_UNREVIEWED_WARNING = 'Bu rehber henüz bir gıda güvenliği uzmanı tarafından incelenmedi. Saklama, fermentasyon ve kurutmada süre, sıcaklık ve hijyen kurallarını resmi kaynaklardan da kontrol et; şüpheli görünen, kokan ya da küflenen ürünü tüketme.';
 
 export interface GuideRelatedRecipe {
   id: number;
@@ -41,6 +46,8 @@ export interface GuideDetail extends GuideSummary {
   sources: GuideSource[];
   /** Only an approved review is public; reviewer name and notes never are. */
   foodSafety: { reviewedAt: string | null } | null;
+  /** Shown above the article when a food-safety guide has not been reviewed yet. */
+  foodSafetyWarning: string | null;
   authorName: string | null;
   publishedAt: string | null;
 }
@@ -134,6 +141,7 @@ export function parseGuideSummary(raw: unknown): GuideSummary | null {
     readingMinutes: minutes && minutes <= 600 ? minutes : null,
     // P23 tool key: kept as data only; unknown keys are ignored by the UI.
     tool: typeof raw.tool === 'string' && raw.tool ? raw.tool : null,
+    foodSafetyReview: raw.food_safety_review === 'approved' || raw.food_safety_review === 'unreviewed' ? raw.food_safety_review : null,
     updatedAt: isoDate(raw.updated_at),
   };
 }
@@ -198,6 +206,7 @@ export function parseGuideDetail(json: unknown): GuideDetail | null {
     relatedRecipes: relatedRecipes.slice(0, 12),
     sources: sources.slice(0, 10),
     foodSafety: safety,
+    foodSafetyWarning: safety ? null : (text(json.food_safety_warning) || (summary.foodSafetyReview === 'unreviewed' ? GUIDE_UNREVIEWED_WARNING : null)),
     authorName: isRecord(json.author) ? text(json.author.name) || null : null,
     publishedAt: isoDate(json.published_at),
   };

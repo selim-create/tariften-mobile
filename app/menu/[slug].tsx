@@ -12,6 +12,7 @@ import { parseIngredients } from '../../lib/recipeUtils';
 import { addRecipeToShopping, isInShopping, useKitchen } from '../../lib/kitchen-store';
 import { useAuth } from '../../context/AuthContext';
 import RecipeCard from '../../components/RecipeCard';
+import { useBlockFilter } from '../../hooks/useBlockFilter';
 import AuthorCard from '../../components/AuthorCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ImagePlaceholder, { isPlaceholderImage } from '../../components/ImagePlaceholder';
@@ -47,6 +48,7 @@ export default function MenuDetailScreen() {
   const [menu, setMenu] = useState<Menu | null>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
+  const { visibleRecipes } = useBlockFilter();
 
   const loadMenu = useCallback(async () => {
     if (!slug) return;
@@ -82,7 +84,10 @@ export default function MenuDetailScreen() {
     );
   }
 
-  const sections = (menu.sections || []).filter(section => (section.recipes || []).length > 0);
+  // Blocked members' recipes are left out of the courses (and of "add all to shopping").
+  const sections = (menu.sections || [])
+    .map(section => ({ ...section, recipes: visibleRecipes(section.recipes) }))
+    .filter(section => section.recipes.length > 0);
   const recipes = sections.flatMap(section => section.recipes);
   const recipeCount = recipes.length;
   const guests = Number(menu.guest_count) || 0;
