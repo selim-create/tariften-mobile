@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /**
- * Xcode 27 refuses generated CocoaPods targets with iOS 9/10/etc.
+ * Xcode 27 refuses generated CocoaPods targets with iOS 9/10/etc., and its
+ * iOS 27 SDK marks UIAction.subtitle as iOS 16+, so expo-router 55
+ * (LinkPreviewNativeActionView.swift) no longer compiles at iOS 15.1.
+ * Local simulator builds therefore raise every Pods target to iOS 16.0.
  * Normalize only the local generated Pods project after pod install.
  *
  * Plain Node on purpose: the earlier Ruby version needed the `xcodeproj` gem,
@@ -12,7 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const MINIMUM = '15.1';
+const MINIMUM = '16.0';
 const projectDir = process.argv[2];
 if (!projectDir) { console.error('Pods project path missing'); process.exit(1); }
 if (!projectDir.replace(/\/+$/, '').endsWith('/ios/Pods/Pods.xcodeproj')) {
@@ -21,7 +24,7 @@ if (!projectDir.replace(/\/+$/, '').endsWith('/ios/Pods/Pods.xcodeproj')) {
 const pbxproj = path.join(projectDir, 'project.pbxproj');
 if (!fs.existsSync(pbxproj)) { console.error(`Pods project not found: ${projectDir}`); process.exit(1); }
 
-/** Numeric compare of dotted versions ("9.0" < "15.1", "15.10" > "15.1"). */
+/** Numeric compare of dotted versions ("9.0" < "16.0", "16.10" > "16.1"). */
 function below(version, minimum) {
   const a = version.split('.').map(Number);
   const b = minimum.split('.').map(Number);
