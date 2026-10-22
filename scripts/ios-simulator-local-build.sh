@@ -95,8 +95,36 @@ if [[ -z "$SCHEME" ]]; then
 fi
 
 DERIVED="$PWD/.expo/ios-local-build"
+# A regenerated ios/ project must not reuse Swift modules compiled for the
+# previous one (new pods such as expo-notifications, or a newer Xcode, make
+# stale modules fail to compile). Only this build cache is cleared.
+if [[ "${TARIFTEN_REGENERATE_IOS:-0}" == "1" && -d "$DERIVED" && "$DERIVED" == */.expo/ios-local-build ]]; then
+  rm -rf "$DERIVED"
+  echo 'Eski derleme önbelleği temizlendi (.expo/ios-local-build).'
+fi
 mkdir -p "$DERIVED"
+LOG="$DERIVED/xcodebuild.log"
+: > "$LOG"
+
+# xcodebuild prints tens of thousands of lines; the real error used to scroll
+# away. Keep the full output in a file and show only the errors on failure.
+show_build_errors() {
+  echo '' >&2
+  echo '** Derleme başarısız. **' >&2
+  echo "Tam kayıt: $LOG" >&2
+  local errors
+  errors="$(grep -E ': (fatal )?error: |^error: ' "$LOG" | awk '!seen[$0]++' | head -n 25 || true)"
+  if [[ -n "$errors" ]]; then
+    echo 'İlk hatalar:' >&2
+    echo "$errors" >&2
+  else
+    echo 'Hata satırı bulunamadı; kaydın son satırları:' >&2
+    tail -n 25 "$LOG" >&2
+  fi
+}
+
 echo "iOS simülatör için yerel derleme: $SCHEME"
+echo "Derleniyor… İlk derleme birkaç dakika sürebilir. Ayrıntılı kayıt: $LOG"
 # Ad-hoc "Sign to Run Locally" embeds the App Group entitlement the share
 # extension needs to hand links to the app; no Apple team is required for the
 # simulator. If that fails, build unsigned (everything except sharing works).
@@ -104,14 +132,19 @@ if ! xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
   -configuration Debug -sdk iphonesimulator \
   -destination "platform=iOS Simulator,id=$DEVICE_ID" \
   -derivedDataPath "$DERIVED" \
-  CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= build; then
+  CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= build >> "$LOG" 2>&1; then
   echo 'İmzalı simülatör derlemesi olmadı; imzasız deneniyor (Paylaş → Tariften simülatörde veri alamayabilir).' >&2
-  xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
+  echo '----- imzasız deneme -----' >> "$LOG"
+  if ! xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
     -configuration Debug -sdk iphonesimulator \
     -destination "platform=iOS Simulator,id=$DEVICE_ID" \
     -derivedDataPath "$DERIVED" \
-    CODE_SIGNING_ALLOWED=NO build
+    CODE_SIGNING_ALLOWED=NO build >> "$LOG" 2>&1; then
+    show_build_errors
+    exit 1
+  fi
 fi
+echo 'Derleme tamamlandı.'
 
 # The generated native bundle must match the isolated development identifier.
 PRODUCTS="$DERIVED/Build/Products/Debug-iphonesimulator"
