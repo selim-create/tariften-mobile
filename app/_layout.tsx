@@ -85,6 +85,18 @@ function AppShell() {
           }}
         />
         <Stack.Screen
+          name="recipe/fotograf"
+          options={{ headerShown: true, headerTitle: 'Fotoğraftan Tarif' }}
+        />
+        <Stack.Screen
+          name="recipe/defter"
+          options={{ headerShown: true, headerTitle: 'Defterden Tarif' }}
+        />
+        <Stack.Screen
+          name="recipe/kendi-video"
+          options={{ headerShown: true, headerTitle: 'Kendi Videondan Tarif' }}
+        />
+        <Stack.Screen
           name="recipe/[slug]"
           options={{
             // Full-bleed editorial hero: the recipe itself renders its own

@@ -22,9 +22,14 @@ import {
   getRecipeRating,
   getRecipes,
   getUserRating,
+  setRecipeVisibility,
   submitRating,
   toggleInteraction,
 } from '../../lib/api';
+import {
+  PRIVATE_OWNER_NOTICE, canToggleVisibility, isPrivateRecipe, isRecipeOwner, nextVisibility, showAiEstimatedBadge,
+} from '../../lib/recipe-visibility';
+import AiEstimatedBadge from '../../components/recipe/AiEstimatedBadge';
 import { Recipe } from '../../lib/types';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import RatingStars from '../../components/RatingStars';
@@ -77,6 +82,7 @@ export default function RecipeDetailScreen() {
   const [tab, setTab] = useState<'ingredients' | 'steps'>('ingredients');
   const [weekPickerVisible, setWeekPickerVisible] = useState(false);
   const [toast, setToast] = useState('');
+  const [visibilityBusy, setVisibilityBusy] = useState(false);
   const kitchen = useKitchen(user?.id);
   // Members only; one cached read per session, refreshed when the kitchen profile is saved.
   const kitchenProfile = useKitchenProfile(user ? token : null);
@@ -97,9 +103,10 @@ export default function RecipeDetailScreen() {
   }, [authLoading, token, user]);
 
   const loadRecipe = useCallback(async () => {
-    if (!slug) return;
+    // Wait for the stored session: a private recipe is only returned to its owner's token.
+    if (!slug || authLoading) return;
     try {
-      const data = await getRecipe(slug);
+      const data = await getRecipe(slug, token);
       setRecipe(data);
       if (data) {
         const servingCount = Number(data.servings);
@@ -129,11 +136,35 @@ export default function RecipeDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [slug, token]);
+  }, [slug, token, authLoading]);
 
   useEffect(() => {
     loadRecipe();
   }, [loadRecipe]);
+
+  const changeVisibility = () => {
+    if (!token || !recipe || visibilityBusy) return;
+    const target = nextVisibility(recipe.visibility);
+    const run = async () => {
+      setVisibilityBusy(true);
+      try {
+        const result = await setRecipeVisibility(token, recipe.id, target);
+        setRecipe(prev => (prev ? { ...prev, visibility: result.visibility } : prev));
+        setToast(result.visibility === 'public' ? 'Tarifin artık herkese açık' : 'Tarifin artık sadece sana görünüyor');
+      } catch (error: unknown) {
+        Alert.alert('Görünürlük değiştirilemedi', error instanceof Error ? error.message : 'Tekrar dene.');
+      } finally {
+        setVisibilityBusy(false);
+      }
+    };
+    if (target === 'private') { void run(); return; }
+    Alert.alert('Tarifin herkese açık olsun mu?', showAiEstimatedBadge(recipe)
+      ? 'Herkes görebilir; "AI Tahmini Tarif" etiketi tarifte kalır. İstediğin zaman yeniden gizleyebilirsin.'
+      : 'Herkes görebilir. İstediğin zaman yeniden gizleyebilirsin.', [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Herkese aç', onPress: () => { void run(); } },
+    ]);
+  };
 
   const handleFavorite = async () => {
     if (!token || !recipe) return;
@@ -286,9 +317,12 @@ export default function RecipeDetailScreen() {
                 <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={21} color={isFavorite ? colors.brand : colors.ink} />
               </TouchableOpacity>
             ) : null}
-            <TouchableOpacity onPress={handleShare} style={styles.heroCircle} accessibilityRole="button" accessibilityLabel="Tarifi paylaş">
-              <Ionicons name="share-outline" size={20} color={colors.ink} />
-            </TouchableOpacity>
+            {/* A private recipe's link opens for nobody else, so it is not offered for sharing. */}
+            {!isPrivateRecipe(recipe) ? (
+              <TouchableOpacity onPress={handleShare} style={styles.heroCircle} accessibilityRole="button" accessibilityLabel="Tarifi paylaş">
+                <Ionicons name="share-outline" size={20} color={colors.ink} />
+              </TouchableOpacity>
+            ) : null}
           </View>
           {/* Only over a real photograph; the pending-photo cover carries its own caption there. */}
           {recipe.social_source && PLATFORM_COPY[recipe.social_source.platform] && !isPlaceholderImage(recipe.image) ? (
@@ -307,6 +341,7 @@ export default function RecipeDetailScreen() {
 
       <View style={styles.content}>
         {facts.length > 0 ? <Text style={styles.kicker}>{facts.join('  ·  ')}</Text> : null}
+        {showAiEstimatedBadge(recipe) ? <View style={styles.aiBadgeRow}><AiEstimatedBadge /></View> : null}
         <Text style={styles.title}>{recipe.title}</Text>
         {recipe.excerpt ? <Text style={styles.excerpt}>{recipe.excerpt}</Text> : null}
 
@@ -332,6 +367,26 @@ export default function RecipeDetailScreen() {
 
         {recipe.social_source ? (
           <View style={styles.block}><SocialSourceCard source={recipe.social_source} /></View>
+        ) : null}
+
+        {user && isRecipeOwner(recipe, user.id) && (isPrivateRecipe(recipe) || canToggleVisibility(recipe, user.id)) ? (
+          <View style={styles.visibilityCard}>
+            <View style={styles.visibilityIcon}>
+              <Ionicons name={isPrivateRecipe(recipe) ? 'lock-closed' : 'globe-outline'} size={17} color={colors.ink} />
+            </View>
+            <View style={styles.visibilityCopy}>
+              <Text style={styles.visibilityTitle}>{isPrivateRecipe(recipe) ? PRIVATE_OWNER_NOTICE : 'Herkese açık'}</Text>
+              <Text style={styles.visibilityText}>{isPrivateRecipe(recipe)
+                ? 'Bu tarif özel; aramalarda ve listelerde görünmez.'
+                : 'Herkes görebilir. İstediğin zaman yeniden gizleyebilirsin.'}</Text>
+            </View>
+            {canToggleVisibility(recipe, user.id) ? (
+              <TouchableOpacity onPress={changeVisibility} disabled={visibilityBusy} style={styles.visibilityButton}
+                accessibilityRole="button" accessibilityLabel={isPrivateRecipe(recipe) ? 'Tarifi herkese aç' : 'Tarifi gizle'}>
+                <Text style={styles.visibilityButtonText}>{visibilityBusy ? '…' : isPrivateRecipe(recipe) ? 'Herkese aç' : 'Gizle'}</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         ) : null}
 
         {user && Number(recipe.author?.id) === Number(user.id) ? (
@@ -658,6 +713,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, height: 44, borderRadius: radius.pill, backgroundColor: colors.brandSoft,
   },
   authorEditText: { flex: 1, fontFamily: fonts.bodySemi, fontSize: 14, color: colors.brand },
+  aiBadgeRow: { marginHorizontal: 20, marginTop: 10 },
+  visibilityCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 20, marginTop: 16, padding: 14,
+    borderRadius: radius.lg, backgroundColor: colors.cream, borderWidth: 1, borderColor: colors.lineStrong,
+  },
+  visibilityIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  visibilityCopy: { flex: 1, gap: 2 },
+  visibilityTitle: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.ink },
+  visibilityText: { fontFamily: fonts.body, fontSize: 12, lineHeight: 17, color: colors.textMuted },
+  visibilityButton: { height: 36, paddingHorizontal: 13, borderRadius: radius.pill, backgroundColor: colors.ink, justifyContent: 'center' },
+  visibilityButtonText: { fontFamily: fonts.bodySemi, fontSize: 13, color: '#fff' },
   quickRow: { flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: 12, marginTop: 24 },
   quick: { flex: 1, alignItems: 'center', gap: 8, paddingHorizontal: 4 },
   quickIcon: {

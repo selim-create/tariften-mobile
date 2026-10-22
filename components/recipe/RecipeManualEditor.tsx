@@ -89,7 +89,7 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
     setDraft(emptyRecipeDraft());
     setReviewStatus(null);
     (async () => {
-      const existing = await getRecipeById(Number(recipeId));
+      const existing = await getRecipeById(Number(recipeId), token);
       if (!mounted) return;
       if (!existing) { setError('Tarif bulunamadı.'); return; }
       // Backend enforces permissions too. Never expose edit actions on another
