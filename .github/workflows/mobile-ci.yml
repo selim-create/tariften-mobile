@@ -69,6 +69,8 @@ jobs:
         run: node --test scripts/check-mobile-content-parity.test.cjs
       - name: Kitchen profile flow, allergen consent and sign-in after registration
         run: node --test scripts/check-kitchen-profile.test.cjs
+      - name: Bu Hafta / Alışveriş three-way merge and account sync
+        run: node --test scripts/check-kitchen-sync.test.cjs
       - name: Guard Expo Router URI parsing compatibility
         run: node --test scripts/check-router-uri-surface.test.cjs
       - name: Verify xcode PBX ids (xcode@4 without uuid, or patched uuid for xcode@3)

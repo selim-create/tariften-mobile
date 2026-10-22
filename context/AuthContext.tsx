@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import * as SecureStore from 'expo-secure-store';
 import { User } from '../lib/types';
 import { getMe, login as apiLogin, register as apiRegister, googleAuth, appleAuth, RegisterData } from '../lib/api';
+import { setKitchenAuth } from '../lib/kitchen-store';
 
 const TOKEN_KEY = 'auth_token';
 
@@ -50,6 +51,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     loadToken();
   }, [loadToken]);
+
+  // Bu Hafta / Alışveriş sync on the account follows the signed-in token.
+  useEffect(() => { setKitchenAuth(token); }, [token]);
 
   const login = async (email: string, password: string) => {
     const data = await apiLogin(email, password);
