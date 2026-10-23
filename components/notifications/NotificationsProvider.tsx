@@ -12,6 +12,7 @@ import {
   markImportPromptDeclined, notificationsModule, openNotificationSettings, requestNotificationPermission,
   setPushPreference, syncPushRegistration,
 } from '../../lib/notifications';
+import { holdReviewPrompt } from '../../lib/review-prompt';
 import InAppBanner, { type BannerContent } from './InAppBanner';
 import NotifyPromptSheet from './NotifyPromptSheet';
 
@@ -30,6 +31,12 @@ type NotificationsContextValue = {
   offerAfterImport: () => void;
   /** Marks one notification read on Core and updates the badge. */
   markRead: (id: number) => Promise<void>;
+  /** Social onboarding's optional last card: true only when the member has never decided. */
+  canOfferFromOnboarding: () => Promise<boolean>;
+  /** "Haber ver" on that card: the same path as the import sheet's button. */
+  acceptNotifyOffer: () => Promise<void>;
+  /** "Şimdi değil" on that card: the same cooldown as the import sheet. */
+  declineNotifyOffer: () => void;
 };
 
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
@@ -190,6 +197,19 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   const dismissBanner = useCallback(() => setBanner(null), []);
 
+  // The rating prompt never appears over our permission sheet.
+  useEffect(() => (promptVisible ? holdReviewPrompt('sheet') : undefined), [promptVisible]);
+
+  const canOfferFromOnboarding = useCallback(async () => {
+    const [permission, preference, declinedAt] = await Promise.all([
+      getNotificationPermission(), getPushPreference(), getImportPromptDeclinedAt(),
+    ]);
+    return promptDecision({
+      moment: 'onboarding', permission: permission.status, canAskAgain: permission.canAskAgain,
+      preference, declinedAt, now: Date.now(),
+    }) === 'sheet';
+  }, []);
+
   const declinePrompt = useCallback(() => {
     setPromptVisible(false);
     void markImportPromptDeclined();
@@ -220,7 +240,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   const value = useMemo<NotificationsContextValue>(() => ({
     unreadCount, setUnreadCount, refreshUnread, pushStatus, refreshPushStatus, setPushEnabled, offerAfterImport, markRead,
-  }), [unreadCount, refreshUnread, pushStatus, refreshPushStatus, setPushEnabled, offerAfterImport, markRead]);
+    canOfferFromOnboarding, acceptNotifyOffer: acceptPrompt, declineNotifyOffer: declinePrompt,
+  }), [unreadCount, refreshUnread, pushStatus, refreshPushStatus, setPushEnabled, offerAfterImport, markRead,
+    canOfferFromOnboarding, acceptPrompt, declinePrompt]);
 
   return (
     <NotificationsContext.Provider value={value}>

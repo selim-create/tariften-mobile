@@ -9,13 +9,16 @@ import { unregisterPushOnSignOut } from '../lib/notifications';
 
 const TOKEN_KEY = 'auth_token';
 
+/** Core 1.0.67 social sign-in reports `is_new_user` when the account was just created. */
+export type SocialSignIn = { isNewUser: boolean };
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: (idToken: string) => Promise<void>;
-  loginWithApple: (identityToken: string, fullName?: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<SocialSignIn>;
+  loginWithApple: (identityToken: string, fullName?: string) => Promise<SocialSignIn>;
   /** Resolves true when Core signed the new member in (token stored), false otherwise. */
   register: (userData: RegisterData) => Promise<boolean>;
   logout: () => Promise<void>;
@@ -74,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(jwt);
     const userData = await getMe(jwt);
     setUser(userData);
+    return { isNewUser: data?.is_new_user === true };
   };
 
   const loginWithApple = async (identityToken: string, fullName?: string) => {
@@ -83,6 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(jwt);
     const userData = await getMe(jwt);
     setUser(userData);
+    return { isNewUser: data?.is_new_user === true };
   };
 
   const register = async (userData: RegisterData) => {

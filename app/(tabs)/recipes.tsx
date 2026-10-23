@@ -39,6 +39,7 @@ import { AIAllergenConflictError, allergenWarningFrom } from '../../lib/allergen
 import { afterModalDismiss, confirmAllergenWarning, showAllergenConflict } from '../../lib/allergen-alerts';
 import HouseholdAdaptToggle, { useHouseholdAdaptSize } from '../../components/recipe/HouseholdAdaptToggle';
 import { shouldAdaptHousehold } from '../../lib/household-adapt';
+import { maybeAskForReview } from '../../lib/review-prompt';
 
 const AI_LOADING_MESSAGES = [
   'Şef malzemeleri kokluyor... 👃',
@@ -237,6 +238,7 @@ export default function RecipesScreen() {
       setReviewExistingId(null);
       setReviewExistingSlug(null);
       setQuickPromptText('');
+      maybeAskForReview('recipe_saved');
       router.push(`/recipe/${saved.slug || saved.id}`);
     } catch (error: unknown) {
       if (error instanceof RecipeCreateUnconfirmedError || requestStarted) {

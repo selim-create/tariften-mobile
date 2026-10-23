@@ -23,6 +23,7 @@ import {
   isInstagramReelLink, isOwnVideoJob, isTikTokShortLink, isVideoRecipeLink, needsRightsConfirmation, videoEditorFromJob,
 } from '../../lib/video-recipe-import';
 import { publishOwnVideoRecipe } from '../../lib/own-video-api';
+import { maybeAskForReview } from '../../lib/review-prompt';
 import { canonicalShareLink, expandShortLink } from '../../lib/share-link';
 import type { VideoJob } from '../../lib/video-recipe-import';
 import { positiveId } from '../../lib/notifications-core';
@@ -438,6 +439,7 @@ export default function RecipeTextImportScreen({ initialMethod = 'text', initial
       );
       const slug: unknown = result?.slug || result?.data?.slug;
       if (typeof slug === 'string' && slug.trim()) {
+        maybeAskForReview('recipe_saved');
         router.replace('/recipe/' + encodeURIComponent(slug));
       } else {
         Alert.alert('Tarifin yayımlandı', 'Tarifini profilindeki Tariflerim bölümünde bulabilirsin.', [

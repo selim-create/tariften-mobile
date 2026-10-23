@@ -3,10 +3,12 @@ import { StyleSheet, Text, TextStyle, View } from 'react-native';
 import { colors, fonts, type } from '../../constants/theme';
 
 /** Renders "Haftanın *sofrası*" with the starred part in italic brand red. */
-export function AccentText({ children, style, accentStyle }: { children: string; style?: TextStyle; accentStyle?: TextStyle }) {
+export function AccentText({ children, style, accentStyle, maxFontSizeMultiplier, allowFontScaling }: {
+  children: string; style?: TextStyle; accentStyle?: TextStyle; maxFontSizeMultiplier?: number; allowFontScaling?: boolean;
+}) {
   const parts = children.split(/\*([^*]+)\*/);
   return (
-    <Text style={style}>
+    <Text style={style} maxFontSizeMultiplier={maxFontSizeMultiplier} allowFontScaling={allowFontScaling}>
       {parts.map((part, i) => i % 2 === 1
         ? <Text key={i} style={[styles.accent, accentStyle]}>{part}</Text>
         : <Text key={i}>{part}</Text>)}

@@ -26,6 +26,7 @@ import {
   splitLabel, stepCta, stepForField, stepHousehold, stepIsDirty, tagLength, toggleAllergen, toggleDiet, toggleValue,
   updateKitchenProfile, KitchenExperience, KitchenTimePreference, AllergenReaction,
 } from '../../lib/kitchen-profile';
+import { shouldOfferWelcomeOnboarding } from '../../lib/onboarding';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -91,10 +92,22 @@ export default function KitchenProfileScreen() {
     return () => { show.remove(); hide.remove(); };
   }, []);
 
+  // A brand-new account (welcome=1) sees the short "Paylaş → Tariften" walkthrough
+  // once, right after this step — finished, skipped or left. Existing members never do.
+  const afterWelcome = useCallback(async (fallback: () => void) => {
+    if (isWelcome && user && await shouldOfferWelcomeOnboarding(user.id)) {
+      router.replace({ pathname: '/onboarding/social', params: { from: 'welcome' } });
+      return;
+    }
+    fallback();
+  }, [isWelcome, user, router]);
+
   const exit = useCallback(() => {
-    if (router.canGoBack()) router.back();
-    else router.replace('/(tabs)/profile');
-  }, [router]);
+    void afterWelcome(() => {
+      if (router.canGoBack()) router.back();
+      else router.replace('/(tabs)/profile');
+    });
+  }, [router, afterWelcome]);
 
   const dirty = !!(draft && saved && stepIsDirty(step, draft, saved));
 
@@ -128,8 +141,8 @@ export default function KitchenProfileScreen() {
     setKitchenProfileCompleted(!!profile.completed_at);
     setKitchenFlash(editing ? 'Mutfak profilin güncellendi.' : 'Mutfak profilin hazır. Önerileri buna göre ayarlayacağız.');
     // Pops back to the profile tab when it is below us; otherwise replaces this screen with it.
-    router.dismissTo('/(tabs)/profile');
-  }, [editing, router, setKitchenProfileCompleted]);
+    void afterWelcome(() => router.dismissTo('/(tabs)/profile'));
+  }, [editing, router, setKitchenProfileCompleted, afterWelcome]);
 
   const advance = useCallback(async (skip: boolean) => {
     if (!token || !saved || !draft || saving) return;

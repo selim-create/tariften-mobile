@@ -79,8 +79,10 @@ export default function LoginScreen() {
         const fullName = credential.fullName?.givenName || credential.fullName?.familyName
           ? `${credential.fullName.givenName || ''} ${credential.fullName.familyName || ''}`.trim()
           : undefined;
-        await loginWithApple(credential.identityToken, fullName);
-        finish();
+        const { isNewUser } = await loginWithApple(credential.identityToken, fullName);
+        // "Apple ile giriş" can create the account: new members get the welcome steps.
+        if (isNewUser) router.replace({ pathname: '/profile/kitchen', params: { welcome: '1' } });
+        else finish();
       }
     } catch (error: any) {
       if (error.code !== 'ERR_REQUEST_CANCELED') {

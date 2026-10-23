@@ -87,6 +87,8 @@ jobs:
         run: node --test scripts/check-photo-video-recipe.test.cjs
       - name: Bildir / Engelle (report API, block list, local filtering, placeholder, Engellenen üyeler, deletion copy)
         run: node --test scripts/check-report-block.test.cjs
+      - name: Social onboarding (new accounts once, replay, per-platform steps, no brands, no API) and native store review rules
+        run: node --test scripts/check-onboarding-review.test.cjs
       - name: Guard Expo Router URI parsing compatibility
         run: node --test scripts/check-router-uri-surface.test.cjs
       - name: Verify xcode PBX ids (xcode@4 without uuid, or patched uuid for xcode@3)
