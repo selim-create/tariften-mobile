@@ -32,6 +32,7 @@ module.exports = ({ config }) => {
       ...config.android,
       intentFilters: undefined,
       package: 'com.tariften.app.dev',
+      googleServicesFile: undefined,
     },
     plugins: [
       ...plugins,
