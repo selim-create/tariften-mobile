@@ -524,7 +524,7 @@ function AktarScene(ctx: Ctx) {
           </View>
           <View style={[styles.linkField, { height: px(28), borderRadius: px(9), paddingHorizontal: px(8), gap: px(6) }]}>
             <Ionicons name="link-outline" size={px(12)} color={colors.textMuted} />
-            <Text allowFontScaling={false} numberOfLines={1} style={{ flex: 1, fontFamily: fonts.body, fontSize: fs(9), color: colors.ink }}>https://…/video/makarna</Text>
+            <Text allowFontScaling={false} numberOfLines={1} style={{ flex: 1, fontFamily: fonts.body, fontSize: fs(9), color: colors.ink }}>{`https://…/video/${DEMO_RECIPE.slug}`}</Text>
             <Ionicons name="checkmark-circle" size={px(12)} color={colors.brand} />
           </View>
         </View>

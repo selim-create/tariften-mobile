@@ -137,20 +137,23 @@ export const COPY = {
 
 /** Static sample recipe for the success card. Local only. */
 export const DEMO_RECIPE = {
-  title: 'Domatesli Fesleğenli Makarna',
+  title: 'Fırın Domatesli Yoğurtlu Tost',
   creator: '@ornek.mutfak',
-  caption: '15 dakikada domatesli makarna',
-  minutes: 15,
+  caption: '20 dakikada fırın domatesli yoğurtlu tost',
+  slug: 'yogurtlu-tost',
+  minutes: 20,
   servings: 2,
   ingredients: [
-    { name: 'makarna', label: '200 g makarna' },
-    { name: 'domates', label: '3 domates' },
-    { name: 'sarımsak', label: '2 diş sarımsak' },
-    { name: 'fesleğen', label: '1 avuç fesleğen' },
-    { name: 'zeytinyağı', label: '2 yemek kaşığı zeytinyağı' },
-    { name: 'parmesan', label: 'Rendelenmiş parmesan' },
+    { name: 'ekmek', label: '2 dilim ekşi maya ekmeği' },
+    { name: 'yoğurt', label: '200 g süzme yoğurt' },
+    { name: 'domates', label: '250 g çeri domates' },
+    { name: 'ceviz', label: '1 avuç ceviz' },
+    { name: 'sumak', label: '1 tatlı kaşığı sumak' },
+    { name: 'nane', label: 'Birkaç dal taze nane' },
+    { name: 'nar ekşisi', label: '1 yemek kaşığı nar ekşisi' },
+    { name: 'bal', label: '1 tatlı kaşığı bal' },
   ],
-  firstStep: 'Makarnayı tuzlu suda haşla; bu sırada sarımsağı zeytinyağında hafifçe çevir.',
+  firstStep: 'Çeri domatesleri tuz ve biraz zeytinyağıyla 200°C fırında kabukları çatlayana kadar 15 dakika pişir.',
 } as const;
 
 // ---- who sees it ----------------------------------------------------------------------------
