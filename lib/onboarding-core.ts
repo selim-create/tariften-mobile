@@ -137,9 +137,9 @@ export const COPY = {
 
 /** Static sample recipe for the success card. Local only. */
 export const DEMO_RECIPE = {
-  title: 'Fırın Domatesli Yoğurtlu Tost',
+  title: 'Fırında Domatesli Yoğurtlu Tost',
   creator: '@ornek.mutfak',
-  caption: '20 dakikada fırın domatesli yoğurtlu tost',
+  caption: '20 dakikada fırında domatesli yoğurtlu tost',
   slug: 'yogurtlu-tost',
   minutes: 20,
   servings: 2,

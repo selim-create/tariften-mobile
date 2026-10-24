@@ -4,7 +4,7 @@ import type { ImageSourcePropType } from 'react-native';
  * The real food photo behind the onboarding demo (the "video" in the phone
  * mock and the finished sample recipe card).
  *
- * Set to the owner-supplied photo (fırın domatesli yoğurtlu tost). If it is
+ * Set to the owner-supplied photo (fırında domatesli yoğurtlu tost). If it is
  * ever set back to null, the demo shows its warm brand gradient + illustrated
  * plate instead (never a broken image).
  *
