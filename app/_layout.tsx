@@ -15,6 +15,7 @@ import { ShareIntentProvider } from 'expo-share-intent';
 import ShareIntentWatcher from '../components/navigation/ShareIntentWatcher';
 import { NotificationsProvider } from '../components/notifications/NotificationsProvider';
 import { colors, fonts } from '../constants/theme';
+import { recordFirstLaunch } from '../lib/review-prompt';
 
 // Keep the native splash (brand tile on cream) until the brand fonts are in,
 // so the first frame is already the real screen. No-op without the module.
@@ -41,6 +42,8 @@ export default function RootLayout() {
 }
 
 function AppShell() {
+  // Store rating rules wait a few days after the first launch on this device.
+  useEffect(() => { recordFirstLaunch(); }, []);
   return (
     <SafeAreaProvider>
     <ErrorBoundary>
@@ -156,6 +159,8 @@ function AppShell() {
         />
         {/* Kitchen profile draws its own safe-area header with progress. */}
         <Stack.Screen name="profile/kitchen" options={{ headerShown: false }} />
+        {/* Paylaş → Tariften walkthrough: own header with progress, back and Atla. */}
+        <Stack.Screen name="onboarding/social" options={{ headerShown: false, animation: 'fade' }} />
         {/* Notlarım: private recipe notes (Core 1.0.59). */}
         <Stack.Screen
           name="profile/notes"

@@ -32,6 +32,7 @@ import { colors, fonts, radius, shadow } from '../../constants/theme';
 import { takeKitchenFlash } from '../../lib/kitchen-profile';
 import { openNotificationSettings, useNotifications } from '../../components/notifications/NotificationsProvider';
 import { badgeLabel } from '../../lib/notifications-core';
+import { storeReviewPageUrl } from '../../lib/review-prompt';
 
 type ProfileTab = 'my_recipes' | 'my_menus' | 'favorites' | 'cooked';
 
@@ -57,6 +58,8 @@ export default function ProfileScreen() {
   const [kitchenFlash, setKitchenFlash] = useState<string | null>(null);
   const notifications = useNotifications();
   const [pushBusy, setPushBusy] = useState(false);
+  // Store write-review page; null (no store URL in app.json yet, or no native module) hides the row.
+  const reviewUrl = useMemo(() => storeReviewPageUrl(), []);
 
   useFocusEffect(useCallback(() => { void notifications.refreshPushStatus(); }, [notifications.refreshPushStatus]));
 
@@ -355,6 +358,26 @@ export default function ProfileScreen() {
               <Text style={styles.settingsRowText}>Notlarım</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
             </TouchableOpacity>
+          </View>
+
+          <Text style={styles.settingsSectionTitle}>Yardım</Text>
+          <View style={styles.settingsCard}>
+            <TouchableOpacity style={styles.settingsRow}
+              onPress={() => router.push({ pathname: '/onboarding/social', params: { from: 'replay' } })}
+              accessibilityRole="button" accessibilityLabel="Nasıl kullanılır? Videodan tarif kaydetmeyi adım adım göster">
+              <View style={styles.settingsIcon}><Ionicons name="play-circle-outline" size={17} color={colors.ink} /></View>
+              <Text style={styles.settingsRowText}>Nasıl kullanılır?</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+            </TouchableOpacity>
+            {reviewUrl ? (
+              <TouchableOpacity style={[styles.settingsRow, styles.settingsRowLine]}
+                onPress={() => Linking.openURL(reviewUrl).catch(() => Alert.alert('Hata', 'Mağaza sayfası açılamadı.'))}
+                accessibilityRole="link" accessibilityLabel="Tariften'i değerlendir, mağazada yorum yaz">
+                <View style={styles.settingsIcon}><Ionicons name="star-outline" size={17} color={colors.ink} /></View>
+                <Text style={styles.settingsRowText}>Tariften'i değerlendir</Text>
+                <Ionicons name="open-outline" size={15} color={colors.textFaint} />
+              </TouchableOpacity>
+            ) : null}
           </View>
 
           <Text style={styles.settingsSectionTitle}>Bildirimler</Text>

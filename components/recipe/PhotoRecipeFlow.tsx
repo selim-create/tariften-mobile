@@ -27,6 +27,7 @@ import QuickRecipeReview from './QuickRecipeReview';
 import AiEstimatedBadge from './AiEstimatedBadge';
 import { AccentText } from '../ui/ScreenTitle';
 import { colors, fonts, radius, shadow } from '../../constants/theme';
+import { maybeAskForReview } from '../../lib/review-prompt';
 
 type Busy = 'preview' | 'save' | null;
 
@@ -188,6 +189,7 @@ export default function PhotoRecipeFlow({ mode }: { mode: PhotoMode }) {
       });
       setReviewVisible(false);
       await afterModalDismiss();
+      maybeAskForReview('recipe_saved');
       router.replace('/recipe/' + encodeURIComponent(result.slug));
     } catch (cause) {
       if (cause instanceof PhotoRecipeError && cause.unavailable) markFeatureUnavailable(feature);

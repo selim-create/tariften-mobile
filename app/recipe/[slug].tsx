@@ -55,6 +55,7 @@ import { unblockAndForget } from '../../lib/member-blocks';
 import {
   BLOCKED_PLACEHOLDER_TITLE, recipeAuthorId, shouldShowBlockedPlaceholder,
 } from '../../lib/report-block-api';
+import { maybeAskForReview } from '../../lib/review-prompt';
 
 const RATING_ICONS = ['sad-outline', 'remove-circle-outline', 'happy-outline', 'heart-outline', 'sparkles-outline'] as const;
 // Short visual captions keep five choices aligned on narrow screens.
@@ -198,6 +199,7 @@ export default function RecipeDetailScreen() {
     setIsCooked(newStatus);
     try {
       await toggleInteraction(token, recipe.id, 'cooked');
+      if (newStatus) maybeAskForReview('recipe_cooked');
     } catch (error: unknown) {
       setIsCooked(!newStatus);
       Alert.alert('Hata', error instanceof Error ? error.message : 'İşlem başarısız');

@@ -21,6 +21,7 @@ import RecipePicker from './RecipePicker';
 import { RECIPE_UNITS, canTypeRecipeAmount } from '../../lib/recipe-measurements';
 import { AccentText } from '../ui/ScreenTitle';
 import { colors, fonts, radius, shadow } from '../../constants/theme';
+import { maybeAskForReview } from '../../lib/review-prompt';
 
 const RED = colors.brand, INK = colors.ink;
 type CategoryKey = 'cuisine' | 'meal_type' | 'difficulty' | 'diet';
@@ -233,8 +234,11 @@ export default function RecipeManualEditor({ recipeId }: { recipeId?: number }) 
         );
         return;
       }
-      if (typeof slug === 'string' && slug.trim()) router.replace('/recipe/' + encodeURIComponent(slug));
-      else Alert.alert('Tarifin kaydedildi', 'Tarifini profilindeki Tariflerim bölümünde bulabilirsin.', [
+      if (typeof slug === 'string' && slug.trim()) {
+        // A new recipe (not an edit) is a happy moment for the store rating rules.
+        if (!editing) maybeAskForReview('recipe_saved');
+        router.replace('/recipe/' + encodeURIComponent(slug));
+      } else Alert.alert('Tarifin kaydedildi', 'Tarifini profilindeki Tariflerim bölümünde bulabilirsin.', [
         { text: 'Profilime git', onPress: () => router.replace('/(tabs)/profile') },
       ]);
     } catch (cause) {

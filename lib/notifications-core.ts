@@ -89,7 +89,7 @@ export function routeForNotification(input: unknown): string {
 // Permission gating
 
 export type PermissionStatus = 'granted' | 'denied' | 'undetermined' | 'unavailable';
-export type PromptMoment = 'launch' | 'import_started' | 'settings_toggle';
+export type PromptMoment = 'launch' | 'import_started' | 'onboarding' | 'settings_toggle';
 export type PromptDecision = 'none' | 'sheet' | 'os' | 'settings';
 
 /** After "Şimdi değil" on the import sheet we stay quiet this long. */
@@ -107,7 +107,9 @@ export type PromptInput = {
 
 /**
  * The OS prompt is NEVER shown at launch. It is offered only:
- *  - right after a social video import starts (an in-app sheet first), or
+ *  - right after a social video import starts (an in-app sheet first),
+ *  - on the optional last card of the social onboarding (same rules and the
+ *    same "Şimdi değil" cooldown as the import sheet), or
  *  - from the profile toggle (direct OS prompt, or system settings when iOS
  *    / Android will no longer show the prompt).
  */
@@ -118,8 +120,10 @@ export function promptDecision(input: PromptInput): PromptDecision {
     if (input.permission === 'granted') return 'none';
     return input.canAskAgain ? 'os' : 'settings';
   }
-  // import_started
+  // import_started / onboarding: an in-app explanation first, never a nag.
   if (input.permission === 'granted') return 'none';
+  // The onboarding card is only for members who have never decided.
+  if (input.moment === 'onboarding' && (input.permission !== 'undetermined' || input.preference !== null)) return 'none';
   if (input.preference === false) return 'none';
   if (!input.canAskAgain) return 'none';
   if (input.declinedAt && input.now - input.declinedAt < IMPORT_PROMPT_COOLDOWN_MS) return 'none';

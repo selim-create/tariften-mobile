@@ -28,6 +28,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import LokmaIngredientIcon from '../../components/LokmaIngredientIcon';
 import { AccentText } from '../../components/ui/ScreenTitle';
 import { colors, fonts, radius, shadow } from '../../constants/theme';
+import { maybeAskForReview } from '../../lib/review-prompt';
 
 type Shelf = 'all' | 'expired' | 'warning' | 'fresh';
 const SHELVES: { key: Shelf; label: string }[] = [
@@ -373,6 +374,7 @@ export default function PantryScreen() {
         const saveResponse = await createRecipe(token, aiResponse.recipe);
         setShowAIModal(false);
         if (saveResponse?.success) {
+          maybeAskForReview('recipe_saved');
           router.push(`/recipe/${saveResponse.slug || saveResponse.id}`);
         } else {
           showModalMessage('error', 'Tarif kaydedilemedi.');

@@ -112,8 +112,10 @@ export default function RegisterScreen() {
         const fullName = credential.fullName?.givenName || credential.fullName?.familyName
           ? `${credential.fullName.givenName || ''} ${credential.fullName.familyName || ''}`.trim()
           : undefined;
-        await loginWithApple(credential.identityToken, fullName);
-        router.replace('/(tabs)');
+        const { isNewUser } = await loginWithApple(credential.identityToken, fullName);
+        // A brand-new Apple account gets the same first steps as e-mail sign-up.
+        if (isNewUser) router.replace({ pathname: '/profile/kitchen', params: { welcome: '1' } });
+        else router.replace('/(tabs)');
       }
     } catch (error: any) {
       if (error.code !== 'ERR_REQUEST_CANCELED') {
