@@ -21,6 +21,8 @@ const REVIEWED = Object.freeze({
   'GHSA-86w9-cpqp-85rv': 'node-forge',
   'GHSA-vcc3-ghjq-m6fr': 'decode-uri-component',
   'GHSA-hp3w-g68c-fv3c': 'sprintf-js',
+  // 2026-10-24: zod@3.25.76 via @expo/cli only (CLI tooling, not bundled); no 3.x fix.
+  'GHSA-mrhx-c7xc-m3w5': 'zod',
 });
 
 function inspectAdvisories(report) {

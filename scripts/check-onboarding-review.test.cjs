@@ -43,10 +43,12 @@ const T0 = Date.UTC(2026, 9, 1, 9, 0, 0);
 const ONBOARDING_FILES = [
   'app/onboarding/social.tsx',
   'components/onboarding/DemoPhone.tsx',
+  'components/onboarding/DemoMedia.tsx',
   'components/onboarding/DemoRecipeCard.tsx',
   'components/onboarding/motion.tsx',
   'lib/onboarding-core.ts',
   'lib/onboarding.ts',
+  'assets/onboarding/index.ts',
 ];
 
 // ===========================================================================
@@ -196,17 +198,175 @@ test('header has back, progress and Atla on every step; Devam fallback; accessib
   assert.match(phone, /accessibilityElementsHidden importantForAccessibility="no-hide-descendants"/);
 });
 
-test('Reduce Motion: no pulse, no confetti, no drifting video', () => {
+test('Reduce Motion: no pulse, no Ken Burns, no progress run, no card rise', () => {
   const screen = read('app/onboarding/social.tsx');
   const phone = read('components/onboarding/DemoPhone.tsx');
+  const media = read('components/onboarding/DemoMedia.tsx');
+  const card = read('components/onboarding/DemoRecipeCard.tsx');
   const motion = read('components/onboarding/motion.tsx');
   assert.match(motion, /AccessibilityInfo\.isReduceMotionEnabled\(\)/);
   assert.match(motion, /addEventListener\('reduceMotionChanged'/);
-  assert.match(screen, /\{reduceMotion \? null : <ConfettiBurst \/>\}/);
-  assert.match(phone, /useLoop\(1500, !reduceMotion/);
+  assert.match(motion, /if \(!enabled\) \{ value\.setValue\(1\); return undefined; \}/, 'entrances are simply there');
+  assert.match(phone, /useLoop\(1800, !reduceMotion, EASE_OUT\)/, 'ring pulse');
   assert.match(phone, /\{!reduceMotion \? \(\s*<Animated\.View pointerEvents="none" style=\{\[styles\.ringPulse/);
-  assert.match(phone, /useLoop\(5200, !reduceMotion\)/);
-  assert.doesNotMatch(read('package.json'), /react-native-reanimated|lottie|confetti/, 'React Native Animated only');
+  assert.match(phone, /const bob = useLoop\(1200, !reduceMotion\)/, 'tag bob');
+  assert.match(media, /useLoop\(18000, !reduceMotion, EASE_SOFT\)/, 'Ken Burns');
+  assert.match(media, /const motion = reduceMotion \? \{ transform: \[\{ scale: 1\.06 \}\] \}/, 'still frame');
+  assert.match(media, /useLoop\(7000, !reduceMotion, Easing\.linear\)/, 'video progress');
+  assert.match(card, /useEntrance\(!reduceMotion, 60, 620\)/);
+  assert.match(card, /useEntrance\(!reduceMotion, 560, 420\)/);
+  assert.match(screen, /<DemoRecipeCard compact=\{compact\} reduceMotion=\{reduceMotion\} \/>/);
+  assert.doesNotMatch(read('package.json'), /react-native-reanimated|lottie|confetti|expo-video|expo-av/, 'React Native Animated only, no new native module');
+});
+
+// ===========================================================================
+// Onboarding polish (owner review 2026-10-24)
+
+test('final screen: no confetti, no check badge; nothing is drawn over the header', () => {
+  for (const file of ONBOARDING_FILES) {
+    assert.doesNotMatch(read(file), /confetti/i, file);
+  }
+  const screen = read('app/onboarding/social.tsx');
+  assert.doesNotMatch(screen, /name="checkmark"/, 'no generic check-in-a-circle');
+  assert.doesNotMatch(screen, /doneBadge/);
+  // The header comes first and is its own layer; no full-screen overlay is rendered after it.
+  assert.match(screen, /header: \{[^}]*zIndex: 2/);
+  assert.doesNotMatch(screen, /StyleSheet\.absoluteFill/, 'no overlay can cover the header');
+  // Editorial headline, the app's brand accent, and the recipe the way the app shows one.
+  assert.match(onb.COPY.doneTitle, /^Tarifin \*hazır\*$/);
+  assert.equal(onb.COPY.doneRibbon, 'Defterine eklemeye hazır');
+  assert.equal(onb.COPY.doneBadge, 'Videodan');
+  const card = read('components/onboarding/DemoRecipeCard.tsx');
+  assert.match(card, /<DemoMedia reduceMotion=\{reduceMotion\} scrim="card" \/>/, 'same media as the phone');
+  assert.match(card, /COPY\.doneBadge/);
+  assert.match(card, /COPY\.doneRibbon/);
+  assert.match(card, /r\.minutes\} dk`\], \['people-outline', `\$\{r\.servings\} kişilik`\], \['list-outline', `\$\{r\.ingredients\.length\} malzeme`/);
+  assert.match(card, /r\.firstStep/);
+});
+
+test('no green and no new colours in the onboarding: theme tokens only', () => {
+  const theme = read('constants/theme.ts');
+  for (const file of ONBOARDING_FILES) {
+    const src = read(file);
+    assert.doesNotMatch(src, /colors\.success|successSoft/, `${file}: no success green`);
+    // Hex literals: only plain white for text/icons on photos and the brand button.
+    const hexes = [...src.matchAll(/'#([0-9a-fA-F]{3,8})'/g)].map(m => m[1].toLowerCase());
+    for (const hex of hexes) assert.ok(['fff', 'ffffff'].includes(hex), `${file}: #${hex} is not a theme colour`);
+    // rgba(): black/ink/white scrims, or the brand red with alpha. Never a green channel lead.
+    for (const m of src.matchAll(/rgba\((\d+),\s*(\d+),\s*(\d+)/g)) {
+      const [r, g, b] = m.slice(1, 4).map(Number);
+      assert.ok(!(g > r + 20 && g > b + 20), `${file}: rgba(${r},${g},${b}) is green`);
+      const known = ['0,0,0', '255,255,255', '31,26,23', '219,76,63'];
+      assert.ok(known.includes(`${r},${g},${b}`), `${file}: rgba(${r},${g},${b}) is not a theme colour`);
+    }
+  }
+  assert.match(theme, /brand: '#db4c3f'/, 'the brand red the rgba halo is derived from');
+  assert.match(theme, /ink: '#1f1a17'/, 'the ink the source pill is derived from');
+});
+
+test('real food media: DemoMedia shows the photo when supplied, a safe fallback until then', () => {
+  const assets = loadTS('assets/onboarding/index.ts', { './demo-recipe.jpg': 4242 });
+  const index = read('assets/onboarding/index.ts');
+  const photo = path.join(root, 'assets/onboarding/demo-recipe.jpg');
+  if (fs.existsSync(photo)) {
+    assert.equal(assets.demoRecipeImage, 4242, 'photo added: wired with the one require line');
+  } else {
+    assert.equal(assets.demoRecipeImage, null, 'no photo yet: null, so the bundle never requires a missing file');
+    assert.doesNotMatch(index.replace(/^\s*\*.*$/gm, ''), /require\(/, 'no live require without the file');
+  }
+  assert.match(index, /assets\/onboarding\/demo-recipe\.jpg/, 'the comment says where the photo goes');
+  assert.match(index, /export const demoRecipeImage: ImageSourcePropType \| null = require\('\.\/demo-recipe\.jpg'\);/, 'and the exact line to enable it');
+  const media = read('components/onboarding/DemoMedia.tsx');
+  assert.match(media, /import \{ demoRecipeImage \} from '\.\.\/\.\.\/assets\/onboarding';/);
+  assert.match(media, /\{demoRecipeImage \? \(\s*<Image source=\{demoRecipeImage/, 'photo when present');
+  assert.match(media, /\) : \(\s*<LinearGradient colors=\{MEDIA_FALLBACK_GRADIENT\}[\s\S]{0,240}<DishArt/, 'brand gradient + plate fallback');
+  assert.match(media, /contentFit="cover"/, 'full bleed');
+  assert.match(media, /scrim === 'video' \? \(\s*<LinearGradient colors=\{\['rgba\(0,0,0,0\.42\)'/, 'top scrim for the status bar and progress');
+  assert.match(media, /scrim !== 'none' \? \(\s*<LinearGradient colors=\{\['rgba\(0,0,0,0\)', 'rgba\(0,0,0,0\.28\)', 'rgba\(0,0,0,0\.66\)'\]/, 'bottom scrim for caption and rail');
+  assert.match(media, /export const MEDIA_FALLBACK_GRADIENT = \[colors\.ink, colors\.ink, colors\.brandDark\] as const;/);
+  const phone = read('components/onboarding/DemoPhone.tsx');
+  assert.match(phone, /<DemoMedia reduceMotion=\{reduceMotion\} scrim="video" progress=\{/, 'the phone plays the same media with the progress bar');
+  assert.doesNotMatch(read('package.json'), /expo-video/, 'no video module yet');
+});
+
+test('share sheets: the video overlay (rail, caption) is hidden under every sheet', () => {
+  const phone = read('components/onboarding/DemoPhone.tsx');
+  assert.match(phone, /const chrome = scene === 'video';/);
+  const rail = phone.indexOf('Right rail');
+  const gate = phone.lastIndexOf('{chrome ? (', rail);
+  assert.ok(gate > 0 && rail > gate, 'the rail renders only on the video scene');
+  assert.match(phone, /\{scene === 'aktar' \? <AktarScene \{\.\.\.ctx\} \/> : <VideoScene \{\.\.\.ctx\} \/>\}/);
+  // iOS share sheet has no grabber; neutral tiles only (no third-party logos, no coloured app tiles).
+  assert.match(phone, /<SlideUp ctx=\{ctx\} style=\{styles\.sheetGrouped\} handle=\{false\}>/);
+  assert.doesNotMatch(phone, /tint="#/);
+});
+
+test('tag placement: inside the screen, clear of content, on the reserved side only', () => {
+  const bounds = { x: 6, y: 34, width: 216, height: 440 };
+  const tag = { width: 46, height: 22 };
+  const base = { tag, bounds, gap: 6, caret: 5 };
+  // Beside the rail's share button, vertically centred, fully inside.
+  const share = { x: 170, y: 300, width: 44, height: 40 };
+  const left = onb.placeTag({ ...base, target: share, prefer: 'left' });
+  assert.equal(left.side, 'left');
+  assert.equal(left.x + tag.width + 5 + 6, share.x, 'caret tip sits the gap away from the target');
+  assert.equal(left.y + tag.height / 2, share.y + share.height / 2);
+  assert.equal(left.caret, tag.height / 2);
+  // A caption under the tag pushes it off that side (the step-1 collision).
+  const caption = { x: 8, y: 300, width: 150, height: 60 };
+  assert.equal(onb.placeTag({ ...base, target: share, prefer: 'left', avoid: [caption], sides: ['left'] }), null, 'never over the caption');
+  const flipped = onb.placeTag({ ...base, target: share, prefer: 'left', avoid: [caption] });
+  assert.ok(flipped && flipped.side !== 'left' && !onb.rectsOverlap({ x: flipped.x, y: flipped.y, ...tag }, caption));
+  // Right edge: a tag under the last tile is pushed inside and its caret still points at the tile.
+  const edgeTile = { x: 186, y: 380, width: 36, height: 44 };
+  const below = onb.placeTag({ ...base, target: edgeTile, prefer: 'bottom', sides: ['bottom'] });
+  assert.equal(below.side, 'bottom');
+  assert.ok(below.x + tag.width <= bounds.x + bounds.width, 'not clipped on the right');
+  assert.ok(Math.abs(below.x + below.caret - (edgeTile.x + edgeTile.width / 2)) < 0.01, 'caret under the tile centre');
+  // No room below: reserved-side only means no tag at all, never a clipped one.
+  const lowTile = { x: 100, y: 440, width: 36, height: 30 };
+  assert.equal(onb.placeTag({ ...base, target: lowTile, prefer: 'bottom', sides: ['bottom'] }), null);
+  // Large Dynamic Type: a wider tag still lands fully inside or not at all.
+  for (const width of [46, 64, 90, 140, 230]) {
+    for (const target of [share, edgeTile, { x: 6, y: 200, width: 40, height: 40 }]) {
+      for (const prefer of ['left', 'top', 'bottom', 'right']) {
+        const p = onb.placeTag({ ...base, tag: { width, height: 22 }, target, prefer });
+        if (!p) continue;
+        assert.ok(p.x >= bounds.x - 0.5 && p.x + width <= bounds.x + bounds.width + 0.5, `x in bounds (${width}, ${prefer})`);
+        assert.ok(p.y >= bounds.y - 0.5 && p.y + 22 <= bounds.y + bounds.height + 0.5, `y in bounds (${width}, ${prefer})`);
+        assert.ok(!onb.rectsOverlap({ x: p.x, y: p.y, width, height: 22 }, target), 'never on the target');
+      }
+    }
+  }
+  assert.equal(onb.placeTag({ ...base, tag: { width: 0, height: 0 }, target: share, prefer: 'left' }), null, 'not measured yet');
+  // The phone uses it with the side it reserved room for, and only while waiting for the tap.
+  const phone = read('components/onboarding/DemoPhone.tsx');
+  assert.match(phone, /placeTag\(\{\s*target: info\.rect, tag: size, bounds, prefer: info\.prefer, sides: \[info\.prefer\]/);
+  assert.match(phone, /\{target && waiting \? \(/, 'no tag while the sample is prepared');
+  assert.match(phone, /node\.measureLayout\(screen,/, 'measured in the phone screen\'s coordinates');
+  assert.match(phone, /<Text maxFontSizeMultiplier=\{1\.35\} numberOfLines=\{1\} style=\{\[styles\.tagText/, 'the tag text is measured, not a fixed box');
+});
+
+test('phone size never exceeds its stage; kickers uppercase in Turkish', () => {
+  for (const stage of [{ width: 375, height: 300 }, { width: 375, height: 389 }, { width: 393, height: 520 }, { width: 430, height: 700 }, { width: 320, height: 200 }]) {
+    const phone = onb.phoneSize(stage);
+    assert.ok(phone, JSON.stringify(stage));
+    assert.ok(phone.height <= stage.height - 12, 'leaves the stage padding');
+    assert.ok(phone.width <= stage.width * 0.74 + 1);
+    assert.ok(phone.height <= 600);
+    assert.ok(Math.abs(phone.height / phone.width - onb.PHONE_RATIO) < 0.05);
+  }
+  assert.equal(onb.phoneSize({ width: 375, height: 60 }), null, 'too small: no phone rather than an overflowing one');
+  assert.equal(onb.phoneSize({ width: 0, height: 0 }), null);
+  assert.match(read('app/onboarding/social.tsx'), /const phone = useMemo\(\(\) => \(stage \? phoneSize\(stage\) : null\), \[stage\]\);/);
+  assert.equal(onb.trUpper('Örnek tarif'), 'ÖRNEK TARİF');
+  assert.equal(onb.trUpper('Adım 3 · Yalnızca ilk sefer'), 'ADIM 3 · YALNIZCA İLK SEFER');
+  assert.equal(onb.trUpper('Neredeyse bitti'), 'NEREDEYSE BİTTİ');
+  const screen = read('app/onboarding/social.tsx');
+  assert.match(screen, /trUpper\(step \? step\.kicker : COPY\.preparingKicker\)/);
+  assert.match(screen, /trUpper\(COPY\.doneKicker\)/);
+  assert.doesNotMatch(screen, /textTransform: 'uppercase'/, 'not locale aware on iOS');
+  assert.doesNotMatch(screen, /numberOfLines=\{3\}/, 'step hints are never truncated');
 });
 
 test('the optional notification card reuses the existing permission flow', () => {

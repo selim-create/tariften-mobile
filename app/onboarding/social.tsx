@@ -10,16 +10,17 @@ import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../components/notifications/NotificationsProvider';
 import DemoPhone from '../../components/onboarding/DemoPhone';
 import DemoRecipeCard from '../../components/onboarding/DemoRecipeCard';
-import { ConfettiBurst, useReduceMotion } from '../../components/onboarding/motion';
+import { useReduceMotion } from '../../components/onboarding/motion';
 import { AccentText } from '../../components/ui/ScreenTitle';
-import { COPY, PREPARING_LINES, PREPARING_TICK_MS, demoSteps, parseEntry, showNotifyCard } from '../../lib/onboarding-core';
+import {
+  COPY, PREPARING_LINES, PREPARING_TICK_MS, demoSteps, parseEntry, phoneSize, showNotifyCard, trUpper,
+} from '../../lib/onboarding-core';
 import { markSocialOnboardingSeen } from '../../lib/onboarding';
 import { holdReviewPrompt, noteDemoEnded } from '../../lib/review-prompt';
 import { colors, fonts, radius } from '../../constants/theme';
 
 type Phase = { kind: 'tap'; index: number } | { kind: 'preparing' } | { kind: 'done' } | { kind: 'notify' };
 
-const PHONE_RATIO = 2.05;
 const plain = (text: string) => text.replace(/\*/g, '');
 
 /**
@@ -149,47 +150,50 @@ export default function SocialOnboardingScreen() {
     setStage(prev => (prev && Math.abs(prev.width - width) < 1 && Math.abs(prev.height - height) < 1 ? prev : { width, height }));
   }, []);
 
-  const phone = useMemo(() => {
-    if (!stage) return null;
-    const h = Math.max(260, Math.min(stage.height - 8, stage.width * 0.74 * PHONE_RATIO, 600));
-    return { width: Math.round(h / PHONE_RATIO), height: Math.round(h) };
-  }, [stage]);
+  // Never taller than the space between the copy and the footer (see phoneSize).
+  const phone = useMemo(() => (stage ? phoneSize(stage) : null), [stage]);
 
   const lastLabel = entry === 'replay' ? COPY.replayFinishCta : COPY.finishCta;
 
   return (
     <View style={styles.screen}>
-      {/* Header: back, where we are, Atla — on every step. */}
+      {/* Header (as the kitchen profile step): back, title, Atla; then the segments and "n / 6".
+          Nothing is ever drawn over it: it sits above the content in its own layer. */}
       <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
         <View style={styles.headerRow}>
           <Pressable style={({ pressed }) => [styles.circle, pressed && styles.pressed]} onPress={back}
             accessibilityRole="button" accessibilityLabel="Geri">
             <Ionicons name="chevron-back" size={21} color={colors.ink} />
           </Pressable>
-          <View style={styles.headerMid} accessible accessibilityLabel={`${COPY.progressLabel}. Adım ${position}, toplam ${total}`}>
-            <Text style={styles.headerTitle} numberOfLines={1} maxFontSizeMultiplier={1.2}>{COPY.progressLabel}</Text>
-            <Text style={styles.headerCount} maxFontSizeMultiplier={1.2}>{position} / {total}</Text>
-          </View>
+          <Text style={styles.headerTitle} numberOfLines={1} maxFontSizeMultiplier={1.2} accessibilityRole="header">
+            {COPY.progressLabel}
+          </Text>
           <Pressable style={({ pressed }) => [styles.skip, pressed && styles.pressed]} onPress={leave} hitSlop={6}
             accessibilityRole="button" accessibilityLabel="Atla" accessibilityHint="Tanıtımı kapatır">
-            <Text style={styles.skipText} maxFontSizeMultiplier={1.3}>{COPY.skip}</Text>
+            <Text style={styles.skipText} maxFontSizeMultiplier={1.2}>{COPY.skip}</Text>
           </Pressable>
         </View>
-        <View style={styles.progress} accessibilityRole="progressbar" accessibilityValue={{ min: 1, max: total, now: position }}>
-          {Array.from({ length: total }, (_, i) => (
-            <View key={i} style={[styles.segment, i < position && styles.segmentDone]} />
-          ))}
+        <View style={styles.progressRow}>
+          <View style={styles.progress} accessibilityRole="progressbar" accessibilityLabel={`Adım ${position}, toplam ${total}`}
+            accessibilityValue={{ min: 1, max: total, now: position }}>
+            {Array.from({ length: total }, (_, i) => (
+              <View key={i} style={[styles.segment, i < position && styles.segmentDone]} />
+            ))}
+          </View>
+          <Text style={styles.stepCount} maxFontSizeMultiplier={1.2} importantForAccessibility="no" accessibilityElementsHidden>
+            {position} / {total}
+          </Text>
         </View>
       </View>
 
       {phase.kind === 'tap' || phase.kind === 'preparing' ? (
         <>
           <View style={[styles.copy, compact && styles.copyCompact]}>
-            <Text style={styles.kicker} maxFontSizeMultiplier={1.3}>{step ? step.kicker : 'Neredeyse bitti'}</Text>
+            <Text style={styles.kicker} maxFontSizeMultiplier={1.3}>{trUpper(step ? step.kicker : COPY.preparingKicker)}</Text>
             <AccentText style={StyleSheet.flatten([styles.title, compact && styles.titleCompact])} accentStyle={styles.titleAccent} maxFontSizeMultiplier={1.25}>
               {step ? step.title : COPY.preparingTitle}
             </AccentText>
-            <Text style={styles.hint} maxFontSizeMultiplier={1.3} numberOfLines={3}>{step ? step.hint : COPY.preparingHint}</Text>
+            <Text style={styles.hint} maxFontSizeMultiplier={1.3}>{step ? step.hint : COPY.preparingHint}</Text>
           </View>
 
           <View style={styles.stage} onLayout={onStage}>
@@ -228,17 +232,15 @@ export default function SocialOnboardingScreen() {
         </>
       ) : phase.kind === 'done' ? (
         <>
+          {/* The finished sample recipe, as the app shows a recipe; a calm moment: the card settles in. */}
           <ScrollView style={styles.flex} contentContainerStyle={[styles.doneContent, compact && styles.doneContentCompact]}
             showsVerticalScrollIndicator={false}>
-            <View style={styles.doneBadge} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-              <Ionicons name="checkmark" size={26} color="#fff" />
-            </View>
-            <Text style={[styles.kicker, styles.center]} maxFontSizeMultiplier={1.3}>{COPY.doneKicker}</Text>
-            <AccentText style={StyleSheet.flatten([styles.title, styles.center, compact && styles.titleCompact])} accentStyle={styles.titleAccent} maxFontSizeMultiplier={1.25}>
+            <Text style={styles.kicker} maxFontSizeMultiplier={1.3}>{trUpper(COPY.doneKicker)}</Text>
+            <AccentText style={StyleSheet.flatten([styles.title, styles.doneTitle, compact && styles.titleCompact])} accentStyle={styles.titleAccent} maxFontSizeMultiplier={1.25}>
               {COPY.doneTitle}
             </AccentText>
-            <Text style={[styles.hint, styles.center]} maxFontSizeMultiplier={1.3}>{COPY.doneHint}</Text>
-            <View style={styles.cardWrap}><DemoRecipeCard compact={compact} /></View>
+            <Text style={styles.hint} maxFontSizeMultiplier={1.3}>{COPY.doneHint}</Text>
+            <View style={styles.cardWrap}><DemoRecipeCard compact={compact} reduceMotion={reduceMotion} /></View>
           </ScrollView>
           <View style={[styles.footer, styles.footerLine, { paddingBottom: Math.max(insets.bottom, 16) }]}>
             <Pressable onPress={afterDone} style={({ pressed }) => [styles.primary, pressed && styles.pressed]} accessibilityRole="button">
@@ -246,7 +248,6 @@ export default function SocialOnboardingScreen() {
               <Ionicons name="arrow-forward" size={18} color="#fff" />
             </Pressable>
           </View>
-          {reduceMotion ? null : <ConfettiBurst />}
         </>
       ) : (
         <>
@@ -283,40 +284,39 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.85 },
   center: { textAlign: 'center' },
   hidden: { opacity: 0 },
-  header: { paddingHorizontal: 20, paddingBottom: 8, backgroundColor: colors.canvas },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  header: { paddingHorizontal: 20, paddingBottom: 10, backgroundColor: colors.canvas, zIndex: 2, elevation: 0 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   circle: {
     width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth, borderColor: colors.lineStrong,
   },
-  headerMid: { flex: 1, alignItems: 'center' },
-  headerTitle: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.ink },
-  headerCount: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.textMuted, marginTop: 1, letterSpacing: 0.4 },
-  skip: { minWidth: 44, height: 44, paddingHorizontal: 12, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { flex: 1, textAlign: 'center', fontFamily: fonts.heading, fontSize: 15, color: colors.ink },
+  skip: { minWidth: 44, height: 44, paddingHorizontal: 10, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   skipText: { fontFamily: fonts.bodySemi, fontSize: 15, color: colors.textMuted },
-  progress: { flexDirection: 'row', gap: 6, marginTop: 10 },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
+  progress: { flex: 1, flexDirection: 'row', gap: 6 },
   segment: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.creamDeep },
   segmentDone: { backgroundColor: colors.brand },
-  copy: { paddingHorizontal: 24, paddingTop: 14, minHeight: 132 },
+  stepCount: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.textMuted, letterSpacing: 0.4, minWidth: 34, textAlign: 'right' },
+  copy: { paddingHorizontal: 24, paddingTop: 14, minHeight: 136 },
   copyCompact: { paddingTop: 8, minHeight: 112 },
-  kicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', color: colors.brand },
-  title: { fontFamily: fonts.headingBold, fontSize: 25, lineHeight: 30, letterSpacing: -0.6, color: colors.ink, marginTop: 6 },
-  titleCompact: { fontSize: 21, lineHeight: 26 },
+  // Kickers are uppercased in code (trUpper): textTransform is not Turkish-aware on iOS.
+  kicker: { fontFamily: fonts.bodySemi, fontSize: 11, letterSpacing: 2.2, color: colors.brand },
+  title: { fontFamily: fonts.headingBold, fontSize: 26, lineHeight: 31, letterSpacing: -0.6, color: colors.ink, marginTop: 8 },
+  titleCompact: { fontSize: 22, lineHeight: 27 },
+  doneTitle: { fontSize: 30, lineHeight: 35, letterSpacing: -0.8 },
   titleAccent: { fontFamily: fonts.headingBoldItalic, color: colors.brand },
-  hint: { fontFamily: fonts.body, fontSize: 14.5, lineHeight: 21, color: colors.textMuted, marginTop: 6 },
+  hint: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22, color: colors.textMuted, marginTop: 8 },
   note: { fontFamily: fonts.body, fontSize: 12.5, lineHeight: 18, color: colors.textFaint, marginTop: 12 },
-  stage: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 4 },
+  stage: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 4, overflow: 'hidden' },
   footer: { paddingHorizontal: 20, paddingTop: 6, alignItems: 'stretch', backgroundColor: colors.canvas },
   footerLine: { paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.lineStrong },
   missHint: { fontFamily: fonts.bodyMedium, fontSize: 13, lineHeight: 18, color: colors.brandDark, textAlign: 'center', minHeight: 18 },
   next: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, height: 44, paddingHorizontal: 18 },
   nextText: { fontFamily: fonts.bodySemi, fontSize: 15, color: colors.textMuted },
-  doneContent: { alignItems: 'center', paddingHorizontal: 24, paddingTop: 18, paddingBottom: 24 },
+  doneContent: { paddingHorizontal: 24, paddingTop: 14, paddingBottom: 28 },
   doneContentCompact: { paddingTop: 8 },
-  doneBadge: {
-    width: 56, height: 56, borderRadius: 28, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center', marginBottom: 14,
-  },
-  cardWrap: { width: '100%', maxWidth: 400, marginTop: 20 },
+  cardWrap: { width: '100%', maxWidth: 420, alignSelf: 'center', marginTop: 22 },
   notifyContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 24 },
   notifyIcon: {
     width: 60, height: 60, borderRadius: 30, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 16,
