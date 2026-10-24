@@ -132,3 +132,12 @@ Propagated high entries (no advisory of their own): `@expo/cli`, `@expo/code-sig
 2. Expected effect (from the published SDK 56 manifests, to be confirmed by a fresh audit): the `sprintf-js` and Jest chains disappear; `braces`, `node-forge` and `decode-uri-component` remain until upstream patches or Router 58.
 3. After the audit, **lower** `BASELINE.high`/`moderate`, remove names from `highPackages`/`moderatePackages`, and drop resolved GHSA IDs from `REVIEWED` in the same reviewed PR. Never raise a budget to make CI pass.
 4. Still prohibited: `npm audit fix --force` (it proposes React Native 0.88 / Expo Router 58 jumps outside the SDK).
+
+
+## 2026-10-24 — new advisory: zod (GHSA-mrhx-c7xc-m3w5)
+
+| GHSA / severity | Root package (installed) | Path | Ships in app bundle? | Exploitability for Tariften | Plan |
+| --- | --- | --- | --- | --- | --- |
+| [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5) high | `zod@3.25.76` | `expo` → `@expo/cli` → `zod` | No — Expo CLI only (no app, lib or component file imports zod) | Memory exhaustion when validating oversized constrained collections. Expo CLI validates its own config and local dev-server data with it; at worst a local developer tool could be slowed down. The shipped app never runs it. | Patched only in zod ≥ 4.6.6; there is no 3.x fix and `@expo/cli@55` depends on the zod 3 API, so an override would break the CLI. Reviewed and allowlisted in both guards; re-check on the next Expo SDK upgrade. |
+
+The audit now reports 6 high / 3 moderate (below the 23 / 8 baseline, raised from 22 by exactly this one reviewed name); `zod` is the only new package name.

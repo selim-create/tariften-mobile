@@ -23,9 +23,16 @@ const { resolve } = require('node:path');
  * MOBILE_SECURITY_ADVISORY_TRIAGE_2026_10_16.md "P25" for the per-advisory
  * table. Moderate affected package NAMES are now allowlisted too, so a new
  * moderate package cannot slip in by replacing a removed one at equal count.
+ *
+ * 2026-10-24: GHSA-mrhx-c7xc-m3w5 (zod <4.6.6, memory exhaustion while
+ * validating oversized constrained collections) was published. zod@3.25.76 is
+ * only a dependency of @expo/cli (Expo CLI / dev server tooling), never in the
+ * app bundle, and no 3.x patch exists; forcing zod 4 would break @expo/cli.
+ * 'zod' is added to the reviewed high packages and the high budget to 23
+ * (one entry per allowlisted name). Current real counts are far lower (6 / 3).
  */
 const BASELINE = Object.freeze({
-  high: 22,
+  high: 23,
   moderate: 8,
   highPackages: Object.freeze([
     '@expo/cli',
@@ -50,6 +57,7 @@ const BASELINE = Object.freeze({
     'micromatch',
     'node-forge',
     'react-native',
+    'zod',
   ]),
   moderatePackages: Object.freeze([
     '@istanbuljs/load-nyc-config',

@@ -27,7 +27,7 @@ function baselineReport() {
   };
 }
 
-test('accepts the reviewed 22 high / 8 moderate baseline', () => {
+test('accepts the reviewed high / moderate baseline (23 / 8, zod added 2026-10-24)', () => {
   assert.equal(checkAuditRegression(baselineReport()).ok, true);
 });
 
