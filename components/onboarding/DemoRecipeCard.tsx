@@ -1,108 +1,134 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import LokmaIngredientIcon from '../LokmaIngredientIcon';
-import { lokmaArtUri } from '../../lib/lokma-svg-art';
-import { DEMO_RECIPE } from '../../lib/onboarding-core';
+import DemoMedia from './DemoMedia';
+import { useEntrance } from './motion';
+import { COPY, DEMO_RECIPE } from '../../lib/onboarding-core';
 import { colors, fonts, radius, shadow } from '../../constants/theme';
 
-/** Warm "video still" behind the demo: a self-drawn plate of pasta (Lokma drawings, bundled). */
-export const DISH_GRADIENT = ['#2b1d17', '#5b2f22', '#9a5132'] as const;
-
-export function DishArt({ size }: { size: number }) {
-  const item = (figure: string, s: number, left: number, top: number, rotate = '0deg') => (
-    <Image key={figure + left} source={{ uri: lokmaArtUri(figure) }} contentFit="contain" cachePolicy="memory" accessible={false}
-      style={{ position: 'absolute', width: size * s, height: size * s, left: size * left, top: size * top, transform: [{ rotate }] }} />
-  );
-  return (
-    <View style={{ width: size, height: size }} accessible={false} importantForAccessibility="no-hide-descendants">
-      <View style={[styles.plate, { width: size, height: size, borderRadius: size / 2 }]} />
-      <View style={[styles.plateInner, { width: size * 0.74, height: size * 0.74, borderRadius: size * 0.37, left: size * 0.13, top: size * 0.13 }]} />
-      {item('pasta', 0.5, 0.25, 0.24)}
-      {item('tomato', 0.24, 0.12, 0.16, '-12deg')}
-      {item('herb', 0.24, 0.62, 0.14, '18deg')}
-      {item('garlic', 0.2, 0.18, 0.62, '-8deg')}
-      {item('cheese', 0.2, 0.62, 0.6, '10deg')}
-    </View>
-  );
-}
-
-/** The success card: a local, static sample recipe. Nothing is fetched or saved. */
-export default function DemoRecipeCard({ compact }: { compact?: boolean }) {
+/**
+ * The finished sample recipe, drawn the way the app shows a recipe: the
+ * photo hero with the brand "Videodan" badge and the source pill (as on the
+ * recipe page), then the facts, the title, ingredient chips and the first
+ * step. A local, static sample: nothing is fetched or saved.
+ *
+ * The calm "done" moment: the card rises into place with a soft shadow, then
+ * the "Defterine eklemeye hazır" ribbon settles in. Reduce Motion: all still.
+ */
+export default function DemoRecipeCard({ compact, reduceMotion }: { compact?: boolean; reduceMotion: boolean }) {
   const r = DEMO_RECIPE;
   const shown = r.ingredients.slice(0, compact ? 3 : 4);
   const more = r.ingredients.length - shown.length;
-  const artHeight = compact ? 112 : 148;
+  const heroHeight = compact ? 136 : 188;
+  const rise = useEntrance(!reduceMotion, 60, 620);
+  const ribbon = useEntrance(!reduceMotion, 560, 420);
+
   return (
-    <View style={styles.card}
-      accessible accessibilityRole="summary"
-      accessibilityLabel={`Örnek tarif: ${r.title}. ${r.minutes} dakika, ${r.servings} kişilik, ${r.ingredients.length} malzeme.`}>
-      <LinearGradient colors={DISH_GRADIENT} style={[styles.art, { height: artHeight }]}>
-        <DishArt size={artHeight * 0.86} />
-        <View style={styles.badge}>
-          <Ionicons name="sparkles" size={12} color={colors.brand} />
-          <Text style={styles.badgeText} allowFontScaling={false}>Videodan</Text>
-        </View>
-      </LinearGradient>
-      <View style={styles.body}>
-        <Text style={styles.title} maxFontSizeMultiplier={1.3}>{r.title}</Text>
-        <View style={styles.meta}>
-          {([['time-outline', `${r.minutes} dk`], ['people-outline', `${r.servings} kişilik`], ['list-outline', `${r.ingredients.length} malzeme`]] as const).map(([icon, label]) => (
-            <View key={label} style={styles.metaItem}>
-              <Ionicons name={icon} size={14} color={colors.textMuted} />
-              <Text style={styles.metaText} maxFontSizeMultiplier={1.3}>{label}</Text>
-            </View>
-          ))}
-        </View>
-        <View style={styles.chips}>
-          {shown.map(ing => (
-            <View key={ing.name} style={styles.chip}>
-              <LokmaIngredientIcon name={ing.name} size={15} />
-              <Text style={styles.chipText} numberOfLines={1} maxFontSizeMultiplier={1.3}>{ing.label}</Text>
-            </View>
-          ))}
-          {more > 0 ? <View style={[styles.chip, styles.chipMore]}><Text style={styles.chipText} maxFontSizeMultiplier={1.3}>+{more}</Text></View> : null}
-        </View>
-        {!compact ? (
-          <View style={styles.step}>
-            <View style={styles.stepNo}><Text style={styles.stepNoText}>1</Text></View>
-            <Text style={styles.stepText} numberOfLines={2} maxFontSizeMultiplier={1.3}>{r.firstStep}</Text>
+    <Animated.View style={[styles.shadow, {
+      opacity: rise, transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [28, 0] }) }],
+    }]}>
+      <View style={styles.card} accessible accessibilityRole="summary"
+        accessibilityLabel={`Örnek tarif: ${r.title}. ${r.minutes} dakika, ${r.servings} kişilik, ${r.ingredients.length} malzeme. ${COPY.doneRibbon}.`}>
+        <View style={[styles.hero, { height: heroHeight }]}>
+          <DemoMedia reduceMotion={reduceMotion} scrim="card" />
+          <View style={styles.badge}>
+            <Ionicons name="sparkles" size={12} color="#fff" />
+            <Text style={styles.badgeText} maxFontSizeMultiplier={1.2} numberOfLines={1}>{COPY.doneBadge}</Text>
           </View>
-        ) : null}
+          <View style={styles.source}>
+            <View style={styles.sourcePlay}><Ionicons name="play" size={10} color={colors.ink} style={styles.playNudge} /></View>
+            <Text style={styles.sourceText} maxFontSizeMultiplier={1.2} numberOfLines={1}>{r.creator}</Text>
+          </View>
+        </View>
+
+        <View style={[styles.body, compact && styles.bodyCompact]}>
+          <View style={styles.meta}>
+            {([['time-outline', `${r.minutes} dk`], ['people-outline', `${r.servings} kişilik`], ['list-outline', `${r.ingredients.length} malzeme`]] as const)
+              .map(([icon, label], i) => (
+                <View key={label} style={styles.metaItem}>
+                  {i > 0 ? <Text style={styles.metaDot} maxFontSizeMultiplier={1.3}>·</Text> : null}
+                  <Ionicons name={icon} size={14} color={colors.textMuted} />
+                  <Text style={styles.metaText} maxFontSizeMultiplier={1.3}>{label}</Text>
+                </View>
+              ))}
+          </View>
+          <Text style={[styles.title, compact && styles.titleCompact]} maxFontSizeMultiplier={1.3}>{r.title}</Text>
+          <View style={styles.chips}>
+            {shown.map(ing => (
+              <View key={ing.name} style={styles.chip}>
+                <LokmaIngredientIcon name={ing.name} size={18} />
+                <Text style={styles.chipText} numberOfLines={1} maxFontSizeMultiplier={1.3}>{ing.label}</Text>
+              </View>
+            ))}
+            {more > 0 ? (
+              <View style={[styles.chip, styles.chipMore]}><Text style={styles.chipText} maxFontSizeMultiplier={1.3}>+{more}</Text></View>
+            ) : null}
+          </View>
+          {!compact ? (
+            <View style={styles.step}>
+              <Text style={styles.stepNo} maxFontSizeMultiplier={1.3}>1</Text>
+              <Text style={styles.stepText} numberOfLines={3} maxFontSizeMultiplier={1.3}>{r.firstStep}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        <Animated.View style={[styles.ribbon, {
+          opacity: ribbon, transform: [{ translateY: ribbon.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) }],
+        }]}>
+          <Ionicons name="bookmark" size={15} color={colors.brand} />
+          <Text style={styles.ribbonText} maxFontSizeMultiplier={1.3}>{COPY.doneRibbon}</Text>
+        </Animated.View>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  plate: { position: 'absolute', backgroundColor: colors.cream },
-  plateInner: { position: 'absolute', backgroundColor: '#fbf6f0', borderWidth: 1, borderColor: colors.creamDeep },
-  card: {
-    width: '100%', borderRadius: radius.xl, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line,
-    overflow: 'hidden', ...shadow.floating,
-  },
-  art: { alignItems: 'center', justifyContent: 'center' },
+  // Shadow on the outer view: iOS drops shadows on a view that clips its children.
+  shadow: { width: '100%', borderRadius: radius.xl, backgroundColor: colors.surface, ...shadow.floating },
+  card: { borderRadius: radius.xl, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
+  hero: { backgroundColor: colors.ink, overflow: 'hidden' },
+  // Same as RecipeCard's badge on a photo.
   badge: {
-    position: 'absolute', left: 12, top: 12, flexDirection: 'row', alignItems: 'center', gap: 4,
-    height: 26, paddingHorizontal: 10, borderRadius: radius.pill, backgroundColor: colors.surface,
+    position: 'absolute', left: 12, top: 12, flexDirection: 'row', alignItems: 'center', gap: 5,
+    height: 26, paddingHorizontal: 10, borderRadius: radius.pill, backgroundColor: colors.brand,
   },
-  badgeText: { fontFamily: fonts.bodySemi, fontSize: 12, color: colors.ink },
-  body: { padding: 16, gap: 10 },
-  title: { fontFamily: fonts.headingBold, fontSize: 19, lineHeight: 24, letterSpacing: -0.3, color: colors.ink },
-  meta: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  badgeText: { fontFamily: fonts.bodySemi, fontSize: 12, color: '#fff' },
+  // Same as the recipe page's "watch the original video" pill.
+  source: {
+    position: 'absolute', left: 12, bottom: 12, maxWidth: '80%', flexDirection: 'row', alignItems: 'center', gap: 7,
+    height: 32, paddingLeft: 4, paddingRight: 12, borderRadius: radius.pill, backgroundColor: 'rgba(31,26,23,0.78)',
+  },
+  sourcePlay: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  playNudge: { marginLeft: 1 },
+  sourceText: { flexShrink: 1, fontFamily: fonts.bodySemi, fontSize: 12.5, color: '#fff' },
+  body: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 16, gap: 10 },
+  bodyCompact: { paddingTop: 14, paddingBottom: 14, gap: 9 },
+  meta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', rowGap: 4 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaDot: { fontFamily: fonts.bodySemi, fontSize: 13, color: colors.textFaint, marginHorizontal: 6 },
   metaText: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.textMuted },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  title: { fontFamily: fonts.headingBold, fontSize: 21, lineHeight: 26, letterSpacing: -0.4, color: colors.ink },
+  titleCompact: { fontSize: 19, lineHeight: 24 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
+  // The recipe page's tag pills (cream), with the Lokma drawing.
   chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, height: 32, paddingLeft: 4, paddingRight: 10, borderRadius: radius.pill,
-    backgroundColor: colors.canvas, borderWidth: 1, borderColor: colors.line, maxWidth: '100%',
+    flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32, paddingLeft: 6, paddingRight: 12, paddingVertical: 4,
+    borderRadius: radius.pill, backgroundColor: colors.cream, maxWidth: '100%',
   },
-  chipMore: { paddingLeft: 10 },
-  chipText: { fontFamily: fonts.bodyMedium, fontSize: 12.5, color: colors.text, flexShrink: 1 },
-  step: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', paddingTop: 2 },
-  stepNo: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
-  stepNoText: { fontFamily: fonts.bodyBold, fontSize: 12, color: colors.brand },
-  stepText: { flex: 1, fontFamily: fonts.body, fontSize: 13.5, lineHeight: 19, color: colors.text },
+  chipMore: { paddingLeft: 12 },
+  chipText: { fontFamily: fonts.bodyMedium, fontSize: 13, color: colors.text, flexShrink: 1 },
+  // The recipe page's step row: a large brand numeral, then the text.
+  step: {
+    flexDirection: 'row', gap: 12, alignItems: 'flex-start', paddingTop: 12, marginTop: 2,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.lineStrong,
+  },
+  stepNo: { width: 22, fontFamily: fonts.headingBold, fontSize: 22, lineHeight: 26, color: colors.brand, textAlign: 'center' },
+  stepText: { flex: 1, fontFamily: fonts.body, fontSize: 14.5, lineHeight: 21, color: colors.ink, paddingTop: 2 },
+  ribbon: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 12,
+    backgroundColor: colors.brandSoft, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.lineStrong,
+  },
+  ribbonText: { flexShrink: 1, fontFamily: fonts.bodySemi, fontSize: 13.5, color: colors.brandDark },
 });

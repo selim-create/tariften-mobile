@@ -116,11 +116,14 @@ export const COPY = {
   progressLabel: 'Tarif kaydetmeyi öğren',
   skip: 'Atla',
   next: 'Devam',
+  preparingKicker: 'Neredeyse bitti',
   preparingTitle: 'Tarifin *hazırlanıyor…*',
   preparingHint: 'Gerçekte bu 1–2 dakika sürer. Uygulamadan çıkabilirsin; hazır olunca haber veririz.',
   doneKicker: 'Örnek tarif',
-  doneTitle: 'Tarifin *hazır!*',
-  doneHint: 'Malzemeler, ölçüler ve adımlar videodan çıkarıldı. Bir göz atıp onayladığında defterine eklenir.',
+  doneTitle: 'Tarifin *hazır*',
+  doneHint: 'Malzemeler, ölçüler ve adımlar videodan çıkarıldı. Göz atıp onayladığında defterine eklenir.',
+  doneRibbon: 'Defterine eklemeye hazır',
+  doneBadge: 'Videodan',
   doneCta: 'Harika, devam',
   finishCta: 'Mutfağa geç',
   replayFinishCta: 'Tamam',
@@ -129,7 +132,7 @@ export const COPY = {
   notifyNote: 'Kampanya ya da reklam bildirimi göndermeyiz. Profil’den istediğin zaman kapatabilirsin.',
   notifyAccept: 'Haber ver',
   notifyDecline: 'Şimdi değil',
-  wrongTap: 'Turuncu halkaya dokun ya da Devam’a bas.',
+  wrongTap: 'Vurgulanan alana dokun ya da Devam’a bas.',
 } as const;
 
 /** Static sample recipe for the success card. Local only. */
@@ -175,4 +178,116 @@ export function shouldShowSocialOnboarding(input: { entry: DemoEntry | null; use
 /** The optional notification card follows the existing permission rules (see notifications-core). */
 export function showNotifyCard(canOffer: boolean): boolean {
   return canOffer;
+}
+
+// ---- layout helpers (pure, tested) -----------------------------------------------------------
+
+/**
+ * Turkish-aware uppercase for kickers. `textTransform: 'uppercase'` is not
+ * locale aware on iOS ("Örnek tarif" → "ÖRNEK TARIF"), so kickers are
+ * uppercased here instead: i → İ, ı → I.
+ */
+export function trUpper(text: string): string {
+  return text.replace(/i/g, 'İ').replace(/ı/g, 'I').toUpperCase();
+}
+
+/** Height / width of the self-drawn phone. */
+export const PHONE_RATIO = 2.05;
+
+/**
+ * The phone mock's size for the space it is given: as large as fits (at most
+ * 600 pt tall, ~74% of the width), never taller than the stage, so it can
+ * never run under the footer on a small phone or at large Dynamic Type.
+ */
+export function phoneSize(stage: { width: number; height: number }): { width: number; height: number } | null {
+  if (!(stage.width > 0) || !(stage.height > 0)) return null;
+  const h = Math.floor(Math.min(stage.height - 12, stage.width * 0.74 * PHONE_RATIO, 600));
+  if (h < 120) return null;
+  return { width: Math.floor(h / PHONE_RATIO), height: h };
+}
+
+export type Rect = { x: number; y: number; width: number; height: number };
+export type TagSide = 'left' | 'top' | 'bottom' | 'right';
+export type TagPlacement = {
+  side: TagSide;
+  /** Top-left of the pill, in the phone screen's coordinates. */
+  x: number;
+  y: number;
+  /** Where the caret sits along the pill's edge that faces the target. */
+  caret: number;
+};
+
+export function rectsOverlap(a: Rect, b: Rect): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+function within(inner: Rect, outer: Rect): boolean {
+  const e = 0.5; // sub-pixel rounding
+  return inner.x >= outer.x - e && inner.y >= outer.y - e
+    && inner.x + inner.width <= outer.x + outer.width + e && inner.y + inner.height <= outer.y + outer.height + e;
+}
+
+const OPPOSITE: Record<TagSide, TagSide> = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
+const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
+
+/**
+ * Where the "Dokun" tag goes: next to the target on the preferred side, kept
+ * fully inside the phone screen (`bounds`), clear of the target and of any
+ * `avoid` rect (caption, rail). Falls back to the opposite side, then the
+ * other two; returns null when no side fits (the ring alone then marks the
+ * target, the tag is never drawn clipped or over content).
+ */
+export function placeTag(input: {
+  target: Rect;
+  tag: { width: number; height: number };
+  bounds: Rect;
+  prefer: TagSide;
+  /** Space between the target and the caret tip. */
+  gap: number;
+  /** How far the caret pokes out of the pill. */
+  caret: number;
+  avoid?: Rect[];
+  /**
+   * Sides allowed, in order. Defaults to the preferred side, its opposite,
+   * then the other two. The phone passes only the side it reserved room for,
+   * so the tag never lands on a sheet's other rows.
+   */
+  sides?: TagSide[];
+}): TagPlacement | null {
+  const { target: t, tag, bounds: b, gap, caret: c } = input;
+  if (!(tag.width > 0) || !(tag.height > 0)) return null;
+  const rest = (['left', 'top', 'bottom', 'right'] as TagSide[]).filter(s => s !== input.prefer && s !== OPPOSITE[input.prefer]);
+  const order: TagSide[] = input.sides && input.sides.length ? input.sides : [input.prefer, OPPOSITE[input.prefer], ...rest];
+  const cx = t.x + t.width / 2;
+  const cy = t.y + t.height / 2;
+  const r = Math.min(tag.height / 2, tag.width / 2);
+
+  for (const side of order) {
+    const vertical = side === 'top' || side === 'bottom';
+    let x: number;
+    let y: number;
+    let footprint: Rect;
+    if (vertical) {
+      x = clamp(cx - tag.width / 2, b.x, b.x + b.width - tag.width);
+      y = side === 'top' ? t.y - gap - c - tag.height : t.y + t.height + gap + c;
+      footprint = { x, y: side === 'top' ? y : y - c, width: tag.width, height: tag.height + c };
+    } else {
+      y = clamp(cy - tag.height / 2, b.y, b.y + b.height - tag.height);
+      x = side === 'left' ? t.x - gap - c - tag.width : t.x + t.width + gap + c;
+      footprint = { x: side === 'left' ? x : x - c, y, width: tag.width + c, height: tag.height };
+    }
+    if (tag.width > b.width || tag.height > b.height) continue;
+    if (!within(footprint, b)) continue;
+    // The caret must point at the target's centre from the pill's straight edge: a pill pushed
+    // sideways by the screen edge would otherwise point past the target. Beside the target
+    // (left/right) the rounded ends leave only the middle, so a clamped pill is rejected.
+    const caretAt = vertical ? cx - x : cy - y;
+    const lo = vertical ? r : tag.height / 2 - 1;
+    const hi = vertical ? tag.width - r : tag.height / 2 + 1;
+    if (caretAt < lo - 0.5 || caretAt > hi + 0.5) continue;
+    if (rectsOverlap(footprint, t)) continue;
+    if ((input.avoid || []).some(a => rectsOverlap(footprint, a))) continue;
+    return { side, x, y, caret: caretAt };
+  }
+  return null;
 }
